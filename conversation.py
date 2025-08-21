@@ -83,34 +83,10 @@ class ConversationManager:
                 logging.info(f"Siguiente pregunta para {equipment_type}, índice: {lead.current_question_index}")
                 self._sync_to_hubspot(lead)
             else:
-                # No hay más preguntas, cambiar al siguiente estado
-                conv['state'] = ConversationState.WAITING_DISTRIBUTOR
-                logging.info(f"Todas las preguntas completadas para {equipment_type}, cambiando a WAITING_DISTRIBUTOR")
+                # No hay más preguntas, cambiar al siguiente estado (cotización)
+                conv['state'] = ConversationState.WAITING_QUOTATION_DATA
+                logging.info(f"Todas las preguntas completadas para {equipment_type}, cambiando a WAITING_QUOTATION_DATA")
                 self._sync_to_hubspot(lead)
-
-        elif current_state == ConversationState.WAITING_DISTRIBUTOR:
-            is_distributor = self.llm.extract_field(message, "is_distributor")
-            logging.info(f"Tipo de cliente extraído: {is_distributor}")
-            
-            if is_distributor:
-                # Convertir a booleano
-                if is_distributor.lower() in ['true', 'verdadero', 'si', 'sí', 'yes']:
-                    lead.is_distributor = True
-                elif is_distributor.lower() in ['false', 'falso', 'no']:
-                    lead.is_distributor = False
-                else:
-                    # Intentar extraer con el nuevo método
-                    use_type = self.llm.extract_field(message, "use_type")
-                    if use_type == 'venta':
-                        lead.is_distributor = True
-                    elif use_type == 'uso_empresa':
-                        lead.is_distributor = False
-                    else:
-                        lead.is_distributor = None
-                
-                if lead.is_distributor is not None:
-                    conv['state'] = ConversationState.WAITING_QUOTATION_DATA
-                    self._sync_to_hubspot(lead)
 
         elif current_state == ConversationState.WAITING_QUOTATION_DATA:
             # Extraer todos los datos de cotización de una vez

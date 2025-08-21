@@ -11,7 +11,6 @@ class ConversationState(Enum):
     WAITING_NAME = "waiting_name"
     WAITING_EQUIPMENT = "waiting_equipment"
     WAITING_EQUIPMENT_QUESTIONS = "waiting_equipment_questions"
-    WAITING_DISTRIBUTOR = "waiting_distributor"
     WAITING_QUOTATION_DATA = "waiting_quotation_data"
     COMPLETED = "completed"
 

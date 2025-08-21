@@ -219,28 +219,17 @@ class LLMManager:
                 )
             return base_prompt + instrucciones
 
-        elif state == ConversationState.WAITING_DISTRIBUTOR:
-            instrucciones = (
-                "<<INSTRUCCIONES DEL SISTEMA (NO RESPONDER)>>\n"
-                "Estado: PREGUNTANDO SI ES DISTRIBUIDOR\n"
-                "INSTRUCCIÓN: Pregunta si es distribuidor de forma breve.\n"
-                "Ejemplo: '¿Es distribuidor?'\n"
-                "Mantén respuestas cortas (máximo 40 palabras).\n"
-                "<</INSTRUCCIONES>>"
-            )
-            return base_prompt + instrucciones
-
         elif state == ConversationState.WAITING_QUOTATION_DATA:
             instrucciones = (
                 "<<INSTRUCCIONES DEL SISTEMA (NO RESPONDER)>>\n"
                 "Estado: PIDIENDO DATOS DE COTIZACIÓN\n"
                 "INSTRUCCIÓN: Solicita todos los datos necesarios para la cotización en un solo mensaje.\n"
-                "Ejemplo: 'Para poder ayudarte con la cotización necesito estos datos:\n"
+                "MANDA ESTO: 'Para poder ayudarte con la cotización necesito estos datos:\n"
                 "1. ¿Es para uso de la empresa o para venta?\n"
                 "2. Nombre completo\n"
                 "3. Nombre y giro de tu empresa\n"
                 "4. Correo electrónico\n"
-                "5. Número telefónico'\n"
+                "4. Número telefónico'\n"
                 "Mantén respuestas claras y organizadas.\n"
                 "<</INSTRUCCIONES>>"
             )
@@ -255,7 +244,6 @@ class LLMManager:
             ConversationState.WAITING_NAME: "Para brindarte atención personalizada, ¿con quién tengo el gusto?",
             ConversationState.WAITING_EQUIPMENT: "¿Qué modelo o equipo requiere?",
             ConversationState.WAITING_EQUIPMENT_QUESTIONS: "¿Podrías darme más detalles sobre las características que necesitas?",
-            ConversationState.WAITING_DISTRIBUTOR: "¿Es distribuidor?",
             ConversationState.WAITING_QUOTATION_DATA: "Para poder ayudarte con la cotización necesito estos datos:\n1. ¿Es para uso de la empresa o para venta?\n2. Nombre completo\n3. Nombre y giro de tu empresa\n4. Correo electrónico\n5. Número telefónico"
         }
         return fallbacks.get(state, "¿Podrías repetir esa información?")
