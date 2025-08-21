@@ -1,10 +1,18 @@
+"""
+Chatbot automatizado para calificación de leads de maquinaria ligera
+Integra WhatsApp + Azure OpenAI GPT-4.1-mini + HubSpot CRM
+Azure Function para procesar webhooks de WhatsApp
+"""
+
 import azure.functions as func
 import logging
 import os
 import json
-import requests
-# from ai_integration import generate_gemini_response, generate_grok_response
-from ai_model import handle_lead_message
+from inventory import InventoryManager
+from hubspot import HubSpotManager
+from llm import LLMManager
+from conversation import ConversationManager
+from whatsapp_bot import WhatsAppBot
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
@@ -59,6 +67,36 @@ def verify(req):
         # Responds with '400 Bad Request' if verify tokens do not match
         logging.info("MISSING_PARAMETER")
         return func.HttpResponse("Missing parameters", status_code=400)
+    
+# Variables globales para los managers
+inventory_manager = None
+hubspot_manager = None
+llm_manager = None
+conversation_manager = None
+whatsapp_bot = None
+
+def initialize_managers():
+    """Inicializa los managers globales si no están inicializados"""
+    global inventory_manager, hubspot_manager, llm_manager, conversation_manager, whatsapp_bot
+    
+    if conversation_manager is None:
+        try:
+            inventory_manager = InventoryManager()
+            hubspot_manager = HubSpotManager(os.environ["HUBSPOT_TOKEN"])
+            llm_manager = LLMManager(os.environ["FOUNDRY_API_KEY"])
+            
+            conversation_manager = ConversationManager(
+                inventory_manager,
+                hubspot_manager, 
+                llm_manager
+            )
+            
+            whatsapp_bot = WhatsAppBot(conversation_manager)
+            logging.info("Managers inicializados correctamente")
+            
+        except Exception as e:
+            logging.error(f"Error inicializando managers: {e}")
+            raise
 
 def handle_message(req):
     """
@@ -109,8 +147,7 @@ def is_valid_whatsapp_message(body):
 def process_whatsapp_message(body):
     """
     Processes the WhatsApp message and sends appropriate response.
-    For text messages: converts to uppercase and sends back.
-    For other message types: sends a help message.
+    Uses the conversation manager and WhatsApp bot for intelligent responses.
     """
     logging.info("process_whatsapp_message - Start")
 
@@ -121,8 +158,11 @@ def process_whatsapp_message(body):
     logging.info(f"name: {name}")
     logging.info(f"Saved wa_id: {os.environ['RECIPIENT_WAID']}") # Debugging line
 
-    # Safeguard against unauthorized users (optional - remove if you want to allow all users)
-    if not (wa_id == os.environ["RECIPIENT_WAID"] or wa_id == "5212212122080" or wa_id == "5219512397285"):
+    # Initialize managers if needed
+    initialize_managers()
+
+    # Safeguard against unauthorized users
+    if not whatsapp_bot.is_authorized_user(wa_id):
         logging.error("Unauthorized user!!!")
         return
 
@@ -131,124 +171,22 @@ def process_whatsapp_message(body):
     logging.info(f"message: {message}")
 
     if "text" in message:
-        # Handle text messages - convert to uppercase and echo back
+        # Handle text messages with AI conversation manager
         logging.info(f"Message Type: TEXT")
         message_body = message["text"]["body"]
         logging.info(f"message_body: {message_body}")
         
-        # Generate response using Gemini API and Grok API
-        # gemini_message = generate_gemini_response(message_body)
-        # grok_message = generate_grok_response(message_body)
-        # final_message = f"Gemini Response:\n{gemini_message}\n\nGrok Response:\n{grok_message}"
-
-        # Handle lead message with AI model
-        final_message = handle_lead_message(wa_id, message_body)
-
-        # Send the final message back
-        data = get_text_message_input(wa_id, final_message)
-        send_message(data)
+        # Process message with conversation manager
+        try:
+            response = whatsapp_bot.process_message(wa_id, message_body)
+            whatsapp_bot.send_message(wa_id, response)
+        except Exception as e:
+            logging.error(f"Error processing message: {e}")
+            error_message = "Disculpa, hubo un problema técnico. ¿Podrías repetir tu mensaje?"
+            whatsapp_bot.send_message(wa_id, error_message)
         
     else:
         # Handle non-text messages with a help message
         logging.info(f"Message Type: NON-TEXT")
-        help_text = "Hi! I can only convert text messages to UPPERCASE. Please send me a text message and I'll reply with it in capital letters!"
-        data = get_text_message_input(wa_id, help_text)
-        send_message(data)
-
-def normalize_mexican_number(phone_number: str) -> str:
-    """
-    Normaliza un número mexicano en formato internacional para que sea aceptado por la API de WhatsApp.
-    Si el número comienza con '521' (México + celular), elimina el '1' extra.
-
-    Args:
-        phone_number: Número de teléfono en formato internacional (ej. '5212345678901')
-
-    Returns:
-        Número de teléfono normalizado (ej. '522345678901')
-    """
-    if phone_number.startswith("521") and len(phone_number) >= 12:
-        return "52" + phone_number[3:]
-    return phone_number
-
-def get_text_message_input(recipient, text):
-    """
-    Creates the JSON payload for sending a text message via WhatsApp API.
-    
-    Args:
-        recipient: WhatsApp ID of the recipient
-        text: Text message to send
-        
-    Returns:
-        JSON string formatted for WhatsApp API
-    """
-    normalized_recipient = normalize_mexican_number(recipient)
-    return json.dumps(
-        {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": normalized_recipient,
-            "type": "text",
-            "text": {
-                "preview_url": False, 
-                "body": text
-            },
-        }
-    )
-
-def send_message(data):
-    """
-    Sends a message to WhatsApp API.
-    
-    Args:
-        data: JSON payload for the message
-        
-    Returns:
-        HTTP response from the API
-    """
-    logging.info("send_message - Start")
-
-    headers = {
-        "Content-type": "application/json",
-        "Authorization": f"Bearer {os.environ['ACCESS_TOKEN']}",
-    }
-
-    url = f"https://graph.facebook.com/{os.environ['VERSION']}/{os.environ['PHONE_NUMBER_ID']}/messages"
-    return send_post_request_to_graph_facebook(url, data, headers)
-
-
-def log_http_response(response):
-    """
-    Logs HTTP response details for debugging.
-    """
-    logging.info(f"Status: {response.status_code}")
-    logging.info(f"Content-type: {response.headers.get('content-type')}")
-    logging.info(f"Body: {response.text}")
-
-
-def send_post_request_to_graph_facebook(url, data, headers):
-    """
-    Sends a POST request to Facebook Graph API with proper error handling.
-    
-    Args:
-        url: API endpoint URL
-        data: JSON payload
-        headers: HTTP headers
-        
-    Returns:
-        HTTP response or error response
-    """
-    logging.info(f"send_post_request_to_graph_facebook - Start, url: {url}")
-
-    try:
-        response = requests.post(url, data=data, headers=headers, timeout=10)
-        response.raise_for_status()  # Raises HTTPError for bad status codes
-    except requests.Timeout:
-        logging.error("Timeout occurred while sending message")
-        return func.HttpResponse("Request timed out", status_code=408)
-    except requests.RequestException as e:
-        logging.error(f"Request failed due to: {e}")
-        return func.HttpResponse("Failed to send message", status_code=500)
-    else:
-        # Process the response as normal
-        log_http_response(response)
-        return response
+        help_text = "¡Hola! Solo puedo procesar mensajes de texto. Por favor, envíame un mensaje de texto y te responderé con información sobre maquinaria."
+        whatsapp_bot.send_message(wa_id, help_text)

@@ -3,6 +3,9 @@
 # Manually managing azure-functions-worker may cause unexpected issues
 
 azure-functions
-requests
 openai
-pydantic
+
+# Dependencias principales
+
+# Para refresh token de HubSpot
+requests
