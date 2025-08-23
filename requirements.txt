@@ -2,10 +2,17 @@
 # The Python Worker is managed by Azure Functions platform
 # Manually managing azure-functions-worker may cause unexpected issues
 
+# Azure Functions
 azure-functions
+
+# OpenAI
 openai
 
-# Dependencias principales
-
-# Para refresh token de HubSpot
+# Requests
 requests
+
+# LangChain packages
+langchain
+langchain-openai
+langchain-core
+pydantic
