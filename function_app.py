@@ -29,18 +29,6 @@ def whatsappbot1(req: func.HttpRequest) -> func.HttpResponse:
         return handle_message(req)
     else:
         return verify(req)
-    
-@app.route(route="login")
-def login(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Handles login request.
-    """
-    logging.info("login - Start")
-    body = req.get_json()
-    if body.get("username") == "admin" and body.get("password") == "admin":
-        return func.HttpResponse("Login successful", status_code=200)
-    else:
-        return func.HttpResponse("Login failed", status_code=401)
 
 def verify(req):
     """
