@@ -1,6 +1,6 @@
 """
 Chatbot automatizado para calificación de leads de maquinaria ligera
-Integra WhatsApp + Azure OpenAI GPT-4.1-mini + HubSpot CRM
+Integra WhatsApp + Azure OpenAI GPT-4.1-mini + LangChain
 Azure Function para procesar webhooks de WhatsApp
 """
 
@@ -8,10 +8,6 @@ import azure.functions as func
 import logging
 import os
 import json
-from inventory import InventoryManager
-from hubspot import HubSpotManager
-from llm import LLMManager
-from conversation import ConversationManager
 from whatsapp_bot import WhatsAppBot
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
@@ -68,34 +64,20 @@ def verify(req):
         logging.info("MISSING_PARAMETER")
         return func.HttpResponse("Missing parameters", status_code=400)
     
-# Variables globales para los managers
-inventory_manager = None
-hubspot_manager = None
-llm_manager = None
-conversation_manager = None
+# Variable global para el bot de WhatsApp
 whatsapp_bot = None
 
-def initialize_managers():
-    """Inicializa los managers globales si no están inicializados"""
-    global inventory_manager, hubspot_manager, llm_manager, conversation_manager, whatsapp_bot
+def initialize_whatsapp_bot():
+    """Inicializa el bot de WhatsApp si no está inicializado"""
+    global whatsapp_bot
     
-    if conversation_manager is None:
+    if whatsapp_bot is None:
         try:
-            inventory_manager = InventoryManager()
-            hubspot_manager = HubSpotManager(os.environ["HUBSPOT_TOKEN"])
-            llm_manager = LLMManager(os.environ["FOUNDRY_API_KEY"])
-            
-            conversation_manager = ConversationManager(
-                inventory_manager,
-                hubspot_manager, 
-                llm_manager
-            )
-            
-            whatsapp_bot = WhatsAppBot(conversation_manager)
-            logging.info("Managers inicializados correctamente")
+            whatsapp_bot = WhatsAppBot()
+            logging.info("WhatsApp bot inicializado correctamente")
             
         except Exception as e:
-            logging.error(f"Error inicializando managers: {e}")
+            logging.error(f"Error inicializando WhatsApp bot: {e}")
             raise
 
 def handle_message(req):
@@ -158,8 +140,8 @@ def process_whatsapp_message(body):
     logging.info(f"name: {name}")
     logging.info(f"Saved wa_id: {os.environ['RECIPIENT_WAID']}") # Debugging line
 
-    # Initialize managers if needed
-    initialize_managers()
+    # Initialize WhatsApp bot if needed
+    initialize_whatsapp_bot()
 
     # Safeguard against unauthorized users
     if not whatsapp_bot.is_authorized_user(wa_id):
