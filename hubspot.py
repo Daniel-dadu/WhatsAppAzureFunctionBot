@@ -5,7 +5,6 @@ Integración con HubSpot CRM
 import requests
 import os
 from typing import Dict, Optional, Callable, Any
-from models import Lead
 import logging
 
 
@@ -51,103 +50,103 @@ class HubSpotManager:
             logging.error(f"Excepción al refrescar token de HubSpot: {e}")
             return False
 
-    def create_or_update_contact(self, lead: Lead) -> Optional[str]:
-        """Crea o actualiza un contacto en HubSpot, refrescando el token si es necesario"""
-        def _core():
-            # Preparar propiedades del contacto
-            properties = {
-                "wa_id": lead.wa_id,
-                "whatsapp_lead": "true",
-                "lifecyclestage": "lead"
-            }
-            if lead.name:
-                properties["firstname"] = lead.name
-            if lead.company_name:
-                properties["empresa_asociada"] = lead.company_name
-            if lead.phone:
-                properties["phone"] = lead.phone
-            if lead.email:
-                properties["email"] = lead.email
-            if lead.equipment_interest:
-                properties["equipo_interesado"] = lead.equipment_interest
+    # def create_or_update_contact(self, lead: Lead) -> Optional[str]:
+    #     """Crea o actualiza un contacto en HubSpot, refrescando el token si es necesario"""
+    #     def _core():
+    #         # Preparar propiedades del contacto
+    #         properties = {
+    #             "wa_id": lead.wa_id,
+    #             "whatsapp_lead": "true",
+    #             "lifecyclestage": "lead"
+    #         }
+    #         if lead.name:
+    #             properties["firstname"] = lead.name
+    #         if lead.company_name:
+    #             properties["empresa_asociada"] = lead.company_name
+    #         if lead.phone:
+    #             properties["phone"] = lead.phone
+    #         if lead.email:
+    #             properties["email"] = lead.email
+    #         if lead.equipment_interest:
+    #             properties["equipo_interesado"] = lead.equipment_interest
             
-            # TODO: Agregar campo para giro de empresa cuando se cree en HubSpot
-            # if lead.company_business:
-            #     properties["giro_empresa"] = lead.company_business
+    #         # TODO: Agregar campo para giro de empresa cuando se cree en HubSpot
+    #         # if lead.company_business:
+    #         #     properties["giro_empresa"] = lead.company_business
             
-            # TODO: Agregar campo para características de máquina cuando se cree en HubSpot
-            # if lead.machine_characteristics:
-            #     properties["caracteristicas_maquina"] = "; ".join(lead.machine_characteristics)
+    #         # TODO: Agregar campo para características de máquina cuando se cree en HubSpot
+    #         # if lead.machine_characteristics:
+    #         #     properties["caracteristicas_maquina"] = "; ".join(lead.machine_characteristics)
             
-            # TODO: Agregar campo para tipo de cliente (distribuidor/cliente final) cuando se cree en HubSpot
-            # if lead.is_distributor is not None:
-            #     properties["tipo_cliente"] = "distribuidor" if lead.is_distributor else "cliente_final"
+    #         # TODO: Agregar campo para tipo de cliente (distribuidor/cliente final) cuando se cree en HubSpot
+    #         # if lead.is_distributor is not None:
+    #         #     properties["tipo_cliente"] = "distribuidor" if lead.is_distributor else "cliente_final"
             
-            logging.info(f"Preparando contacto para HubSpot - WhatsApp ID: {lead.wa_id}")
-            logging.info(f"Propiedades a enviar: {properties}")
+    #         logging.info(f"Preparando contacto para HubSpot - WhatsApp ID: {lead.wa_id}")
+    #         logging.info(f"Propiedades a enviar: {properties}")
             
-            # Intentar actualizar contacto existente primero
-            if lead.hubspot_contact_id:
-                result = self._update_contact(lead.hubspot_contact_id, properties)
-                if result:
-                    return result
-            # Buscar contacto existente por wa_id
-            existing_contact = self._find_contact_by_wa_id(lead.wa_id)
-            if existing_contact:
-                result = self._update_contact(existing_contact, properties)
-                if result:
-                    return result
-            # Crear nuevo contacto
-            logging.info("Creando nuevo contacto en HubSpot")
-            return self._create_contact(properties)
-        try:
-            return _core()
-        except Exception as e:
-            logging.error(f"Error en HubSpot: {e}")
-            return None
+    #         # Intentar actualizar contacto existente primero
+    #         if lead.hubspot_contact_id:
+    #             result = self._update_contact(lead.hubspot_contact_id, properties)
+    #             if result:
+    #                 return result
+    #         # Buscar contacto existente por wa_id
+    #         existing_contact = self._find_contact_by_wa_id(lead.wa_id)
+    #         if existing_contact:
+    #             result = self._update_contact(existing_contact, properties)
+    #             if result:
+    #                 return result
+    #         # Crear nuevo contacto
+    #         logging.info("Creando nuevo contacto en HubSpot")
+    #         return self._create_contact(properties)
+    #     try:
+    #         return _core()
+    #     except Exception as e:
+    #         logging.error(f"Error en HubSpot: {e}")
+    #         return None
     
-    def create_new_contact(self, lead: Lead) -> Optional[str]:
-        """Crea un nuevo contacto en HubSpot sin verificar si existe uno previo"""
-        def _core():
-            # Preparar propiedades del contacto
-            properties = {
-                "wa_id": lead.wa_id,
-                "whatsapp_lead": "true",
-                "lifecyclestage": "lead"
-            }
-            if lead.name:
-                properties["firstname"] = lead.name
-            if lead.company_name:
-                properties["empresa_asociada"] = lead.company_name
-            if lead.phone:
-                properties["phone"] = lead.phone
-            if lead.email:
-                properties["email"] = lead.email
-            if lead.equipment_interest:
-                properties["equipo_interesado"] = lead.equipment_interest
+    # def create_new_contact(self, lead: Lead) -> Optional[str]:
+    #     """Crea un nuevo contacto en HubSpot sin verificar si existe uno previo"""
+    #     def _core():
+    #         # Preparar propiedades del contacto
+    #         properties = {
+    #             "wa_id": lead.wa_id,
+    #             "whatsapp_lead": "true",
+    #             "lifecyclestage": "lead"
+    #         }
+    #         if lead.name:
+    #             properties["firstname"] = lead.name
+    #         if lead.company_name:
+    #             properties["empresa_asociada"] = lead.company_name
+    #         if lead.phone:
+    #             properties["phone"] = lead.phone
+    #         if lead.email:
+    #             properties["email"] = lead.email
+    #         if lead.equipment_interest:
+    #             properties["equipo_interesado"] = lead.equipment_interest
             
-            # TODO: Agregar campo para giro de empresa cuando se cree en HubSpot
-            # if lead.company_business:
-            #     properties["giro_empresa"] = lead.company_business
+    #         # TODO: Agregar campo para giro de empresa cuando se cree en HubSpot
+    #         # if lead.company_business:
+    #         #     properties["giro_empresa"] = lead.company_business
             
-            # TODO: Agregar campo para características de máquina cuando se cree en HubSpot
-            # if lead.machine_characteristics:
-            #     properties["caracteristicas_maquina"] = "; ".join(lead.machine_characteristics)
+    #         # TODO: Agregar campo para características de máquina cuando se cree en HubSpot
+    #         # if lead.machine_characteristics:
+    #         #     properties["caracteristicas_maquina"] = "; ".join(lead.machine_characteristics)
             
-            # TODO: Agregar campo para tipo de cliente (distribuidor/cliente final) cuando se cree en HubSpot
-            # if lead.is_distributor is not None:
-            #     properties["tipo_cliente"] = "distribuidor" if lead.is_distributor else "cliente_final"
+    #         # TODO: Agregar campo para tipo de cliente (distribuidor/cliente final) cuando se cree en HubSpot
+    #         # if lead.is_distributor is not None:
+    #         #     properties["tipo_cliente"] = "distribuidor" if lead.is_distributor else "cliente_final"
             
-            logging.info(f"Creando nuevo contacto en HubSpot para reset - WhatsApp ID: {lead.wa_id}")
-            logging.info(f"Propiedades a enviar: {properties}")
+    #         logging.info(f"Creando nuevo contacto en HubSpot para reset - WhatsApp ID: {lead.wa_id}")
+    #         logging.info(f"Propiedades a enviar: {properties}")
             
-            return self._create_contact(properties)
+    #         return self._create_contact(properties)
         
-        try:
-            return _core()
-        except Exception as e:
-            logging.error(f"Error creando nuevo contacto en HubSpot: {e}")
-            return None
+    #     try:
+    #         return _core()
+    #     except Exception as e:
+    #         logging.error(f"Error creando nuevo contacto en HubSpot: {e}")
+    #         return None
     
     def _create_contact(self, properties: Dict) -> Optional[str]:
         """Crea un nuevo contacto"""

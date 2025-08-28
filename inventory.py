@@ -3,8 +3,15 @@ Gestión del inventario de maquinaria
 """
 
 from typing import List
-from models import InventoryItem
 import logging
+from dataclasses import dataclass
+
+
+@dataclass
+class InventoryItem:
+    tipo_maquina: str
+    modelo: str
+    ubicacion: str
 
 class InventoryManager:
     def __init__(self):
