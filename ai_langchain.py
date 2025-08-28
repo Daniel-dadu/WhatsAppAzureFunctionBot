@@ -1,12 +1,12 @@
 import json
 import os
-from typing import TypedDict, Dict, Any, Optional, List
-from enum import Enum
+from typing import Dict, Any, Optional, List
 from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 import langchain
+from state_management import MaquinariaType, ConversationState, ConversationStateStore, InMemoryStateStore
 
 langchain.debug = False
 langchain.verbose = False
@@ -48,14 +48,6 @@ def get_inventory():
 # MODELOS DE DATOS
 # ============================================================================
 
-class MaquinariaType(str, Enum):
-    SOLDADORAS = "soldadoras"
-    COMPRESOR = "compresor"
-    TORRE_ILUMINACION = "torre_iluminacion"
-    LGMG = "lgmg"
-    GENERADORES = "generadores"
-    ROMPEDORES = "rompedores"
-
 class DetallesSoldadora(BaseModel):
     amperaje: Optional[str] = Field(None, description="Amperaje requerido para la soldadora")
     electrodo: Optional[str] = Field(None, description="Tipo de electrodo que quema")
@@ -79,20 +71,6 @@ class DetallesGenerador(BaseModel):
 class DetallesRompedor(BaseModel):
     uso: Optional[str] = Field(None, description="Para qué lo va a utilizar")
     tipo: Optional[str] = Field(None, description="Si lo requiere eléctrico o neumático")
-
-class ConversationState(TypedDict):
-    messages: List[Dict[str, str]]
-    nombre: Optional[str]
-    tipo_maquinaria: Optional[MaquinariaType]
-    detalles_maquinaria: Dict[str, Any]
-    sitio_web: Optional[str]
-    uso_empresa_o_venta: Optional[str]
-    nombre_completo: Optional[str]
-    nombre_empresa: Optional[str]
-    giro_empresa: Optional[str]
-    correo: Optional[str]
-    telefono: Optional[str]
-    completed: bool
 
 # ============================================================================
 # DICCIONARIO CON CONFIGURACIÓN DE MAQUINARIA
@@ -848,17 +826,23 @@ class InventoryResponder:
 class IntelligentLeadQualificationChatbot:
     """Chatbot con slot-filling inteligente que detecta información ya proporcionada"""
     
-    def __init__(self, azure_config: AzureOpenAIConfig):
+    def __init__(self, azure_config: AzureOpenAIConfig, state_store: Optional[ConversationStateStore] = None):
         self.azure_config = azure_config
         self.llm = azure_config.create_llm()
         self.slot_filler = IntelligentSlotFiller(self.llm)
         self.response_generator = IntelligentResponseGenerator(self.llm)
         self.inventory_responder = InventoryResponder(self.llm)
-        self.reset_conversation()
-    
-    def reset_conversation(self):
-        """Reinicia el estado de la conversación"""
-        self.state = {
+        
+        # Usar el state_store proporcionado o crear uno en memoria por defecto
+        self.state_store = state_store or InMemoryStateStore()
+        self.current_user_id = None
+        
+        # El estado local sigue existiendo para compatibilidad con código existente
+        self.state = self._create_empty_state()
+
+    def _create_empty_state(self) -> ConversationState:
+        """Crea un estado vacío"""
+        return {
             "messages": [],
             "nombre": None,
             "tipo_maquinaria": None,
@@ -873,10 +857,41 @@ class IntelligentLeadQualificationChatbot:
             "completed": False
         }
     
-    def send_message(self, user_message: str) -> str:
-        """Procesa un mensaje del usuario con slot-filling inteligente, validación de respuestas específicas, respuestas sobre inventario y manejo de preguntas sobre requerimientos"""
+    def load_conversation(self, user_id: str):
+        """Carga la conversación de un usuario específico"""
+        self.current_user_id = user_id
+        stored_state = self.state_store.get_conversation_state(user_id)
+        
+        if stored_state:
+            self.state = stored_state
+            debug_print(f"DEBUG: Estado cargado para usuario {user_id}")
+        else:
+            self.state = self._create_empty_state()
+            debug_print(f"DEBUG: Nuevo estado creado para usuario {user_id}")
+
+    def save_conversation(self):
+        """Guarda el estado actual de la conversación"""
+        if self.current_user_id:
+            self.state_store.save_conversation_state(self.current_user_id, self.state)
+            debug_print(f"DEBUG: Estado guardado para usuario {self.current_user_id}")
+
+    def reset_conversation(self):
+        """Reinicia el estado de la conversación"""
+        if self.current_user_id:
+            self.state_store.delete_conversation_state(self.current_user_id)
+        self.state = self._create_empty_state()
+    
+    def send_message(self, user_message: str, user_id: Optional[str] = None) -> str:
+        """
+        Procesa un mensaje del usuario con slot-filling inteligente
+        Si se proporciona user_id, carga/guarda automáticamente el estado
+        """
         
         try:
+            # Si se proporciona user_id, cargar la conversación
+            if user_id:
+                self.load_conversation(user_id)
+
             debug_print(f"DEBUG: send_message llamado con mensaje: '{user_message}'")
             
             # Si el mensaje está vacío, no hacer nada y esperar al usuario
@@ -911,6 +926,9 @@ class IntelligentLeadQualificationChatbot:
             if self.inventory_responder.is_inventory_question(user_message):
                 debug_print(f"DEBUG: Pregunta sobre inventario detectada, generando respuesta...")
                 inventory_response = self.inventory_responder.generate_inventory_response(user_message)
+
+                # Si es el primer mensaje, agregar saludo inicial, el cual ya se agregó al contextual_response
+                inventory_response = contextual_response + inventory_response
                 
                 # Obtener la siguiente pregunta necesaria para continuar el flujo
                 next_question = self.slot_filler.get_next_question(self.state)
@@ -918,14 +936,10 @@ class IntelligentLeadQualificationChatbot:
                 if next_question:
                     the_question = next_question["question"]
                     # Combinar respuesta de inventario con la siguiente pregunta
-                    full_response = f"{inventory_response}\n\n{the_question}"
-                    self.state["messages"].append({"role": "assistant", "content": full_response})
-                    debug_print(f"DEBUG: Respuesta combinada (inventario + siguiente pregunta): {full_response}")
-                    return full_response
-                else:
-                    # No hay más preguntas, solo responder sobre inventario
-                    self.state["messages"].append({"role": "assistant", "content": inventory_response})
-                    return inventory_response
+                    inventory_response = f"{inventory_response}\n\n{the_question}"
+                    debug_print(f"DEBUG: Respuesta combinada (inventario + siguiente pregunta): {inventory_response}")
+                
+                return self._add_message_and_return_response("assistant", inventory_response)
             
             # Si no es pregunta de inventario ni de requerimientos, continuar con el flujo normal
             debug_print(f"DEBUG: Flujo normal de calificación de leads...")
@@ -935,8 +949,7 @@ class IntelligentLeadQualificationChatbot:
                 debug_print(f"DEBUG: Conversación completa!")
                 self.state["completed"] = True
                 final_response = self.response_generator.generate_final_response(self.state)
-                self.state["messages"].append({"role": "assistant", "content": final_response})
-                return final_response
+                return self._add_message_and_return_response("assistant", final_response)
             
             # Obtener la siguiente pregunta necesaria
             next_question = self.slot_filler.get_next_question(self.state)
@@ -944,8 +957,7 @@ class IntelligentLeadQualificationChatbot:
             if next_question == None:
                 debug_print(f"DEBUG: Estado completo: {self.state}")
                 final_message = "Gracias por toda la información. Estoy procesando su solicitud."
-                self.state["messages"].append({"role": "assistant", "content": final_message})
-                return final_message
+                return self._add_message_and_return_response("assistant", final_message)
 
             next_question_str = next_question["question"]
 
@@ -953,7 +965,6 @@ class IntelligentLeadQualificationChatbot:
 
             next_question_type = next_question['question_type']
             debug_print(f"DEBUG: Tipo de siguiente pregunta: {next_question_type}")
-
 
             # Para preguntas específicas de maquinaria, generar respuesta simple sin LLM
             if next_question["question_type"] == "detalles_maquinaria":
@@ -981,12 +992,22 @@ class IntelligentLeadQualificationChatbot:
                 )
                 contextual_response += generated_response
 
-            self.state["messages"].append({"role": "assistant", "content": contextual_response})
-            return contextual_response
+            return self._add_message_and_return_response("assistant", contextual_response)
         
         except Exception as e:
             print(f"Error procesando mensaje: {e}")
             return "Disculpe, hubo un error técnico. ¿Podría intentar de nuevo?"
+        
+    def _add_message_and_return_response(self, message_type: str, response: str) -> str:
+        """
+        Añade un mensaje al estado y devuelve la respuesta final
+        """
+        self.state["messages"].append({"role": message_type, "content": response})
+        
+        # Al final, guardar el estado
+        self.save_conversation()
+
+        return response
     
     def _update_state_with_extracted_info(self, extracted_info: Dict[str, Any]):
         """

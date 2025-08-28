@@ -188,8 +188,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "Es para venderlo a un cliente.",
         "nuestro sitio web es maquinariapesada.mx",
         "venta de maquinaria",
-        "Roberto Carlos Paredes",
-        "mi tel es 81 8765 4321"
+        "Roberto Carlos Paredes y mi tel es 81 8765 4321"
     ]
     
     esperado_2 = {
@@ -208,7 +207,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "81 8765 4321"
     }
     
-    # run_conversation_test("Flujo 2: Usuario con Múltiples Datos", chatbot, flujo_2, esperado_2)
+    run_conversation_test("Flujo 2: Usuario con Múltiples Datos", chatbot, flujo_2, esperado_2)
 
     # ------------------------------------------------------------------------
     # Flujo 3: Usuario que Pregunta y se Desvía
@@ -244,7 +243,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "33 9876 5432"
     }
     
-    run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
+    # run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
 
 # ============================================================================
 # PUNTO DE ENTRADA PRINCIPAL

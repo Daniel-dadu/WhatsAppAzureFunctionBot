@@ -7,13 +7,15 @@ import logging
 import os
 import requests
 from ai_langchain import AzureOpenAIConfig, IntelligentLeadQualificationChatbot
+from state_management import ConversationStateStore, InMemoryStateStore
+from typing import Optional
 
 # ============================================================================
 # CLASE PRINCIPAL DEL BOT DE WHATSAPP
 # ============================================================================
 
 class WhatsAppBot:
-    def __init__(self):
+    def __init__(self, state_store: Optional[ConversationStateStore] = None):
         self.access_token = os.environ['WHATSAPP_ACCESS_TOKEN']
         self.phone_number_id = os.environ['PHONE_NUMBER_ID']
         self.version = os.environ['WHATSAPP_API_VERSION']
@@ -22,8 +24,11 @@ class WhatsAppBot:
         self.langchain_config = None
         self._initialize_langchain_config()
         
-        # Diccionario para mantener el estado de las conversaciones por usuario
-        self.conversations = {}
+        # Usar el state_store proporcionado o crear uno por defecto
+        self.state_store = state_store or InMemoryStateStore()
+
+        # Una sola instancia del chatbot que manejará todos los usuarios
+        self.chatbot = IntelligentLeadQualificationChatbot(self.langchain_config, self.state_store)
         
     def _initialize_langchain_config(self):
         """Inicializa la configuración de LangChain con Azure OpenAI"""
@@ -98,45 +103,27 @@ class WhatsAppBot:
             elif message_text.lower() == "status":
                 return self._get_conversation_status(wa_id)
             
-            # Procesar mensaje con LangChain
-            return self._process_message_with_langchain(wa_id, message_text)
+            # Procesar mensaje con LangChain - ahora pasamos el user_id
+            response = self.chatbot.send_message(message_text, user_id=wa_id)
+
+            # Verificar si la conversación está completa
+            self.chatbot.load_conversation(wa_id)  # Cargar para verificar estado
+            if self.chatbot.state["completed"]:
+                logging.info(f"Conversación completada para usuario {wa_id}")
+                # TODO: aquí podrías sincronizar con HubSpot si es necesario
                 
+            return response
+            
         except Exception as e:
             logging.error(f"Error procesando mensaje: {e}")
             return "Disculpa, hubo un problema técnico. ¿Podrías repetir tu mensaje?"
     
     def _handle_reset_command(self, wa_id: str) -> str:
         """Maneja el comando de reset"""
-        if wa_id in self.conversations:
-            del self.conversations[wa_id]
-            logging.info(f"Conversación reiniciada para usuario {wa_id}")
+        self.chatbot.load_conversation(wa_id)
+        self.chatbot.reset_conversation()
+        logging.info(f"Conversación reiniciada para usuario {wa_id}")
         return "Conversación reiniciada. Puedes comenzar de nuevo."
-    
-    def _process_message_with_langchain(self, wa_id: str, message_text: str) -> str:
-        """Procesa mensaje usando la API de LangChain"""
-        try:
-            # Obtener o crear instancia del chatbot para este usuario
-            if wa_id not in self.conversations:
-                self.conversations[wa_id] = IntelligentLeadQualificationChatbot(self.langchain_config)
-                logging.info(f"Nueva conversación iniciada para usuario {wa_id}")
-            
-            chatbot = self.conversations[wa_id]
-            
-            # Procesar mensaje con LangChain
-            response = chatbot.send_message(message_text)
-            
-            # Verificar si la conversación está completa
-            if chatbot.state["completed"]:
-                logging.info(f"Conversación completada para usuario {wa_id}")
-                # Opcional: aquí podrías sincronizar con HubSpot si es necesario
-                
-            return response
-            
-        except Exception as e:
-            logging.error(f"Error procesando mensaje con LangChain: {e}")
-            return "Disculpa, hubo un problema técnico. ¿Podrías repetir tu mensaje?"
-    
-
     
     def is_authorized_user(self, wa_id: str) -> bool:
         """
@@ -150,36 +137,26 @@ class WhatsAppBot:
         return wa_id in authorized_ids
     
     def get_conversation_summary(self, wa_id: str) -> dict:
-        """
-        Obtiene un resumen de la conversación actual del usuario.
-        """
-        if wa_id in self.conversations:
-            return self.conversations[wa_id].get_conversation_summary()
-        else:
-            return {"error": "No hay conversación activa para este usuario"}
+        """Obtiene un resumen de la conversación actual del usuario."""
+        self.chatbot.load_conversation(wa_id)
+        return self.chatbot.get_conversation_summary()
     
     def _get_conversation_status(self, wa_id: str) -> str:
-        """
-        Obtiene el estado actual de la conversación del usuario.
-        Útil para debugging y monitoreo.
-        """
+        """Obtiene el estado actual de la conversación del usuario."""
         try:
-            if wa_id in self.conversations:
-                chatbot = self.conversations[wa_id]
-                state = chatbot.state
-                return f"""📊 ESTADO DE CONVERSACIÓN:
-🤖 API: LangChain (IntelligentLeadQualificationChatbot)
-👤 Usuario: {wa_id}
-✅ Completada: {'Sí' if state.get('completed', False) else 'No'}
-📝 Nombre: {state.get('nombre', 'No especificado')}
-🔧 Tipo maquinaria: {state.get('tipo_maquinaria', 'No especificado')}
-🌐 Sitio web: {state.get('sitio_web', 'No especificado')}
-💼 Uso: {state.get('uso_empresa_o_venta', 'No especificado')}
-📧 Correo: {state.get('correo', 'No especificado')}
-📱 Teléfono: {state.get('telefono', 'No especificado')}
-💬 Total mensajes: {len(state.get('messages', []))}"""
-            else:
-                return f"📊 No hay conversación activa para el usuario {wa_id}"
+            self.chatbot.load_conversation(wa_id)
+            state = self.chatbot.state
+            return f"""📊 ESTADO DE CONVERSACIÓN:
+        🤖 API: LangChain (IntelligentLeadQualificationChatbot)
+        👤 Usuario: {wa_id}
+        ✅ Completada: {'Sí' if state.get('completed', False) else 'No'}
+        📝 Nombre: {state.get('nombre', 'No especificado')}
+        🔧 Tipo maquinaria: {state.get('tipo_maquinaria', 'No especificado')}
+        🌐 Sitio web: {state.get('sitio_web', 'No especificado')}
+        💼 Uso: {state.get('uso_empresa_o_venta', 'No especificado')}
+        📧 Correo: {state.get('correo', 'No especificado')}
+        📱 Teléfono: {state.get('telefono', 'No especificado')}
+        💬 Total mensajes: {len(state.get('messages', []))}"""
         except Exception as e:
             logging.error(f"Error obteniendo estado de conversación: {e}")
             return f"❌ Error obteniendo estado: {str(e)}"

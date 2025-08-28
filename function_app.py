@@ -9,6 +9,7 @@ import logging
 import os
 import json
 from whatsapp_bot import WhatsAppBot
+from state_management import InMemoryStateStore
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
@@ -73,7 +74,13 @@ def initialize_whatsapp_bot():
     
     if whatsapp_bot is None:
         try:
-            whatsapp_bot = WhatsAppBot()
+            # Crear el state store apropiado para producción
+            # Aquí inicializarías tu CosmosDBStateStore
+            # cosmos_state_store = CosmosDBStateStore(cosmos_client, db_name, container_name)
+
+            state_store = InMemoryStateStore()  # Cambiar por CosmosDBStateStore en producción
+            
+            whatsapp_bot = WhatsAppBot(state_store=state_store)
             logging.info("WhatsApp bot inicializado correctamente")
             
         except Exception as e:
