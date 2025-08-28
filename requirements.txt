@@ -16,3 +16,6 @@ langchain
 langchain-openai
 langchain-core
 pydantic
+
+# Cosmos DB
+azure-cosmos

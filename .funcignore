@@ -11,3 +11,4 @@ test.http
 test_chatbot.py
 test_results/
 .env
+ARQUITECTURA_CHATBOT.md

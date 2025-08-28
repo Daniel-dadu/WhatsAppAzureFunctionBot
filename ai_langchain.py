@@ -7,6 +7,7 @@ from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 import langchain
 from state_management import MaquinariaType, ConversationState, ConversationStateStore, InMemoryStateStore
+from datetime import datetime, timezone
 
 langchain.debug = False
 langchain.verbose = False
@@ -288,6 +289,7 @@ class IntelligentSlotFiller:
             - nombre: nombre de la persona
             - tipo_maquinaria: soldadoras, compresor, torre_iluminacion, lgmg, generadores, rompedores
             - detalles_maquinaria: objeto con campos específicos según tipo_maquinaria
+            - lugar_requerimiento: lugar donde se requiere la máquina
             - sitio_web: URL del sitio web o "No tiene" (para respuestas negativas como "no", "no tenemos", "no cuenta", etc.)
             - uso_empresa_o_venta: "uso empresa" o "venta"
             - nombre_completo: nombre completo de la persona
@@ -413,6 +415,7 @@ class IntelligentSlotFiller:
                 ("nombre", "Para brindarte atención personalizada"),
                 ("tipo_maquinaria", "Para revisar nuestro inventario disponible"),
                 ("detalles_maquinaria", None),  # Se maneja por separado
+                ("lugar_requerimiento", "Para coordinar la entrega del equipo"),
                 ("uso_empresa_o_venta", "Para ofrecerle las mejores opciones comerciales"),
                 ("nombre_empresa", "Para generar la cotización a nombre de su empresa"),
                 ("sitio_web", "Para conocer mejor su empresa y generar una cotización más precisa"),
@@ -503,6 +506,10 @@ class IntelligentSlotFiller:
                 - "¿Cuál es su correo electrónico? Por ahí le enviaré la cotización."
                 - "Para enviarle la propuesta, ¿me comparte su email?"
                 
+                Para "lugar_requerimiento":
+                - "¿En qué lugar necesita el equipo? Esto me ayuda a coordinar la entrega."
+                - "¿Dónde van a usar la maquinaria? Necesito la ubicación para el servicio."
+                
                 Para "telefono":
                 - "¿Cuál es su número de teléfono? Así puedo darle seguimiento personalizado a su cotización."
                 - "Para contactarlo después con la propuesta, ¿me comparte su teléfono?"
@@ -533,6 +540,7 @@ class IntelligentSlotFiller:
             fallback_questions = {
                 "nombre": "¿Con quién tengo el gusto?",
                 "tipo_maquinaria": "¿Qué tipo de maquinaria requiere?",
+                "lugar_requerimiento": "¿En qué lugar necesita el equipo?",
                 "nombre_empresa": "¿Cuál es el nombre de su empresa?",
                 "giro_empresa": "¿Cuál es el giro de su empresa?",
                 "sitio_web": "¿Su empresa cuenta con sitio web?",
@@ -569,8 +577,8 @@ class IntelligentSlotFiller:
         """Verifica si la conversación está completa (todos los slots llenos)"""
         
         required_fields = [
-            "nombre", "tipo_maquinaria", "nombre_empresa", "giro_empresa", "sitio_web",
-            "uso_empresa_o_venta", "nombre_completo", "correo", "telefono"
+            "nombre", "tipo_maquinaria", "lugar_requerimiento", "nombre_empresa", "giro_empresa",
+            "sitio_web", "uso_empresa_o_venta", "nombre_completo", "correo", "telefono"
         ]
         
         # Verificar campos básicos
@@ -854,7 +862,10 @@ class IntelligentLeadQualificationChatbot:
             "giro_empresa": None,
             "correo": None,
             "telefono": None,
-            "completed": False
+            "completed": False,
+            "lugar_requerimiento": None,
+            "conversation_mode": "bot",
+            "asignado_asesor": None
         }
     
     def load_conversation(self, user_id: str):
@@ -901,7 +912,9 @@ class IntelligentLeadQualificationChatbot:
             # Agregar mensaje del usuario
             self.state["messages"].append({
                 "role": "user", 
-                "content": user_message
+                "content": user_message,
+                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "sender": "lead"
             })
 
             # Mensaje que se regresa
@@ -1002,7 +1015,13 @@ class IntelligentLeadQualificationChatbot:
         """
         Añade un mensaje al estado y devuelve la respuesta final
         """
-        self.state["messages"].append({"role": message_type, "content": response})
+        from datetime import datetime
+        self.state["messages"].append({
+            "role": message_type, 
+            "content": response,
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "sender": "bot" if message_type == "assistant" else "lead"
+        })
         
         # Al final, guardar el estado
         self.save_conversation()

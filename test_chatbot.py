@@ -185,6 +185,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "Qué tal, soy Roberto, de la empresa 'Maquinaria Pesada S.A.' y mi correo es roberto@maqpesada.mx. Necesito un compresor.",
         "Lo necesito de 185 pcm.",
         "Es para conectar dos pistolas de clavos y un taladro neumático.",
+        "En Chiapas.",
         "Es para venderlo a un cliente.",
         "nuestro sitio web es maquinariapesada.mx",
         "venta de maquinaria",
@@ -198,6 +199,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
             "capacidad_volumen": "185 pcm",
             "herramientas_conectar": "dos pistolas de clavos y un taladro neumático"
         },
+        "lugar_requerimiento": "Chiapas",
         "sitio_web": "maquinariapesada.mx",
         "uso_empresa_o_venta": "venta",
         "nombre_completo": "Roberto Carlos Paredes",

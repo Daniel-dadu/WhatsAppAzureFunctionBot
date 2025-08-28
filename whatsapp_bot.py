@@ -7,7 +7,7 @@ import logging
 import os
 import requests
 from ai_langchain import AzureOpenAIConfig, IntelligentLeadQualificationChatbot
-from state_management import ConversationStateStore, InMemoryStateStore
+from state_management import ConversationStateStore
 from typing import Optional
 
 # ============================================================================
@@ -24,8 +24,8 @@ class WhatsAppBot:
         self.langchain_config = None
         self._initialize_langchain_config()
         
-        # Usar el state_store proporcionado o crear uno por defecto
-        self.state_store = state_store or InMemoryStateStore()
+        # Usar el state_store proporcionado
+        self.state_store = state_store
 
         # Una sola instancia del chatbot que manejará todos los usuarios
         self.chatbot = IntelligentLeadQualificationChatbot(self.langchain_config, self.state_store)
@@ -85,7 +85,7 @@ class WhatsAppBot:
             response = requests.post(url, data=data, headers=headers, timeout=10)
             response.raise_for_status()
             
-            logging.info(f"Mensaje enviado exitosamente a {wa_id}")
+            # logging.info(f"Mensaje enviado exitosamente a {wa_id}")
             return True
             
         except Exception as e:
