@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 import langchain
 from state_management import MaquinariaType, ConversationState, ConversationStateStore, InMemoryStateStore
 from datetime import datetime, timezone
+import logging
 
 langchain.debug = False
 langchain.verbose = False
@@ -872,6 +873,8 @@ class IntelligentLeadQualificationChatbot:
         """Carga la conversación de un usuario específico"""
         self.current_user_id = user_id
         stored_state = self.state_store.get_conversation_state(user_id)
+
+        logging.info(f"DADU: stored_state: {stored_state}")
         
         if stored_state:
             self.state = stored_state
@@ -934,6 +937,15 @@ class IntelligentLeadQualificationChatbot:
             # Actualizar el estado con la información extraída
             self._update_state_with_extracted_info(extracted_info)
             debug_print(f"DEBUG: Estado después de actualización: {self.state}")
+
+            # Verificar modo de conversación antes de generar respuesta
+            current_mode = self.state.get("conversation_mode", "bot")
+            
+            if current_mode == "agente":
+                # Modo agente: solo guardar estado, no generar respuesta automática
+                debug_print(f"DEBUG: Modo agente activo, no generando respuesta automática")
+                self.save_conversation()
+                return ""  # No response en modo agente
             
             # Verificar si es una pregunta sobre inventario
             if self.inventory_responder.is_inventory_question(user_message):
@@ -957,7 +969,7 @@ class IntelligentLeadQualificationChatbot:
             # Si no es pregunta de inventario ni de requerimientos, continuar con el flujo normal
             debug_print(f"DEBUG: Flujo normal de calificación de leads...")
             
-            # Verificar si la conversación está completa
+            # Verificar si la conversación está completa (solo en modo bot)
             if self.slot_filler.is_conversation_complete(self.state):
                 debug_print(f"DEBUG: Conversación completa!")
                 self.state["completed"] = True
@@ -1015,7 +1027,6 @@ class IntelligentLeadQualificationChatbot:
         """
         Añade un mensaje al estado y devuelve la respuesta final
         """
-        from datetime import datetime
         self.state["messages"].append({
             "role": message_type, 
             "content": response,

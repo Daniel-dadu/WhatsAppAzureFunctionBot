@@ -300,3 +300,23 @@ ConversationState = {
 **Cambios realizados:**
 - `function_app.py`: Factory methods para bot y state store, eliminación de estado global
 - Compatibilidad total con el patrón stateless de Azure Functions
+
+### ✅ Fase 2: Modos de Conversación (Completada)
+- [x] Endpoint `/agent-message` para recibir mensajes del agente
+- [x] Lógica de modos de conversación (bot vs agente)
+- [x] Timeout automático de 30 minutos para regreso a modo bot
+- [x] Procesamiento diferenciado según modo activo
+- [x] Slot-filling contextual en ambos modos
+
+**Funcionalidades implementadas:**
+- **Endpoint del agente**: `/agent-message` recibe mensajes del agente humano
+- **Cambio automático de modo**: A "agente" cuando llega primer mensaje del agente
+- **Timeout inteligente**: Regreso automático a "bot" después de 30 min de inactividad del agente
+- **Procesamiento dual**:
+  - Modo bot: Respuesta automática + slot-filling
+  - Modo agente: Solo slot-filling (sin respuesta automática)
+- **Slot-filling contextual**: Usa último mensaje (bot o agente) como contexto
+
+**Cambios realizados:**
+- `function_app.py`: Endpoint agent-message, lógica de modos, verificación de timeout
+- `ai_langchain.py`: Detección de modo agente para suprimir respuestas automáticas

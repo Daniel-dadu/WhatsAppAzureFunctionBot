@@ -11,6 +11,7 @@ import json
 from whatsapp_bot import WhatsAppBot
 from state_management import InMemoryStateStore, CosmosDBStateStore
 from azure.cosmos import CosmosClient
+from datetime import datetime, timezone, timedelta
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
@@ -183,17 +184,174 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
         message_body = message["text"]["body"]
         # logging.info(f"message_body: {message_body}")
         
-        # Process message with conversation manager
-        try:
-            response = whatsapp_bot.process_message(wa_id, message_body)
-            whatsapp_bot.send_message(wa_id, response)
-        except Exception as e:
-            logging.error(f"Error processing message: {e}")
-            error_message = "Disculpa, hubo un problema técnico. ¿Podrías repetir tu mensaje?"
-            whatsapp_bot.send_message(wa_id, error_message)
+        # Verificar timeout de agente antes de procesar
+        timeout_occurred = check_agent_timeout(wa_id, whatsapp_bot)
+        if timeout_occurred:
+            logging.info(f"Timeout de agente detectado para {wa_id}, regresando a modo bot")
+        
+        # Cargar estado actual para verificar modo
+        whatsapp_bot.chatbot.load_conversation(wa_id)
+        current_mode = whatsapp_bot.chatbot.state.get("conversation_mode", "bot")
+        
+        if current_mode == "agente":
+            # Modo agente: solo ejecutar slot-filling, NO enviar respuesta automática
+            logging.info(f"Modo agente activo para {wa_id}, solo ejecutando slot-filling")
+            try:
+                # Ejecutar slot-filling usando el contexto del último mensaje (agente o bot)
+                whatsapp_bot.chatbot.send_message(message_body, user_id=wa_id)
+                # Nota: send_message ejecuta slot-filling pero en modo agente no genera respuesta automática
+                logging.info(f"Slot-filling ejecutado para mensaje en modo agente: {wa_id}")
+            except Exception as e:
+                logging.error(f"Error ejecutando slot-filling en modo agente: {e}")
+        else:
+            # Modo bot: procesar normalmente con respuesta automática
+            logging.info(f"Modo bot activo para {wa_id}, procesando normalmente")
+            try:
+                response = whatsapp_bot.process_message(wa_id, message_body)
+                whatsapp_bot.send_message(wa_id, response)
+            except Exception as e:
+                logging.error(f"Error processing message: {e}")
+                error_message = "Disculpa, hubo un problema técnico. ¿Podrías repetir tu mensaje?"
+                whatsapp_bot.send_message(wa_id, error_message)
         
     else:
         # Handle non-text messages with a help message
         logging.info(f"Message Type: NON-TEXT")
         help_text = "¡Hola! Solo puedo procesar mensajes de texto. Por favor, envíame un mensaje de texto y te responderé con información sobre maquinaria."
         whatsapp_bot.send_message(wa_id, help_text)
+
+@app.route(route="agent-message", methods=["POST"])
+def agent_message(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Endpoint para recibir mensajes del agente humano.
+    Procesa el mensaje, ejecuta slot-filling y envía al lead vía WhatsApp.
+    """
+    logging.info('Endpoint agent-message activado')
+    
+    try:
+        # Validar que sea POST
+        if req.method != 'POST':
+            return func.HttpResponse("Method not allowed", status_code=405)
+        
+        # Obtener datos del request
+        body = req.get_json()
+        if not body:
+            return func.HttpResponse("Invalid JSON", status_code=400)
+        
+        # Validar campos requeridos
+        wa_id = body.get("wa_id")
+        message = body.get("message")
+        
+        if not wa_id or not message:
+            return func.HttpResponse("Missing wa_id or message", status_code=400)
+        
+        # Crear instancia del bot
+        whatsapp_bot = create_whatsapp_bot()
+        
+        # Procesar mensaje del agente
+        success = process_agent_message(wa_id, message, whatsapp_bot)
+        
+        if success:
+            return func.HttpResponse("Agent message processed successfully", status_code=200)
+        else:
+            return func.HttpResponse("Error processing agent message", status_code=500)
+            
+    except Exception as e:
+        logging.error(f"Error en endpoint agent-message: {e}")
+        return func.HttpResponse("Internal server error", status_code=500)
+
+def process_agent_message(wa_id: str, message: str, whatsapp_bot: WhatsAppBot) -> bool:
+    """
+    Procesa un mensaje del agente humano.
+    1. Cambia el modo de conversación a 'agente' si no estaba ya
+    2. Agrega el mensaje del agente al historial
+    3. Envía el mensaje al lead vía WhatsApp
+    4. NO ejecuta slot-filling en mensajes del agente
+    """
+    try:
+        logging.info(f"Procesando mensaje de agente para wa_id: {wa_id}")
+        
+        # Cargar conversación actual
+        whatsapp_bot.chatbot.load_conversation(wa_id)
+        current_state = whatsapp_bot.chatbot.state
+        
+        # Cambiar a modo agente si no estaba ya
+        if current_state.get("conversation_mode") != "agente":
+            current_state["conversation_mode"] = "agente"
+            logging.info(f"Modo cambiado a 'agente' para usuario {wa_id}")
+        
+        # Agregar mensaje del agente al historial
+        current_state["messages"].append({
+            "role": "assistant",
+            "content": message,
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "sender": "agente"
+        })
+        
+        # Guardar estado actualizado
+        whatsapp_bot.chatbot.save_conversation()
+        
+        # Enviar mensaje al lead vía WhatsApp
+        success = whatsapp_bot.send_message(wa_id, message)
+        
+        if success:
+            logging.info(f"Mensaje de agente enviado exitosamente a {wa_id}")
+        else:
+            logging.error(f"Error enviando mensaje de agente a {wa_id}")
+        
+        return success
+        
+    except Exception as e:
+        logging.error(f"Error procesando mensaje de agente: {e}")
+        return False
+
+def check_agent_timeout(wa_id: str, whatsapp_bot: WhatsAppBot) -> bool:
+    """
+    Verifica si han pasado 30 minutos desde el último mensaje del agente.
+    Si es así, cambia el modo de conversación de vuelta a 'bot'.
+    Retorna True si se cambió el modo, False si no.
+    """
+    try:
+        # Cargar conversación
+        whatsapp_bot.chatbot.load_conversation(wa_id)
+        current_state = whatsapp_bot.chatbot.state
+        
+        # Solo verificar si está en modo agente
+        if current_state.get("conversation_mode") != "agente":
+            return False
+        
+        # Buscar el último mensaje del agente
+        last_agent_message_time = None
+        
+        for msg in reversed(current_state.get("messages", [])):
+            if msg.get("sender") == "agente":
+                last_agent_message_time = msg.get("timestamp")
+                break
+        
+        if not last_agent_message_time:
+            # No hay mensajes del agente, cambiar a bot
+            current_state["conversation_mode"] = "bot"
+            whatsapp_bot.chatbot.save_conversation()
+            logging.info(f"Modo cambiado a 'bot' para {wa_id} (no hay mensajes de agente)")
+            return True
+        
+        # Verificar si han pasado 30 minutos
+        try:
+            last_time = datetime.fromisoformat(last_agent_message_time.replace('Z', '+00:00'))
+            now = datetime.now(timezone.utc)
+            time_diff = now - last_time
+            
+            if time_diff > timedelta(minutes=30):
+                current_state["conversation_mode"] = "bot"
+                whatsapp_bot.chatbot.save_conversation()
+                logging.info(f"Modo cambiado a 'bot' para {wa_id} (timeout de 30 minutos)")
+                return True
+                
+        except Exception as e:
+            logging.error(f"Error parseando timestamp: {e}")
+            
+        return False
+        
+    except Exception as e:
+        logging.error(f"Error verificando timeout de agente: {e}")
+        return False

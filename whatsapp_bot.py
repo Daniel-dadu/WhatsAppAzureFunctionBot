@@ -132,7 +132,8 @@ class WhatsAppBot:
         authorized_ids = [
             os.environ['RECIPIENT_WAID'],
             "5212212122080",
-            "5219512397285"
+            "5219512397285",
+            "5217821730008"
         ]
         return wa_id in authorized_ids
     
