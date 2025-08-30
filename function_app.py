@@ -224,7 +224,9 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
 def agent_message(req: func.HttpRequest) -> func.HttpResponse:
     """
     Endpoint para recibir mensajes del agente humano.
-    Procesa el mensaje, ejecuta slot-filling y envía al lead vía WhatsApp.
+    Procesa el mensaje y envía al lead vía WhatsApp.
+    No ejecuta slot-filling ni guarda el estado ni mensaje en Cosmos DB.
+    El mensaje ya se guardó en Cosmos DB por la otra funcion.
     """
     logging.info('Endpoint agent-message activado')
     
@@ -245,11 +247,11 @@ def agent_message(req: func.HttpRequest) -> func.HttpResponse:
         if not wa_id or not message:
             return func.HttpResponse("Missing wa_id or message", status_code=400)
         
-        # Crear instancia del bot
+        # Crear instancia de WhatsAppBot
         whatsapp_bot = create_whatsapp_bot()
         
-        # Procesar mensaje del agente
-        success = process_agent_message(wa_id, message, whatsapp_bot)
+        # Enviar mensaje al lead vía WhatsApp
+        success = whatsapp_bot.send_message(wa_id, message)
         
         if success:
             return func.HttpResponse("Agent message processed successfully", status_code=200)
@@ -259,51 +261,6 @@ def agent_message(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         logging.error(f"Error en endpoint agent-message: {e}")
         return func.HttpResponse("Internal server error", status_code=500)
-
-def process_agent_message(wa_id: str, message: str, whatsapp_bot: WhatsAppBot) -> bool:
-    """
-    Procesa un mensaje del agente humano.
-    1. Cambia el modo de conversación a 'agente' si no estaba ya
-    2. Agrega el mensaje del agente al historial
-    3. Envía el mensaje al lead vía WhatsApp
-    4. NO ejecuta slot-filling en mensajes del agente
-    """
-    try:
-        logging.info(f"Procesando mensaje de agente para wa_id: {wa_id}")
-        
-        # Cargar conversación actual
-        whatsapp_bot.chatbot.load_conversation(wa_id)
-        current_state = whatsapp_bot.chatbot.state
-        
-        # Cambiar a modo agente si no estaba ya
-        if current_state.get("conversation_mode") != "agente":
-            current_state["conversation_mode"] = "agente"
-            logging.info(f"Modo cambiado a 'agente' para usuario {wa_id}")
-        
-        # Agregar mensaje del agente al historial
-        current_state["messages"].append({
-            "role": "assistant",
-            "content": message,
-            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "sender": "agente"
-        })
-        
-        # Guardar estado actualizado
-        whatsapp_bot.chatbot.save_conversation()
-        
-        # Enviar mensaje al lead vía WhatsApp
-        success = whatsapp_bot.send_message(wa_id, message)
-        
-        if success:
-            logging.info(f"Mensaje de agente enviado exitosamente a {wa_id}")
-        else:
-            logging.error(f"Error enviando mensaje de agente a {wa_id}")
-        
-        return success
-        
-    except Exception as e:
-        logging.error(f"Error procesando mensaje de agente: {e}")
-        return False
 
 def check_agent_timeout(wa_id: str, whatsapp_bot: WhatsAppBot) -> bool:
     """
