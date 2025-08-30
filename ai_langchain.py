@@ -873,8 +873,6 @@ class IntelligentLeadQualificationChatbot:
         """Carga la conversación de un usuario específico"""
         self.current_user_id = user_id
         stored_state = self.state_store.get_conversation_state(user_id)
-
-        logging.info(f"DADU: stored_state: {stored_state}")
         
         if stored_state:
             self.state = stored_state
@@ -902,10 +900,6 @@ class IntelligentLeadQualificationChatbot:
         """
         
         try:
-            # Si se proporciona user_id, cargar la conversación
-            if user_id:
-                self.load_conversation(user_id)
-
             debug_print(f"DEBUG: send_message llamado con mensaje: '{user_message}'")
             
             # Si el mensaje está vacío, no hacer nada y esperar al usuario

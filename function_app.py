@@ -34,16 +34,8 @@ def verify(req):
     Handles WhatsApp webhook verification (GET requests).
     This is called when you first set up the webhook in Meta Developer Console.
     """
-    # logging.info("verify - Start")
 
     verify_token = os.environ["VERIFY_TOKEN"]
-    # if verify_token:
-    #     logging.info(f"verify_token: {verify_token}")
-    # else:
-    #     logging.info("VERIFY_TOKEN Empty")
-
-    # if req.params:
-    #     logging.info(req.params)
 
     # Parse params from the webhook verification request
     mode = req.params.get("hub.mode")
@@ -133,7 +125,6 @@ def handle_message(req):
             whatsapp_bot = create_whatsapp_bot()
             process_whatsapp_message(body, whatsapp_bot)
 
-            # logging.info(f"Webhook body completo: {json.dumps(body, indent=2)}")
             return func.HttpResponse("OK", status_code=200)
         else:
             # if the request is not a WhatsApp API event, return an error
@@ -180,7 +171,6 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
 
     if "text" in message:
         # Handle text messages with AI conversation manager
-        # logging.info(f"Message Type: TEXT")
         message_body = message["text"]["body"]
         # logging.info(f"message_body: {message_body}")
         
@@ -190,7 +180,6 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
             logging.info(f"Timeout de agente detectado para {wa_id}, regresando a modo bot")
         
         # Cargar estado actual para verificar modo
-        whatsapp_bot.chatbot.load_conversation(wa_id)
         current_mode = whatsapp_bot.chatbot.state.get("conversation_mode", "bot")
         
         if current_mode == "agente":
