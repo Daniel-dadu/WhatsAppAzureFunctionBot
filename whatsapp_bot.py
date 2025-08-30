@@ -106,11 +106,7 @@ class WhatsAppBot:
             # Procesar mensaje con LangChain - ahora pasamos el user_id
             response = self.chatbot.send_message(message_text, user_id=wa_id)
 
-            # Verificar si la conversación está completa
-            self.chatbot.load_conversation(wa_id)  # Cargar para verificar estado
-            if self.chatbot.state["completed"]:
-                logging.info(f"Conversación completada para usuario {wa_id}")
-                # TODO: aquí podrías sincronizar con HubSpot si es necesario
+            # TODO: aquí podrías sincronizar con HubSpot si es necesario
                 
             return response
             

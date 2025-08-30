@@ -192,8 +192,7 @@ ConversationState = {
 
 ### Fase 3: Slot-filling Mejorado
 1. Integrar slot-filling contextual (considerar mensajes de agente)
-2. Agregar campo `lugar_requerimiento` al flujo (creo que ya está implementado)
-3. Asegurar funcionamiento en ambos modos
+2. Asegurar funcionamiento en ambos modos
 
 ### Fase 4: Integraciones
 1. Implementar actualización HubSpot completa
