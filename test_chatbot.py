@@ -151,24 +151,24 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     flujo_1 = [
         "Hola",
         "Me llamo Ana",
+        "Mi apellido es Gómez",
         "Busco una torre de iluminación.",
         "Sí, la prefiero de LED por favor.",
+        "La empresa se llama 'Construcciones del Sol' y nos dedicamos a la construcción de carreteras.",
+        "La necesitamos en Chiapas.",
         "Es para uso en nuestra empresa.",
-        "La empresa se llama 'Construcciones del Sol'.",
         "La página web es constresol.com",
-        "Nos dedicamos a la construcción de carreteras.",
-        "Claro, mi nombre completo es Ana María Gómez Pérez.",
         "mi correo es ana.gomez@constresol.com",
-        "55 1234 5678"
+        "mi teléfono es 55 1234 5678"
     ]
     
     esperado_1 = {
-        "nombre": "Ana María Gómez Pérez",
+        "nombre": "Ana Gómez",
+        "apellido": "Gómez",
         "tipo_maquinaria": MaquinariaType.TORRE_ILUMINACION,
         "detalles_maquinaria": {"es_led": True},
         "sitio_web": "constresol.com",
         "uso_empresa_o_venta": "uso empresa",
-        "nombre_completo": "Ana María Gómez Pérez",
         "nombre_empresa": "Construcciones del Sol",
         "giro_empresa": "construcción de carreteras",
         "correo": "ana.gomez@constresol.com",
@@ -182,29 +182,32 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     # Este usuario proporciona varios datos en una sola respuesta.
     # ------------------------------------------------------------------------
     flujo_2 = [
-        "Qué tal, soy Roberto, de la empresa 'Maquinaria Pesada S.A.' y mi correo es roberto@maqpesada.mx. Necesito un compresor.",
-        "Lo necesito de 185 pcm.",
-        "Es para conectar dos pistolas de clavos y un taladro neumático.",
-        "En Chiapas.",
+        "Qué tal, soy Roberto, de la empresa 'Maquinaria Pesada S.A.' y mi correo es roberto@maqpesada.mx. Necesito una plataforma de elevación.",
+        "mi apellido es Marquez",
+        "la necesito de 10 metros",
+        "voy a elevar personal de construccion",
+        "es para exterior",
+        "nos dedicamos a la renta de maquinaria",
+        "En Jalisco.",
         "Es para venderlo a un cliente.",
-        "nuestro sitio web es maquinariapesada.mx",
-        "venta de maquinaria",
-        "Roberto Carlos Paredes y mi tel es 81 8765 4321"
+        "nuestro sitio web es maquinariapesada.mx y mi correo es roberto@maqpesada.mx",
+        "mi tel es 81 8765 4321"
     ]
     
     esperado_2 = {
-        "nombre": "Roberto",
-        "tipo_maquinaria": MaquinariaType.COMPRESOR,
+        "nombre": "Roberto Marquez",
+        "apellido": "Marquez",
+        "tipo_maquinaria": MaquinariaType.PLATAFORMA,
         "detalles_maquinaria": {
-            "capacidad_volumen": "185 pcm",
-            "herramientas_conectar": "dos pistolas de clavos y un taladro neumático"
+            "altura_trabajo": "10 metros",
+            "actividad": "elevar personal de construccion",
+            "ubicacion": "exterior"
         },
-        "lugar_requerimiento": "Chiapas",
+        "lugar_requerimiento": "Jalisco",
         "sitio_web": "maquinariapesada.mx",
         "uso_empresa_o_venta": "venta",
-        "nombre_completo": "Roberto Carlos Paredes",
         "nombre_empresa": "Maquinaria Pesada S.A.",
-        "giro_empresa": "venta de maquinaria",
+        "giro_empresa": "renta de maquinaria",
         "correo": "roberto@maqpesada.mx",
         "telefono": "81 8765 4321"
     }
@@ -309,6 +312,6 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
 
 if __name__ == "__main__":
     chatbot_instance = setup_chatbot()
-    # define_test_flows(chatbot_instance)
-    test_manually(chatbot_instance)
+    define_test_flows(chatbot_instance)
+    # test_manually(chatbot_instance)
     print("\n🎉 Todas las pruebas han finalizado.")

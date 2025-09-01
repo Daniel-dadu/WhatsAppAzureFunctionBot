@@ -8,7 +8,7 @@ class MaquinariaType(str, Enum):
     SOLDADORAS = "soldadoras"
     COMPRESOR = "compresor"
     TORRE_ILUMINACION = "torre_iluminacion"
-    LGMG = "lgmg"
+    PLATAFORMA = "plataforma"
     GENERADORES = "generadores"
     ROMPEDORES = "rompedores"
 

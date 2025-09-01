@@ -38,7 +38,7 @@ def get_inventory():
             "soldadoras",
             "compresor",
             "torre_iluminacion",
-            "lgmg",
+            "plataforma",
             "generadores",
             "rompedores"
         ],
@@ -61,7 +61,7 @@ class DetallesCompresor(BaseModel):
 class DetallesTorre(BaseModel):
     es_led: Optional[bool] = Field(None, description="Si requiere LED o no")
 
-class DetallesLGMG(BaseModel):
+class DetallesPlataforma(BaseModel):
     altura_trabajo: Optional[str] = Field(None, description="Altura de trabajo necesaria")
     actividad: Optional[str] = Field(None, description="Actividad que va a realizar")
     ubicacion: Optional[str] = Field(None, description="Si es en interior o exterior")
@@ -124,8 +124,8 @@ MAQUINARIA_CONFIG = {
             }
         ]
     },
-    MaquinariaType.LGMG: {
-        "model": DetallesLGMG,
+    MaquinariaType.PLATAFORMA: {
+        "model": DetallesPlataforma,
         "fields": [
             {
                 "name": "altura_trabajo", 
@@ -288,7 +288,7 @@ class IntelligentSlotFiller:
             
             CAMPOS A EXTRAER (solo si están vacíos):
             - nombre: nombre de la persona
-            - tipo_maquinaria: soldadoras, compresor, torre_iluminacion, lgmg, generadores, rompedores
+            - tipo_maquinaria: soldadoras, compresor, torre_iluminacion, plataforma, generadores, rompedores
             - detalles_maquinaria: objeto con campos específicos según tipo_maquinaria
             - lugar_requerimiento: lugar donde se requiere la máquina
             - sitio_web: URL del sitio web o "No tiene" (para respuestas negativas como "no", "no tenemos", "no cuenta", etc.)
@@ -361,7 +361,7 @@ class IntelligentSlotFiller:
             - Para TORRE_ILUMINACION: es_led (true/false para LED)
             - Para SOLDADORAS: amperaje, electrodo
             - Para COMPRESOR: capacidad_volumen, herramientas_conectar
-            - Para LGMG: altura_trabajo, actividad, ubicacion
+            - Para PLATAFORMA: altura_trabajo, actividad, ubicacion
             - Para GENERADORES: actividad, capacidad
             - Para ROMPEDORES: uso, tipo
             - IMPORTANTE: Usa exactamente estos nombres de campos, NO inventes nombres alternativos
