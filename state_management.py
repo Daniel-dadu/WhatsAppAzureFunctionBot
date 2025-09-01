@@ -11,6 +11,9 @@ class MaquinariaType(str, Enum):
     PLATAFORMA = "plataforma"
     GENERADORES = "generadores"
     ROMPEDORES = "rompedores"
+    APISONADOR = "apisonador"
+    MONTACARGAS = "montacargas"
+    MANIPULADOR = "manipulador"
 
 class ConversationState(TypedDict):
     messages: List[Dict[str, Any]]  # Cambiado para soportar campos adicionales

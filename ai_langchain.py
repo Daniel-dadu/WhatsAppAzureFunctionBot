@@ -40,7 +40,10 @@ def get_inventory():
             "torre_iluminacion",
             "plataforma",
             "generadores",
-            "rompedores"
+            "rompedores",
+            "apisonador",
+            "montacargas",
+            "manipulador"
         ],
         "modelo_maquinaria": "Cualquier modelo",
         "ubicacion": "Cualquier ubicación en México",
@@ -73,6 +76,23 @@ class DetallesGenerador(BaseModel):
 class DetallesRompedor(BaseModel):
     uso: Optional[str] = Field(None, description="Para qué lo va a utilizar")
     tipo: Optional[str] = Field(None, description="Si lo requiere eléctrico o neumático")
+
+class DetallesApisonador(BaseModel):
+    uso: Optional[str] = Field(None, description="Para qué lo va a utilizar")
+    motor: Optional[str] = Field(None, description="Qué tipo de motor trae")
+    es_diafragma: Optional[bool] = Field(None, description="Si es de diafragma o no")
+
+class DetallesMontacargas(BaseModel):
+    capacidad: Optional[str] = Field(None, description="Capacidad requerida")
+    tipo_energia: Optional[str] = Field(None, description="Si lo requiere eléctrico, a combustión a gasolina o gas lp")
+    posicion_operador: Optional[str] = Field(None, description="Si lo requiere para hombre parado o sentado")
+    altura: Optional[str] = Field(None, description="Altura requerida")
+
+class DetallesManipulador(BaseModel):
+    capacidad: Optional[str] = Field(None, description="Capacidad requerida")
+    altura: Optional[str] = Field(None, description="Altura necesaria")
+    actividad: Optional[str] = Field(None, description="Actividad que va a realizar")
+    tipo_energia: Optional[str] = Field(None, description="Si lo requiere eléctrico o a combustión")
 
 # ============================================================================
 # DICCIONARIO CON CONFIGURACIÓN DE MAQUINARIA
@@ -177,6 +197,87 @@ MAQUINARIA_CONFIG = {
                 "name": "tipo", 
                 "reason": "Para determinar el tipo de energía necesaria",
                 "question": "¿lo requiere eléctrico o neumático?",
+                "required": True
+            }
+        ]
+    },
+    MaquinariaType.APISONADOR: {
+        "model": DetallesApisonador,
+        "fields": [
+            {
+                "name": "uso", 
+                "reason": "Para entender el contexto de uso",
+                "question": "¿para qué lo va a utilizar?",
+                "required": True
+            },
+            {
+                "name": "motor", 
+                "reason": "Para determinar las características del equipo",
+                "question": "¿qué tipo de motor debe tener?",
+                "required": True
+            },
+            {
+                "name": "es_diafragma", 
+                "reason": "Para determinar si lo requiere",
+                "question": "¿el equipo debe ser de diafragma?",
+                "required": True
+            }
+        ]
+    },
+    MaquinariaType.MONTACARGAS: {
+        "model": DetallesMontacargas,
+        "fields": [
+            {
+                "name": "capacidad", 
+                "reason": "Para determinar la capacidad necesaria",
+                "question": "¿qué peso requiere levantar?",
+                "required": True
+            },
+            {
+                "name": "tipo_energia", 
+                "reason": "Para determinar el tipo de energía adecuado",
+                "question": "¿lo requiere eléctrico, a combustión a gasolina o gas lp?",
+                "required": True
+            },
+            {
+                "name": "posicion_operador", 
+                "reason": "Para determinar la posición del operador",
+                "question": "¿lo requiere para hombre parado o sentado?",
+                "required": True
+            },
+            {
+                "name": "altura", 
+                "reason": "Para determinar la altura necesaria",
+                "question": "¿qué altura requiere?",
+                "required": True
+            }
+        ]
+    },
+    MaquinariaType.MANIPULADOR: {
+        "model": DetallesManipulador,
+        "fields": [
+            {
+                "name": "capacidad", 
+                "reason": "Para determinar la capacidad necesaria",
+                "question": "¿qué peso requiere mover?",
+                "required": True
+            },
+            {
+                "name": "altura", 
+                "reason": "Para determinar la altura necesaria",
+                "question": "¿qué altura necesita?",
+                "required": True
+            },
+            {
+                "name": "actividad", 
+                "reason": "Para entender el contexto de uso",
+                "question": "¿qué actividad va a realizar?",
+                "required": True
+            },
+            {
+                "name": "tipo_energia", 
+                "reason": "Para determinar el tipo de energía adecuado",
+                "question": "¿lo requiere eléctrico o a combustión?",
                 "required": True
             }
         ]
@@ -288,7 +389,7 @@ class IntelligentSlotFiller:
             
             CAMPOS A EXTRAER (solo si están vacíos):
             - nombre: nombre de la persona
-            - tipo_maquinaria: soldadoras, compresor, torre_iluminacion, plataforma, generadores, rompedores
+            - tipo_maquinaria: soldadoras, compresor, torre_iluminacion, plataforma, generadores, rompedores, apisonador, montacargas, manipulador
             - detalles_maquinaria: objeto con campos específicos según tipo_maquinaria
             - lugar_requerimiento: lugar donde se requiere la máquina
             - sitio_web: URL del sitio web o "No tiene" (para respuestas negativas como "no", "no tenemos", "no cuenta", etc.)
@@ -364,6 +465,9 @@ class IntelligentSlotFiller:
             - Para PLATAFORMA: altura_trabajo, actividad, ubicacion
             - Para GENERADORES: actividad, capacidad
             - Para ROMPEDORES: uso, tipo
+            - Para APISONADOR: uso, motor, es_diafragma
+            - Para MONTACARGAS: capacidad, tipo_energia, posicion_operador, altura
+            - Para MANIPULADOR: capacidad, altura, actividad, tipo_energia
             - IMPORTANTE: Usa exactamente estos nombres de campos, NO inventes nombres alternativos
             - NO extraer campos que no estén en esta lista exacta
             - NO inventar campos adicionales como "proyecto", "aplicación", "capacidad_de_volumen", etc.
