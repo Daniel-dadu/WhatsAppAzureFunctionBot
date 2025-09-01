@@ -103,8 +103,8 @@ class WhatsAppBot:
             elif message_text.lower() == "status":
                 return self._get_conversation_status(wa_id)
             
-            # Procesar mensaje con LangChain - ahora pasamos el user_id
-            response = self.chatbot.send_message(message_text, user_id=wa_id)
+            # Procesar mensaje con LangChain
+            response = self.chatbot.send_message(message_text)
 
             # TODO: aquí podrías sincronizar con HubSpot si es necesario
                 
@@ -148,12 +148,19 @@ class WhatsAppBot:
         👤 Usuario: {wa_id}
         ✅ Completada: {'Sí' if state.get('completed', False) else 'No'}
         📝 Nombre: {state.get('nombre', 'No especificado')}
+        👤 Apellido: {state.get('apellido', 'No especificado')}
         🔧 Tipo maquinaria: {state.get('tipo_maquinaria', 'No especificado')}
+        🔍 Detalles maquinaria: {state.get('detalles_maquinaria', 'No especificado')}
+        💼 Nombre empresa: {state.get('nombre_empresa', 'No especificado')}
+        💼 Giro empresa: {state.get('giro_empresa', 'No especificado')}
         🌐 Sitio web: {state.get('sitio_web', 'No especificado')}
-        💼 Uso: {state.get('uso_empresa_o_venta', 'No especificado')}
+        💼 Tipo de uso: {state.get('uso_empresa_o_venta', 'No especificado')}
         📧 Correo: {state.get('correo', 'No especificado')}
         📱 Teléfono: {state.get('telefono', 'No especificado')}
-        💬 Total mensajes: {len(state.get('messages', []))}"""
+        📍 Lugar requerimiento: {state.get('lugar_requerimiento', 'No especificado')}
+        💬 Total mensajes: {len(state.get('messages', []))}
+        👤 Conversación mode: {state.get('conversation_mode', 'No especificado')}
+        """
         except Exception as e:
             logging.error(f"Error obteniendo estado de conversación: {e}")
             return f"❌ Error obteniendo estado: {str(e)}"

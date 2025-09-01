@@ -167,12 +167,23 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
 
     # Extract message content
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
+    phone_number = message["from"] # Número de WhatsApp del lead empezando por 521
     logging.info(f"message: {message}")
 
     if "text" in message:
         # Handle text messages with AI conversation manager
         message_body = message["text"]["body"]
         # logging.info(f"message_body: {message_body}")
+
+        # Cargar conversación
+        whatsapp_bot.chatbot.load_conversation(wa_id)
+
+        # Actualizar número de WhatsApp en estado si no se ha guardado
+        current_state = whatsapp_bot.chatbot.state
+        if not current_state.get("telefono"):
+            # Normalizar número de WhatsApp
+            phone_number = whatsapp_bot.normalize_mexican_number(phone_number)
+            current_state["telefono"] = phone_number
         
         # Verificar timeout de agente antes de procesar
         timeout_occurred = check_agent_timeout(wa_id, whatsapp_bot)
@@ -181,13 +192,13 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
         
         # Cargar estado actual para verificar modo
         current_mode = whatsapp_bot.chatbot.state.get("conversation_mode", "bot")
-        
+
         if current_mode == "agente":
             # Modo agente: solo ejecutar slot-filling, NO enviar respuesta automática
             logging.info(f"Modo agente activo para {wa_id}, solo ejecutando slot-filling")
             try:
                 # Ejecutar slot-filling usando el contexto del último mensaje (agente o bot)
-                whatsapp_bot.chatbot.send_message(message_body, user_id=wa_id)
+                whatsapp_bot.chatbot.send_message(message_body)
                 # Nota: send_message ejecuta slot-filling pero en modo agente no genera respuesta automática
                 logging.info(f"Slot-filling ejecutado para mensaje en modo agente: {wa_id}")
             except Exception as e:
@@ -258,8 +269,6 @@ def check_agent_timeout(wa_id: str, whatsapp_bot: WhatsAppBot) -> bool:
     Retorna True si se cambió el modo, False si no.
     """
     try:
-        # Cargar conversación
-        whatsapp_bot.chatbot.load_conversation(wa_id)
         current_state = whatsapp_bot.chatbot.state
         
         # Solo verificar si está en modo agente

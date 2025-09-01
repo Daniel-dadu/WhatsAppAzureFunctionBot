@@ -262,11 +262,11 @@ class IntelligentSlotFiller:
             
             ESTADO ACTUAL:
             - nombre: {current_nombre}
+            - apellido: {current_apellido}
             - tipo_maquinaria: {current_tipo}
             - detalles_maquinaria: {current_detalles}
             - sitio_web: {current_sitio_web}
             - uso_empresa_o_venta: {current_uso}
-            - nombre_completo: {current_nombre_completo}
             - nombre_empresa: {current_nombre_empresa}
             - giro_empresa: {current_giro}
             - correo: {current_correo}
@@ -293,7 +293,6 @@ class IntelligentSlotFiller:
             - lugar_requerimiento: lugar donde se requiere la máquina
             - sitio_web: URL del sitio web o "No tiene" (para respuestas negativas como "no", "no tenemos", "no cuenta", etc.)
             - uso_empresa_o_venta: "uso empresa" o "venta"
-            - nombre_completo: nombre completo de la persona
             - nombre_empresa: nombre de la empresa
             - giro_empresa: giro o actividad de la empresa (ej: "venta de maquinaria", "construcción", "manufactura", "servicios", etc.)
             - correo: dirección de email
@@ -315,19 +314,20 @@ class IntelligentSlotFiller:
             - Extrae la actividad principal, no solo palabras sueltas
             
             REGLAS ESPECIALES PARA NOMBRES:
-            - Si el usuario dice "soy [nombre]", "me llamo [nombre]", "hola, soy [nombre]" → extraer nombre y nombre_completo
-            - Para nombres de 1-2 palabras: llenar solo "nombre"
-            - Para nombres de 3+ palabras: llenar tanto "nombre" como "nombre_completo"
-            - Ejemplos: "soy Paco Perez" → nombre: "Paco Perez"
-            - Ejemplos: "soy Paco Perez Diaz" →  nombre: "Paco Perez Diaz" y nombre_completo: "Paco Perez Diaz"
+            - Si el usuario dice "soy [nombre]", "me llamo [nombre]", "hola, soy [nombre]" → extraer nombre y apellido
+            - Para nombres de 1 palabra: llenar solo "nombre"
+            - Para nombres de 2+ palabras: llenar "nombre" con la primera palabra y "apellido" con el resto
+            - Ejemplos: "soy Paco" → nombre: "Paco"
+            - Ejemplos: "soy Paco Perez" → nombre: "Paco", apellido: "Perez"
+            - Ejemplos: "soy Paco Perez Diaz" → nombre: "Paco", apellido: "Perez Diaz"
             
             REGLAS ESPECIALES PARA USO_EMPRESA_O_VENTA:
             - Si el usuario dice "para venta", "es para vender", "para comercializar" → uso_empresa_o_venta: "venta"
             - Si el usuario dice "para uso", "para usar", "para trabajo interno" → uso_empresa_o_venta: "uso empresa"
             
             EJEMPLOS DE EXTRACCIÓN:
-            - Mensaje: "soy Renato Fuentes" → {{"nombre": "Renato Fuentes", "nombre_completo": None}}
-            - Mensaje: "me llamo Mauricio Martinez Rodriguez" → {{"nombre": "Mauricio Martinez Rodriguez", "nombre_completo": "Mauricio Martinez Rodriguez"}}
+            - Mensaje: "soy Renato Fuentes" → {{"nombre": "Renato", "apellido": "Fuentes"}}
+            - Mensaje: "me llamo Mauricio Martinez Rodriguez" → {{"nombre": "Mauricio", "apellido": "Martinez Rodriguez"}}
             - Mensaje: "no hay pagina web" → {{"sitio_web": "No tiene"}}
             - Mensaje: "venta de maquinaria pesada" → {{"giro_empresa": "venta de maquinaria pesada"}}
             - Mensaje: "para venta" → {{"uso_empresa_o_venta": "venta"}}
@@ -381,11 +381,11 @@ class IntelligentSlotFiller:
             response = self.llm.invoke(prompt.format_prompt(
                 message=message,
                 current_nombre=current_state.get("nombre", "No especificado"),
+                current_apellido=current_state.get("apellido", "No especificado"),
                 current_tipo=current_state.get("tipo_maquinaria", "No especificado"),
                 current_detalles=current_detalles_str,
                 current_sitio_web=current_state.get("sitio_web", "No especificado"),
                 current_uso=current_state.get("uso_empresa_o_venta", "No especificado"),
-                current_nombre_completo=current_state.get("nombre_completo", "No especificado"),
                 current_nombre_empresa=current_state.get("nombre_empresa", "No especificado"),
                 current_giro=current_state.get("giro_empresa", "No especificado"),
                 current_correo=current_state.get("correo", "No especificado"),
@@ -414,16 +414,16 @@ class IntelligentSlotFiller:
             # Definir el orden de prioridad de los slots con explicaciones centralizadas
             slot_priority = [
                 ("nombre", "Para brindarte atención personalizada"),
+                ("apellido", "Para completar tu información personal"), # Solo se pregunta si en nombre solo dice 1 palabra
                 ("tipo_maquinaria", "Para revisar nuestro inventario disponible"),
                 ("detalles_maquinaria", None),  # Se maneja por separado
-                ("lugar_requerimiento", "Para coordinar la entrega del equipo"),
-                ("uso_empresa_o_venta", "Para ofrecerle las mejores opciones comerciales"),
                 ("nombre_empresa", "Para generar la cotización a nombre de su empresa"),
+                ("giro_empresa", "Para entender mejor sus necesidades específicas"), # Se pregunta junto con nombre_empresa
+                ("lugar_requerimiento", "Para coordinar la entrega del equipo"),
+                ("uso_empresa_o_venta", "Para ofrecerle los mejores precios"),
                 ("sitio_web", "Para conocer mejor su empresa y generar una cotización más precisa"),
-                ("giro_empresa", "Para entender mejor sus necesidades específicas"),
-                ("nombre_completo", "Para los documentos oficiales de cotización"),
                 ("correo", "Para enviarle la cotización"),
-                ("telefono", "Para darle seguimiento personalizado")
+                ("telefono", "Para darle seguimiento personalizado") # TODO: Solo se pregunta si está respondiendo todo de forma fluida
             ]
             
             # Verificar cada slot en orden de prioridad
@@ -436,7 +436,7 @@ class IntelligentSlotFiller:
                 else:
                     # Verificar si el slot está vacío o tiene respuestas negativas
                     value = current_state.get(slot_name)
-                    if not value or value in ["No tiene", "No especificado"]:
+                    if not value:
                         return {"question": self._generate_conversational_question(slot_name, reason, current_state), "question_type": slot_name}
             
             # Si todos los slots están llenos
@@ -452,9 +452,15 @@ class IntelligentSlotFiller:
         """
         
         try:
+            giro_empresa = current_state.get("giro_empresa")
+
+            # Verificar si es un campo de empresa y manejar la lógica especial
+            if field_name == "nombre_empresa" and not giro_empresa:
+                return self._generate_empresa_combined_question(current_state)
+            
             prompt = ChatPromptTemplate.from_template(
                 """
-                Eres Juan, un asistente de ventas profesional especializado en maquinaria ligera en México.
+                Eres un asesor comercial en Alpha C y asistente de ventas profesional especializado en maquinaria de la empresa.
                 
                 Tu tarea es generar UNA pregunta natural y conversacional para obtener la siguiente información:
                 
@@ -471,7 +477,7 @@ class IntelligentSlotFiller:
                 3. Para campos como sitio_web, correo, teléfono: haz la pregunta completa en una sola oración
                 4. Mantén la pregunta corta pero completa (máximo 50 palabras)
                 5. Usa un tono conversacional natural
-                6. Si ya tienes el nombre del usuario, púédelo usar para personalizar
+                6. Si ya tienes el nombre del usuario, puedes usarlo para personalizar
                 
                 EJEMPLOS PARA CADA CAMPO:
                 
@@ -479,12 +485,16 @@ class IntelligentSlotFiller:
                 - "¿Con quién tengo el gusto? Esto me ayuda a personalizar nuestra conversación."
                 - "Para brindarte atención personalizada, ¿podrías decirme tu nombre?"
                 
+                Para "apellido":
+                - "¿Cuál es tu apellido? Para completar tu información personal."
+                - "¿Podrías decirme tu apellido? Así completo tu información."
+                
                 Para "tipo_maquinaria":
-                - "¿Qué tipo de maquinaria ligera estás buscando? Esto me permite revisar nuestro inventario."
+                - "¿Qué tipo de maquinaria estás buscando? Esto me permite revisar nuestro inventario."
                 - "¿Qué equipo necesitas? Así puedo verificar disponibilidad."
                 
                 Para "uso_empresa_o_venta":
-                - "¿Es para uso de tu empresa o para venta? Esto me permite ofrecerte las mejores opciones."
+                - "¿Es para uso de tu empresa o para venta? Esto me permite ofrecerte los mejores precios."
                 - "¿Lo van a usar internamente o es para comercializar? Así ajusto la propuesta."
 
                 Para "nombre_empresa":
@@ -498,10 +508,6 @@ class IntelligentSlotFiller:
                 Para "sitio_web":
                 - "¿Su empresa cuenta con algún sitio web? Si es así, ¿me lo podría compartir?"
                 - "¿Tienen página web? Si es así, me gustaría conocerla para entender mejor su giro."
-                
-                Para "nombre_completo":
-                - "¿Cuál es tu nombre completo? Lo necesito para los documentos oficiales."
-                - "Para la cotización formal, ¿podrías darme tu nombre completo?"
                 
                 Para "correo":
                 - "¿Cuál es su correo electrónico? Por ahí le enviaré la cotización."
@@ -546,7 +552,6 @@ class IntelligentSlotFiller:
                 "giro_empresa": "¿Cuál es el giro de su empresa?",
                 "sitio_web": "¿Su empresa cuenta con sitio web?",
                 "uso_empresa_o_venta": "¿Es para uso de la empresa o para venta?",
-                "nombre_completo": "¿Cuál es su nombre completo?",
                 "correo": "¿Cuál es su correo electrónico?",
                 "telefono": "¿Cuál es su teléfono?"
             }
@@ -574,12 +579,59 @@ class IntelligentSlotFiller:
 
         return None # Todos los detalles están completos
     
+    def _generate_empresa_combined_question(self, current_state: ConversationState) -> str:
+        """Genera pregunta conversacional para ambos campos de empresa usando LLM"""
+        
+        try:
+            prompt = ChatPromptTemplate.from_template(
+                """
+                Eres un asesor comercial en Alpha C y asistente de ventas profesional especializado en maquinaria de la empresa.
+                
+                Tu tarea es generar UNA pregunta natural y conversacional para obtener tanto el nombre como el giro de la empresa.
+                
+                ESTADO ACTUAL:
+                - Nombre: {current_nombre}
+                - Tipo de maquinaria: {current_tipo}
+                
+                REGLAS PARA LA PREGUNTA:
+                1. Sé amigable y profesional
+                2. Explica brevemente por qué necesitas esta información
+                3. Pregunta por AMBOS campos (nombre y giro) en una sola pregunta natural
+                4. Mantén la pregunta corta pero completa (máximo 60 palabras)
+                5. Usa un tono conversacional natural
+                6. Si ya tienes el nombre del usuario, puedes usarlo para personalizar
+                
+                EJEMPLOS:
+                - "¿Cuál es el nombre y giro de su empresa? Esto me permite generar la cotización a nombre de su empresa."
+                - "Para generar la cotización formal, ¿podrías decirme el nombre y giro de su empresa?"
+                
+                Genera SOLO la pregunta (sin explicaciones adicionales):
+                """
+            )
+            
+            response = self.llm.invoke(prompt.format_prompt(
+                current_nombre=current_state.get("nombre", "No especificado"),
+                current_tipo=current_state.get("tipo_maquinaria", "No especificado")
+            ))
+            
+            return response.content.strip()
+                
+        except Exception as e:
+            print(f"Error generando pregunta de empresa: {e}")
+            # Fallback a preguntas predefinidas
+            return "¿Cuál es el nombre y giro de su empresa? Esto me permite generar la cotización a nombre de su empresa."
+    
     def is_conversation_complete(self, current_state: ConversationState) -> bool:
         """Verifica si la conversación está completa (todos los slots llenos)"""
+
+        # Verificar si el nombre tiene al menos dos palabras (nombre + apellido)
+        nombre = current_state.get("nombre", "")
+        if not nombre or len(nombre.split()) < 2:
+            return False
         
         required_fields = [
-            "nombre", "tipo_maquinaria", "lugar_requerimiento", "nombre_empresa", "giro_empresa",
-            "sitio_web", "uso_empresa_o_venta", "nombre_completo", "correo", "telefono"
+            "tipo_maquinaria", "lugar_requerimiento", "nombre_empresa", "giro_empresa",
+            "sitio_web", "uso_empresa_o_venta", "correo", "telefono"
         ]
         
         # Verificar campos básicos
@@ -625,12 +677,12 @@ class IntelligentResponseGenerator:
         try:
             # Crear prompt conversacional basado en el estilo de llm.py
             prompt_str = """
-                Eres Juan, un asistente de ventas profesional especializado en maquinaria ligera en México.
+                Eres un asesor comercial en Alpha C y un asistente de ventas profesional especializado en maquinaria de la empresa.
                 Tu trabajo es calificar leads de manera natural y conversacional.
                 
                 REGLAS IMPORTANTES:
                 - Sé amigable pero profesional
-                - No te presentes, ni digas palabras como "Hola", "Soy Juan"
+                - No te presentes, ni digas palabras como "Hola", "Soy un asesor comercial en Alpha C"
                 - Mantén respuestas CORTAS (máximo 50 palabras)
                 - Explica brevemente por qué necesitas cada información cuando sea apropiado
                 - Si el usuario hace preguntas sobre por qué necesitas ciertos datos, explícaselo de manera clara
@@ -649,7 +701,6 @@ class IntelligentResponseGenerator:
                 - Giro: {current_giro}
                 - Sitio web: {current_sitio_web}
                 - Uso: {current_uso}
-                - Nombre completo: {current_nombre_completo}
                 - Correo: {current_correo}
                 - Teléfono: {current_telefono}
                 
@@ -666,7 +717,7 @@ class IntelligentResponseGenerator:
                 
                 EJEMPLOS DE RESPUESTAS:
                 - Si se extrajo nombre: "¡Okay [nombre]!"
-                - Si se extrajo maquinaria: "Perfecto, veo que necesita [tipo]. Esto me ayuda a revisar nuestro inventario."
+                - Si se extrajo maquinaria: "Entendido."
                 - Si se extrajo empresa: "Excelente, [empresa]. Esto me permite personalizar la cotización."
                 - Para explicar por qué necesitas datos: "Necesito esta información para generar una cotización precisa y contactarlo después."
                 
@@ -686,7 +737,6 @@ class IntelligentResponseGenerator:
                 current_detalles=json.dumps(current_state.get("detalles_maquinaria", {}), ensure_ascii=False),
                 current_sitio_web=current_state.get("sitio_web", "No especificado"),
                 current_uso=current_state.get("uso_empresa_o_venta", "No especificado"),
-                current_nombre_completo=current_state.get("nombre_completo", "No especificado"),
                 current_empresa=current_state.get("nombre_empresa", "No especificado"),
                 current_giro=current_state.get("giro_empresa", "No especificado"),
                 current_correo=current_state.get("correo", "No especificado"),
@@ -709,11 +759,11 @@ class IntelligentResponseGenerator:
         return f"""¡Perfecto, {current_state['nombre']}! 
 
 He registrado toda su información:
+- Nombre: {current_state['nombre']}
 - Maquinaria: {current_state['tipo_maquinaria'].value}
 - Detalles: {json.dumps(current_state['detalles_maquinaria'], indent=2, ensure_ascii=False)}
 - Sitio web: {current_state['sitio_web']}
 - Uso: {current_state['uso_empresa_o_venta']}
-- Nombre completo: {current_state['nombre_completo']}
 - Empresa: {current_state['nombre_empresa']}
 - Giro: {current_state['giro_empresa']}
 - Correo: {current_state['correo']}
@@ -854,11 +904,11 @@ class IntelligentLeadQualificationChatbot:
         return {
             "messages": [],
             "nombre": None,
+            "apellido": None,
             "tipo_maquinaria": None,
             "detalles_maquinaria": {},
             "sitio_web": None,
             "uso_empresa_o_venta": None,
-            "nombre_completo": None,
             "nombre_empresa": None,
             "giro_empresa": None,
             "correo": None,
@@ -893,11 +943,8 @@ class IntelligentLeadQualificationChatbot:
             self.state_store.delete_conversation_state(self.current_user_id)
         self.state = self._create_empty_state()
     
-    def send_message(self, user_message: str, user_id: Optional[str] = None) -> str:
-        """
-        Procesa un mensaje del usuario con slot-filling inteligente
-        Si se proporciona user_id, carga/guarda automáticamente el estado
-        """
+    def send_message(self, user_message: str) -> str:
+        """Procesa un mensaje del usuario con slot-filling inteligente"""
         
         try:
             debug_print(f"DEBUG: send_message llamado con mensaje: '{user_message}'")
@@ -906,6 +953,13 @@ class IntelligentLeadQualificationChatbot:
             if not user_message or not user_message.strip():
                 return ""
             
+            # Mensaje que se regresa
+            contextual_response = ""
+
+            # Si es el primer mensaje (no hay mensajes anteriores), generar saludo inicial
+            if not self.state["messages"]:
+                contextual_response += "¡Hola! Soy un asesor comercial en Alpha C. "
+            
             # Agregar mensaje del usuario
             self.state["messages"].append({
                 "role": "user", 
@@ -913,13 +967,6 @@ class IntelligentLeadQualificationChatbot:
                 "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "sender": "lead"
             })
-
-            # Mensaje que se regresa
-            contextual_response = ""
-
-            # Si es el primer mensaje (no hay mensajes anteriores), generar saludo inicial
-            if not self.state["messages"]:
-                contextual_response += "¡Hola! Soy Juan, tu asistente especializado en maquinaria ligera. "
             
             # Extraer TODA la información disponible del mensaje (SIEMPRE)
             # Obtener la última pregunta del bot para contexto
@@ -988,8 +1035,7 @@ class IntelligentLeadQualificationChatbot:
             # Para preguntas específicas de maquinaria, generar respuesta simple sin LLM
             if next_question["question_type"] == "detalles_maquinaria":
                 if extracted_info and extracted_info.get("tipo_maquinaria"):
-                    tipo_extraido = extracted_info["tipo_maquinaria"]
-                    contextual_response += f"Perfecto, veo que necesitas {tipo_extraido.lower()}. {next_question_str}"
+                    contextual_response += f"Entendido. {next_question_str}"
                 else:
                     # Si solo hay confirmación de información extraída
                     confirmation_parts = []
@@ -998,7 +1044,7 @@ class IntelligentLeadQualificationChatbot:
                             if key == "nombre" and value:
                                 confirmation_parts.append(f"¡Perfecto, {value}!")
                             elif key == "tipo_maquinaria" and value:
-                                confirmation_parts.append(f"Veo que necesitas {value.lower()}.")
+                                confirmation_parts.append(f"Entendido.")
                     
                     if confirmation_parts:
                         contextual_response += " ".join(confirmation_parts) + " " + next_question_str
@@ -1069,6 +1115,17 @@ class IntelligentLeadQualificationChatbot:
                     # Si el LLM extrae un tipo inválido, lo registramos pero no detenemos el flujo.
                     print(f"ADVERTENCIA: Tipo de maquinaria inválido '{value}' extraído por el LLM.")
             
+            elif key == "apellido":
+                # Combinar nombre y apellido en el campo nombre
+                nombre_actual = self.state.get("nombre", "")
+                if nombre_actual and value:
+                    self.state["nombre"] = f"{nombre_actual} {value}".strip()
+                    self.state["apellido"] = value 
+                    debug_print(f"DEBUG: Nombre y apellido combinados: '{self.state['nombre']}'")
+                else:
+                    self.state[key] = value
+                    debug_print(f"DEBUG: Campo '{key}' actualizado con valor: '{value}'")
+            
             # 4. Para todos los demás campos, la actualización es directa.
             # Se confía en que el LLM ya formateó la respuesta según las reglas del prompt.
             else:
@@ -1097,7 +1154,7 @@ class IntelligentLeadQualificationChatbot:
         """Obtiene un resumen completo del lead calificado"""
         return {
             "nombre": self.state["nombre"],
-            "nombre_completo": self.state["nombre_completo"],
+            "apellido": self.state["apellido"],
             "tipo_maquinaria": self.state["tipo_maquinaria"],
             "detalles_maquinaria": self.state["detalles_maquinaria"],
             "nombre_empresa": self.state["nombre_empresa"],
@@ -1112,75 +1169,3 @@ class IntelligentLeadQualificationChatbot:
     def get_lead_data_json(self) -> str:
         """Obtiene los datos del lead en formato JSON"""
         return json.dumps(self.get_conversation_summary(), indent=2, ensure_ascii=False)
-
-"""
-# ============================================================================
-# EJEMPLO DE USO
-# ============================================================================
-
-if __name__ == "__main__":
-    # Configurar Azure OpenAI
-    azure_config = AzureOpenAIConfig(
-        endpoint=os.getenv("FOUNDRY_ENDPOINT"),
-        api_key=os.getenv("FOUNDRY_API_KEY"),
-        deployment_name="gpt-4.1-mini",
-        api_version="2024-12-01-preview",
-        model_name="gpt-4.1-mini"
-    )
-    
-    try:
-        print("🔄 Inicializando chatbot con slot-filling inteligente...")
-        chatbot = IntelligentLeadQualificationChatbot(azure_config)
-        print("✅ ¡Chatbot iniciado correctamente!")
-        print("📝 Escriba 'salir' para terminar.")
-        print("💬 ¡Usted inicia la conversación! Escriba su mensaje:\n")
-        
-        # Loop de conversación
-        while True:
-            try:
-                user_input = input("\n👤 Usuario: ").strip()
-                
-                if user_input.lower() in ['salir', 'exit', 'quit']:
-                    print("👋 ¡Gracias por usar el sistema de calificación de leads!")
-                    break
-
-                if user_input.lower() == "estado":
-                    estado = chatbot.get_lead_data_json()
-                    print(f"🤖 Estado actual de la conversación:\n{estado}")
-                    continue
-
-                if user_input:
-                    response = chatbot.send_message(user_input)
-                    print(f"🤖 Bot: {response}")
-                    
-                    # Mostrar resumen si la conversación está completa
-                    if chatbot.state["completed"]:
-                        print("\n" + "="*60)
-                        print("📊 RESUMEN DEL LEAD CALIFICADO:")
-                        print("="*60)
-                        print(chatbot.get_lead_data_json())
-                        print("="*60)
-                        
-                        respuesta = input("\n🔄 ¿Desea iniciar una nueva conversación? (s/n): ").strip().lower()
-                        if respuesta == 's':
-                            chatbot.reset_conversation()
-                            print("\n🔄 Nueva conversación iniciada. ¡Usted comienza! Escriba su mensaje:\n")
-                        else:
-                            print("👋 ¡Gracias por usar el sistema!")
-                            break
-                            
-            except KeyboardInterrupt:
-                print("\n\n👋 ¡Hasta luego!")
-                break
-            except Exception as e:
-                print(f"❌ Error: {e}")
-                print("💡 Intente de nuevo o escriba 'salir' para terminar.")
-    
-    except Exception as e:
-        print(f"❌ Error iniciando el chatbot: {e}")
-        print("💡 Verifique su configuración de Azure OpenAI:")
-        print("   - Endpoint correcto")
-        print("   - API Key válida") 
-        print("   - Nombre del deployment correcto")
-        print("   - Versión de API compatible")
-"""

@@ -247,11 +247,68 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     
     # run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
 
+def test_manually(chatbot: IntelligentLeadQualificationChatbot):
+    try:
+        print("🔄 Inicializando chatbot con slot-filling inteligente...")
+        print("✅ ¡Chatbot iniciado correctamente!")
+        print("📝 Escriba 'salir' para terminar.")
+        print("💬 ¡Usted inicia la conversación! Escriba su mensaje:\n")
+        
+        # Loop de conversación
+        while True:
+            try:
+                user_input = input("\n👤 Usuario: ").strip()
+                
+                if user_input.lower() in ['salir', 'exit', 'quit']:
+                    print("👋 ¡Gracias por usar el sistema de calificación de leads!")
+                    break
+
+                if user_input.lower() == "status":
+                    estado = chatbot.get_lead_data_json()
+                    print(f"🤖 Estado actual de la conversación:\n{estado}")
+                    continue
+
+                if user_input:
+                    response = chatbot.send_message(user_input)
+                    print(f"🤖 Bot: {response}")
+                    
+                    # Mostrar resumen si la conversación está completa
+                    if chatbot.state["completed"]:
+                        print("\n" + "="*60)
+                        print("📊 RESUMEN DEL LEAD CALIFICADO:")
+                        print("="*60)
+                        print(chatbot.get_lead_data_json())
+                        print("="*60)
+                        
+                        respuesta = input("\n🔄 ¿Desea iniciar una nueva conversación? (s/n): ").strip().lower()
+                        if respuesta == 's':
+                            chatbot.reset_conversation()
+                            print("\n🔄 Nueva conversación iniciada. ¡Usted comienza! Escriba su mensaje:\n")
+                        else:
+                            print("👋 ¡Gracias por usar el sistema!")
+                            break
+                            
+            except KeyboardInterrupt:
+                print("\n\n👋 ¡Hasta luego!")
+                break
+            except Exception as e:
+                print(f"❌ Error: {e}")
+                print("💡 Intente de nuevo o escriba 'salir' para terminar.")
+    
+    except Exception as e:
+        print(f"❌ Error iniciando el chatbot: {e}")
+        print("💡 Verifique su configuración de Azure OpenAI:")
+        print("   - Endpoint correcto")
+        print("   - API Key válida") 
+        print("   - Nombre del deployment correcto")
+        print("   - Versión de API compatible")
+
 # ============================================================================
 # PUNTO DE ENTRADA PRINCIPAL
 # ============================================================================
 
 if __name__ == "__main__":
     chatbot_instance = setup_chatbot()
-    define_test_flows(chatbot_instance)
+    # define_test_flows(chatbot_instance)
+    test_manually(chatbot_instance)
     print("\n🎉 Todas las pruebas han finalizado.")

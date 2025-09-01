@@ -15,11 +15,11 @@ class MaquinariaType(str, Enum):
 class ConversationState(TypedDict):
     messages: List[Dict[str, Any]]  # Cambiado para soportar campos adicionales
     nombre: Optional[str]
+    apellido: Optional[str]
     tipo_maquinaria: Optional[MaquinariaType]
     detalles_maquinaria: Dict[str, Any]
     sitio_web: Optional[str]
     uso_empresa_o_venta: Optional[str]
-    nombre_completo: Optional[str]
     nombre_empresa: Optional[str]
     giro_empresa: Optional[str]
     correo: Optional[str]
@@ -211,11 +211,11 @@ class CosmosDBStateStore(ConversationStateStore):
         conversation_state: ConversationState = {
             "messages": messages,
             "nombre": state.get("nombre"),
+            "apellido": state.get("apellido"),
             "tipo_maquinaria": state.get("tipo_maquinaria"),
             "detalles_maquinaria": state.get("detalles_maquinaria", {}),
             "sitio_web": state.get("sitio_web"),
             "uso_empresa_o_venta": state.get("uso_empresa_o_venta"),
-            "nombre_completo": state.get("nombre_completo"),
             "nombre_empresa": state.get("nombre_empresa"),
             "giro_empresa": state.get("giro_empresa"),
             "correo": state.get("correo"),
@@ -250,8 +250,8 @@ class CosmosDBStateStore(ConversationStateStore):
         
         # Campos a monitorear para cambios
         fields_to_check = [
-            "nombre", "tipo_maquinaria", "detalles_maquinaria", "sitio_web",
-            "uso_empresa_o_venta", "nombre_completo", "nombre_empresa", 
+            "nombre", "apellido", "tipo_maquinaria", "detalles_maquinaria", "sitio_web",
+            "uso_empresa_o_venta", "nombre_empresa", 
             "giro_empresa", "correo", "telefono", "completed", 
             "lugar_requerimiento", "asignado_asesor"
         ]
