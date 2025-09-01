@@ -9,6 +9,7 @@ import requests
 from ai_langchain import AzureOpenAIConfig, IntelligentLeadQualificationChatbot
 from state_management import ConversationStateStore
 from typing import Optional
+from hubspot_manager import HubSpotManager
 
 # ============================================================================
 # CLASE PRINCIPAL DEL BOT DE WHATSAPP
@@ -92,21 +93,20 @@ class WhatsAppBot:
             logging.error(f"Error enviando mensaje a {wa_id}: {e}")
             return False
     
-    def process_message(self, wa_id: str, message_text: str) -> str:
+    def process_message(self, wa_id: str, message_text: str, hubspot_manager: HubSpotManager) -> str:
         """
         Procesa un mensaje entrante y retorna la respuesta usando LangChain.
         """
         try:
             # Verificar si es un comando especial
             if message_text.lower() == "reset":
+                hubspot_manager.delete_contact()
                 return self._handle_reset_command(wa_id)
             elif message_text.lower() == "status":
                 return self._get_conversation_status(wa_id)
             
             # Procesar mensaje con LangChain
-            response = self.chatbot.send_message(message_text)
-
-            # TODO: aquí podrías sincronizar con HubSpot si es necesario
+            response = self.chatbot.send_message(message_text, hubspot_manager)
                 
             return response
             

@@ -12,6 +12,7 @@ from whatsapp_bot import WhatsAppBot
 from state_management import InMemoryStateStore, CosmosDBStateStore
 from azure.cosmos import CosmosClient
 from datetime import datetime, timezone, timedelta
+from hubspot_manager import HubSpotManager
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
@@ -178,12 +179,19 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
         # Cargar conversación
         whatsapp_bot.chatbot.load_conversation(wa_id)
 
+        # Crear instancia de HubSpotManager
+        hubspot_manager = HubSpotManager(os.environ["HUBSPOT_ACCESS_TOKEN"])
+
         # Actualizar número de WhatsApp en estado si no se ha guardado
+        # Esto solo se ejecuta cuando se inicia una conversación
         current_state = whatsapp_bot.chatbot.state
         if not current_state.get("telefono"):
             # Normalizar número de WhatsApp
             phone_number = whatsapp_bot.normalize_mexican_number(phone_number)
             current_state["telefono"] = phone_number
+            current_state["hubspot_contact_id"] = hubspot_manager.create_contact(wa_id, phone_number)
+        else:
+            hubspot_manager.contact_id = current_state["hubspot_contact_id"]
         
         # Verificar timeout de agente antes de procesar
         timeout_occurred = check_agent_timeout(wa_id, whatsapp_bot)
@@ -198,7 +206,7 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
             logging.info(f"Modo agente activo para {wa_id}, solo ejecutando slot-filling")
             try:
                 # Ejecutar slot-filling usando el contexto del último mensaje (agente o bot)
-                whatsapp_bot.chatbot.send_message(message_body)
+                whatsapp_bot.chatbot.send_message(message_body, hubspot_manager)
                 # Nota: send_message ejecuta slot-filling pero en modo agente no genera respuesta automática
                 logging.info(f"Slot-filling ejecutado para mensaje en modo agente: {wa_id}")
             except Exception as e:
@@ -207,7 +215,7 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
             # Modo bot: procesar normalmente con respuesta automática
             logging.info(f"Modo bot activo para {wa_id}, procesando normalmente")
             try:
-                response = whatsapp_bot.process_message(wa_id, message_body)
+                response = whatsapp_bot.process_message(wa_id, message_body, hubspot_manager)
                 whatsapp_bot.send_message(wa_id, response)
             except Exception as e:
                 logging.error(f"Error processing message: {e}")

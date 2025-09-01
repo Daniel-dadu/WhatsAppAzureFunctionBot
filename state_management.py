@@ -32,6 +32,8 @@ class ConversationState(TypedDict):
     lugar_requerimiento: Optional[str]
     conversation_mode: str  # "bot" | "agente"
     asignado_asesor: Optional[str]
+    # ID del contacto en HubSpot
+    hubspot_contact_id: Optional[str]
 
 class ConversationStateStore(ABC):
     """Interfaz para almacenar y recuperar estados de conversación"""
@@ -169,6 +171,7 @@ class CosmosDBStateStore(ConversationStateStore):
         state_copy.pop("messages", None)
         state_copy.pop("conversation_mode", None)
         state_copy.pop("asignado_asesor", None)
+        state_copy.pop("hubspot_contact_id", None)
         
         # Convertir MaquinariaType a string para JSON
         if state_copy.get("tipo_maquinaria"):
@@ -183,7 +186,8 @@ class CosmosDBStateStore(ConversationStateStore):
             "state": state_copy,
             "messages": messages_formatted,
             "conversation_mode": state.get("conversation_mode", "bot"),
-            "asignado_asesor": state.get("asignado_asesor")
+            "asignado_asesor": state.get("asignado_asesor"),
+            "hubspot_contact_id": state.get("hubspot_contact_id")
         }
         
         return cosmos_doc
@@ -226,7 +230,8 @@ class CosmosDBStateStore(ConversationStateStore):
             "completed": state.get("completed", False),
             "lugar_requerimiento": state.get("lugar_requerimiento"),
             "conversation_mode": cosmos_doc.get("conversation_mode", "bot"),
-            "asignado_asesor": cosmos_doc.get("asignado_asesor")
+            "asignado_asesor": cosmos_doc.get("asignado_asesor"),
+            "hubspot_contact_id": cosmos_doc.get("hubspot_contact_id")
         }
         
         return conversation_state

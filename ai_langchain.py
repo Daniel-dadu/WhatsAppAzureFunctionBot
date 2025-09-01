@@ -9,6 +9,7 @@ import langchain
 from state_management import MaquinariaType, ConversationState, ConversationStateStore, InMemoryStateStore
 from datetime import datetime, timezone
 import logging
+from hubspot_manager import HubSpotManager
 
 langchain.debug = False
 langchain.verbose = False
@@ -1020,7 +1021,8 @@ class IntelligentLeadQualificationChatbot:
             "completed": False,
             "lugar_requerimiento": None,
             "conversation_mode": "bot",
-            "asignado_asesor": None
+            "asignado_asesor": None,
+            "hubspot_contact_id": None
         }
     
     def load_conversation(self, user_id: str):
@@ -1047,7 +1049,7 @@ class IntelligentLeadQualificationChatbot:
             self.state_store.delete_conversation_state(self.current_user_id)
         self.state = self._create_empty_state()
     
-    def send_message(self, user_message: str) -> str:
+    def send_message(self, user_message: str, hubspot_manager: HubSpotManager) -> str:
         """Procesa un mensaje del usuario con slot-filling inteligente"""
         
         try:
@@ -1076,9 +1078,11 @@ class IntelligentLeadQualificationChatbot:
             # Obtener la última pregunta del bot para contexto
             last_bot_question = self._get_last_bot_question()
             extracted_info = self.slot_filler.extract_all_information(user_message, self.state, last_bot_question)
-            
             debug_print(f"DEBUG: Información extraída: {extracted_info}") 
             
+            # Actualizar el contacto en HubSpot
+            hubspot_manager.update_contact(self.state, extracted_info)
+
             # Actualizar el estado con la información extraída
             self._update_state_with_extracted_info(extracted_info)
             debug_print(f"DEBUG: Estado después de actualización: {self.state}")
