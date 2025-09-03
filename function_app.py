@@ -197,25 +197,15 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
         timeout_occurred = check_agent_timeout(wa_id, whatsapp_bot)
         if timeout_occurred:
             logging.info(f"Timeout de agente detectado para {wa_id}, regresando a modo bot")
-        
-        # Cargar estado actual para verificar modo
-        current_mode = whatsapp_bot.chatbot.state.get("conversation_mode", "bot")
 
-        if current_mode == "agente":
-            # Modo agente: solo ejecutar slot-filling, NO enviar respuesta automática
-            logging.info(f"Modo agente activo para {wa_id}, solo ejecutando slot-filling")
-            try:
-                # Ejecutar slot-filling usando el contexto del último mensaje (agente o bot)
-                whatsapp_bot.chatbot.send_message(message_body, hubspot_manager)
-                # Nota: send_message ejecuta slot-filling pero en modo agente no genera respuesta automática
-                logging.info(f"Slot-filling ejecutado para mensaje en modo agente: {wa_id}")
-            except Exception as e:
-                logging.error(f"Error ejecutando slot-filling en modo agente: {e}")
-        else:
+        # Ejecutar slot-filling usando el contexto del último mensaje (agente o bot)
+        response = whatsapp_bot.process_message(wa_id, message_body, hubspot_manager)
+        
+        # Solo se genera respuesta en modo bot
+        if response is not None:
             # Modo bot: procesar normalmente con respuesta automática
             logging.info(f"Modo bot activo para {wa_id}, procesando normalmente")
             try:
-                response = whatsapp_bot.process_message(wa_id, message_body, hubspot_manager)
                 whatsapp_bot.send_message(wa_id, response)
             except Exception as e:
                 logging.error(f"Error processing message: {e}")

@@ -1057,7 +1057,7 @@ class IntelligentLeadQualificationChatbot:
             
             # Si el mensaje está vacío, no hacer nada y esperar al usuario
             if not user_message or not user_message.strip():
-                return ""
+                return None
             
             # Mensaje que se regresa
             contextual_response = ""
@@ -1094,7 +1094,7 @@ class IntelligentLeadQualificationChatbot:
                 # Modo agente: solo guardar estado, no generar respuesta automática
                 debug_print(f"DEBUG: Modo agente activo, no generando respuesta automática")
                 self.save_conversation()
-                return ""  # No response en modo agente
+                return None  # No response en modo agente
             
             # Verificar si es una pregunta sobre inventario
             if self.inventory_responder.is_inventory_question(user_message):

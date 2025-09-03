@@ -174,11 +174,17 @@ class HubSpotManager:
 
             elif key == "giro_empresa":
                 # TODO: mejorar con el valor real
-                properties["giro_de_la_empresa_"] = GIRO_EMPRESA[0]
+                if value in GIRO_EMPRESA:
+                    properties["giro_de_la_empresa_"] = value
+                else:
+                    properties["giro_de_la_empresa_"] = GIRO_EMPRESA[0]
 
             elif key == "lugar_requerimiento":
                 # TODO: mejorar con el valor real
-                properties["estado___region"] = ESTADOS[0]
+                if value in ESTADOS:
+                    properties["estado___region"] = value
+                else:
+                    properties["estado___region"] = ESTADOS[0]
 
             elif key == "telefono":
                 properties["phone"] = value
