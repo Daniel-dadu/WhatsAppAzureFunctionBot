@@ -36,12 +36,12 @@ def debug_print(*args, **kwargs):
 def get_inventory():
     return {
         "tipo_maquinaria": [
-            "soldadoras",
+            "soldadora",
             "compresor",
             "torre_iluminacion",
             "plataforma",
-            "generadores",
-            "rompedores",
+            "generador",
+            "rompedor",
             "apisonador",
             "montacargas",
             "manipulador"
@@ -390,7 +390,7 @@ class IntelligentSlotFiller:
             
             CAMPOS A EXTRAER (solo si están vacíos):
             - nombre: nombre de la persona
-            - tipo_maquinaria: soldadoras, compresor, torre_iluminacion, plataforma, generadores, rompedores, apisonador, montacargas, manipulador
+            - tipo_maquinaria: soldadora, compresor, torre_iluminacion, plataforma, generador, rompedor, apisonador, montacargas, manipulador
             - detalles_maquinaria: objeto con campos específicos según tipo_maquinaria
             - lugar_requerimiento: lugar donde se requiere la máquina
             - sitio_web: URL del sitio web o "No tiene" (para respuestas negativas como "no", "no tenemos", "no cuenta", etc.)
@@ -454,8 +454,8 @@ class IntelligentSlotFiller:
             - Si el usuario pregunta "¿tienen [tipo]?" → extraer [tipo] como tipo_maquinaria
             - Si el usuario pregunta "¿manejan [tipo]?" → extraer [tipo] como tipo_maquinaria  
             - Si el usuario pregunta "necesito [tipo]" → extraer [tipo] como tipo_maquinaria
-            - Ejemplos: "¿tienen generadores?" → {{"tipo_maquinaria": "generadores"}}
-            - Ejemplos: "¿manejan soldadoras?" → {{"tipo_maquinaria": "soldadoras"}}
+            - Ejemplos: "¿tienen generadores?" → {{"tipo_maquinaria": "generador"}}
+            - Ejemplos: "¿manejan soldadoras?" → {{"tipo_maquinaria": "soldadora"}}
             - Ejemplos: "necesito un compresor" → {{"tipo_maquinaria": "compresor"}}
             IMPORTANTE: Incluso en preguntas sobre inventario, SIEMPRE extraer tipo_maquinaria si se menciona
             
@@ -1049,8 +1049,11 @@ class IntelligentLeadQualificationChatbot:
             self.state_store.delete_conversation_state(self.current_user_id)
         self.state = self._create_empty_state()
     
-    def send_message(self, user_message: str, hubspot_manager: HubSpotManager) -> str:
-        """Procesa un mensaje del usuario con slot-filling inteligente"""
+    def send_message(self, user_message: str, hubspot_manager: HubSpotManager = None) -> str:
+        """
+        Procesa un mensaje del usuario con slot-filling inteligente.
+        Si hubspot_manager es None, no se actualiza el contacto en HubSpot (para poder usar test_chatbot.py)
+        """
         
         try:
             debug_print(f"DEBUG: send_message llamado con mensaje: '{user_message}'")
@@ -1073,7 +1076,7 @@ class IntelligentLeadQualificationChatbot:
                 "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "sender": "lead"
             })
-            
+
             # Extraer TODA la información disponible del mensaje (SIEMPRE)
             # Obtener la última pregunta del bot para contexto
             last_bot_question = self._get_last_bot_question()
@@ -1081,7 +1084,8 @@ class IntelligentLeadQualificationChatbot:
             debug_print(f"DEBUG: Información extraída: {extracted_info}") 
             
             # Actualizar el contacto en HubSpot
-            hubspot_manager.update_contact(self.state, extracted_info)
+            if hubspot_manager:
+                hubspot_manager.update_contact(self.state, extracted_info)
 
             # Actualizar el estado con la información extraída
             self._update_state_with_extracted_info(extracted_info)
@@ -1117,7 +1121,7 @@ class IntelligentLeadQualificationChatbot:
             
             # Si no es pregunta de inventario ni de requerimientos, continuar con el flujo normal
             debug_print(f"DEBUG: Flujo normal de calificación de leads...")
-            
+
             # Verificar si la conversación está completa (solo en modo bot)
             if self.slot_filler.is_conversation_complete(self.state):
                 debug_print(f"DEBUG: Conversación completa!")
@@ -1193,7 +1197,6 @@ class IntelligentLeadQualificationChatbot:
         pre-procesamiento y formato realizado por el LLM.
         """
         debug_print(f"DEBUG: Actualizando estado con información: {extracted_info}")
-
         for key, value in extracted_info.items():
             # 1. Ignorar valores nulos o vacíos para no insertar datos inútiles.
             if value is None or value == "":

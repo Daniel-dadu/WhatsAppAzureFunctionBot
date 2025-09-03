@@ -3,8 +3,7 @@ Integración con HubSpot CRM
 """
 
 import requests
-import os
-from typing import Dict, Optional, Callable, Any
+from typing import Dict, Optional
 import logging
 import json
 
@@ -29,15 +28,15 @@ PRODUCTO_INTERESADO = [
 # Diccionario de productos de interés registrados en HubSpot
 # TODO: mejorar clasificación de productos del bot
 PRODUCTO_INTERESADO_DICT = {
-    "soldadoras": "Soldadoras Shindaiwa",
-    "plataformas": "Plataformas de elevación LGMG",
+    "soldadora": "Soldadoras Shindaiwa",
+    "plataforma": "Plataformas de elevación LGMG",
     "torre_iluminacion": "Torres de iluminación Trime",
-    "generadores": "Generadores",
+    "generador": "Generadores",
     "compresor": "Compresores eléctricos Airman",
     "montacargas": "Montacargas LGMG",
     "manipulador": "Manipulador LGMG",
     "apisonador": "Apisonador Sakai",
-    "rompedores": "Martillos neumáticos Toku"
+    "rompedor": "Martillos neumáticos Toku"
 }
 
 # Giro de la empresa registrado en HubSpot
@@ -143,59 +142,65 @@ class HubSpotManager:
         """Actualiza un contacto existente"""
 
         properties = {}
-        
-        for key, value in extracted_info.items():
-            current_value = state.get(key)
-            if key != "detalles_maquinaria" and current_value and current_value not in ["No especificado", "No tiene", None, ""]:
-                continue
 
-            if key == "nombre":
-                properties["firstname"] = value
+        try:
+            logging.info(f"Actualizando contacto en HubSpot con información: {extracted_info}")
 
-            elif key == "apellido":
-                # Combinar nombre y apellido en el campo nombre
-                nombre_actual = state.get("nombre", "")
-                if nombre_actual and value:
-                    properties["firstname"] = f"{nombre_actual} {value}".strip()
+            for key, value in extracted_info.items():
+                current_value = state.get(key)
+                if key != "detalles_maquinaria" and current_value and current_value not in ["No especificado", "No tiene", None, ""]:
+                    continue
 
-            elif key == "tipo_maquinaria":
-                # TODO: mejorar con el valor real
-                properties["en_que_producto_estas_interesado_"] = PRODUCTO_INTERESADO_DICT[value]
-            
-            elif key == "detalles_maquinaria" and isinstance(value, dict):
-                current_detalles = state.get("detalles_maquinaria", {})
-                current_detalles.update(value)
-                # Convertir detalles_maquinaria a string
-                current_detalles_str = json.dumps(current_detalles)
-                properties["caracteristicas_de_maquinaria_de_interes"] = current_detalles_str
+                if key == "nombre":
+                    properties["firstname"] = value
 
-            elif key == "nombre_empresa":
-                properties["company"] = value
+                elif key == "apellido":
+                    # Combinar nombre y apellido en el campo nombre
+                    nombre_actual = state.get("nombre", "")
+                    if nombre_actual and value:
+                        properties["firstname"] = f"{nombre_actual} {value}".strip()
 
-            elif key == "giro_empresa":
-                # TODO: mejorar con el valor real
-                if value in GIRO_EMPRESA:
-                    properties["giro_de_la_empresa_"] = value
-                else:
-                    properties["giro_de_la_empresa_"] = GIRO_EMPRESA[0]
+                elif key == "tipo_maquinaria":
+                    # TODO: mejorar con el valor real
+                    properties["en_que_producto_estas_interesado_"] = PRODUCTO_INTERESADO_DICT[value]
+                
+                elif key == "detalles_maquinaria" and isinstance(value, dict):
+                    current_detalles = state.get("detalles_maquinaria", {})
+                    current_detalles.update(value)
+                    # Convertir detalles_maquinaria a string
+                    current_detalles_str = json.dumps(current_detalles)
+                    properties["caracteristicas_de_maquinaria_de_interes"] = current_detalles_str
 
-            elif key == "lugar_requerimiento":
-                # TODO: mejorar con el valor real
-                if value in ESTADOS:
-                    properties["estado___region"] = value
-                else:
-                    properties["estado___region"] = ESTADOS[0]
+                elif key == "nombre_empresa":
+                    properties["company"] = value
 
-            elif key == "telefono":
-                properties["phone"] = value
+                elif key == "giro_empresa":
+                    # TODO: mejorar con el valor real
+                    if value in GIRO_EMPRESA:
+                        properties["giro_de_la_empresa_"] = value
+                    else:
+                        properties["giro_de_la_empresa_"] = GIRO_EMPRESA[0]
 
-            elif key == "correo":
-                properties["email"] = value
+                elif key == "lugar_requerimiento":
+                    # TODO: mejorar con el valor real
+                    if value in ESTADOS:
+                        properties["estado___region"] = value
+                    else:
+                        properties["estado___region"] = ESTADOS[0]
 
-            elif key == "sitio_web":
-                properties["pgina_web_de_tu_negocio"] = value
+                elif key == "telefono":
+                    properties["phone"] = value
 
-        return self._update_contact(properties)
+                elif key == "correo":
+                    properties["email"] = value
+
+                elif key == "sitio_web":
+                    properties["pgina_web_de_tu_negocio"] = value
+
+            return self._update_contact(properties)
+        except Exception as e:
+            logging.error(f"Error actualizando contacto en HubSpot: {e}")
+            return None
     
     def _update_contact(self, properties: Dict) -> Optional[str]:
         """Actualiza un contacto existente"""
