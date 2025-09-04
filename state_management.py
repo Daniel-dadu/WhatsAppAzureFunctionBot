@@ -5,12 +5,12 @@ from datetime import datetime, timezone
 import logging
 
 class MaquinariaType(str, Enum):
-    SOLDADORAS = "soldadoras"
+    SOLDADORAS = "soldadora"
     COMPRESOR = "compresor"
     TORRE_ILUMINACION = "torre_iluminacion"
     PLATAFORMA = "plataforma"
-    GENERADORES = "generadores"
-    ROMPEDORES = "rompedores"
+    GENERADORES = "generador"
+    ROMPEDORES = "rompedor"
     APISONADOR = "apisonador"
     MONTACARGAS = "montacargas"
     MANIPULADOR = "manipulador"

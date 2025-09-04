@@ -220,35 +220,34 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     # ------------------------------------------------------------------------
     flujo_3 = [
         "Hola, ¿tienen generadores en existencia?",
-        "Ok, necesito uno para una construcción. Soy Lucía.",
-        "Es para alimentar varias herramientas eléctricas.",
+        "Ok, necesito uno para una construcción. Soy Lucía Martinez.",
         "Necesito unos 50 kva.",
-        "Para venta.",
         "Constructora H&H",
-        "Entiendo. No, no tenemos.",
-        "Construcción general",
-        "Lucía Hernández Parra",
-        "lucia.h@hh.com",
-        "33 9876 5432"
+        "Nos dedicamos a la construcción.",
+        "En qué estados pueden hacer entrega?",
+        "Okay, en Aguascalientes.",
+        "Para venta.",
+        "Entiendo. La web es hh.com",
+        "Mi correo es lucia.h@hh.com y mi teléfono es 33 9876 5432"
     ]
     
     esperado_3 = {
-        "nombre": "Lucía",
+        "nombre": "Lucía Martinez",
         "tipo_maquinaria": MaquinariaType.GENERADORES,
         "detalles_maquinaria": {
-            "actividad": "alimentar varias herramientas eléctricas",
+            "actividad": "construcción",
             "capacidad": "50 kva"
         },
-        "sitio_web": "No tiene",
-        "uso_empresa_o_venta": "venta",
-        "nombre_completo": "Lucía Hernández Parra",
         "nombre_empresa": "Constructora H&H",
-        "giro_empresa": "Construcción general",
+        "sitio_web": "hh.com",
+        "giro_empresa": "construcción",
+        "uso_empresa_o_venta": "venta",
+        "lugar_requerimiento": "Aguascalientes",
         "correo": "lucia.h@hh.com",
         "telefono": "33 9876 5432"
     }
     
-    # run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
+    run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
 
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:

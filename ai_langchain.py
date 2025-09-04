@@ -412,7 +412,8 @@ class IntelligentSlotFiller:
             - Si el usuario dice "no tengo correo", "no tengo teléfono", "no tengo empresa" → usar "No tiene" como valor
             
             REGLAS ESPECIALES PARA GIRO_EMPRESA:
-            - Si el usuario describe la actividad de su empresa → giro_empresa: [descripción de la actividad]
+            - Si el usuario describe la actividad de su empresa → giro_empresa: [descripción de la actividad
+            - Si el usuario dice "nos dedicamos a la [actividad]" → giro_empresa: [actividad]
             - Ejemplos: "venta de maquinaria pesada", "construcción", "manufactura", "servicios de mantenimiento", "distribución", "logística", etc.
             - Extrae la actividad principal, no solo palabras sueltas
             
@@ -538,9 +539,9 @@ class IntelligentSlotFiller:
             for slot_name, question, reason in slot_priority:
                 if slot_name == "detalles_maquinaria":
                     # Manejar detalles específicos de maquinaria
-                    question = self._get_maquinaria_detail_question_with_reason(current_state)
-                    if question:
-                        return {"question": question, "reason": "", "question_type": "detalles_maquinaria"}
+                    question_details = self._get_maquinaria_detail_question_with_reason(current_state)
+                    if question_details:
+                        return question_details
                 else:
                     # Verificar si el slot está vacío o tiene respuestas negativas
                     value = current_state.get(slot_name)
@@ -562,7 +563,7 @@ class IntelligentSlotFiller:
             print(f"Error generando siguiente pregunta: {e}")
             return None
     
-    def _get_maquinaria_detail_question_with_reason(self, current_state: ConversationState) -> Optional[str]:
+    def _get_maquinaria_detail_question_with_reason(self, current_state: ConversationState) -> Optional[dict]:
         """Obtiene la siguiente pregunta específica sobre detalles de maquinaria de manera conversacional con el motivo"""
         
         tipo = current_state.get("tipo_maquinaria")
@@ -579,8 +580,11 @@ class IntelligentSlotFiller:
             if not detalles.get(field_name):
                 # Encontrado el siguiente campo a preguntar
                 # Devolver la pregunta fija definida en la configuración centralizada
-                full_text = field_info.get("reason") + ", " + field_info.get("question")
-                return full_text
+                return {
+                    "question": field_info.get("question"), 
+                    "reason": field_info.get("reason"), 
+                    "question_type": "detalles_maquinaria"
+                }
 
         return None # Todos los detalles están completos
     
@@ -1014,30 +1018,10 @@ class IntelligentLeadQualificationChatbot:
             next_question_type = next_question['question_type']
             debug_print(f"DEBUG: Tipo de siguiente pregunta: {next_question_type}")
 
-            # Para preguntas específicas de maquinaria, generar respuesta simple sin LLM
-            if next_question["question_type"] == "detalles_maquinaria":
-                if extracted_info and extracted_info.get("tipo_maquinaria"):
-                    contextual_response += f"Entendido. {next_question_str}"
-                else:
-                    # Si solo hay confirmación de información extraída
-                    confirmation_parts = []
-                    if extracted_info:
-                        for key, value in extracted_info.items():
-                            if key == "nombre" and value:
-                                confirmation_parts.append(f"¡Perfecto, {value}!")
-                            elif key == "tipo_maquinaria" and value:
-                                confirmation_parts.append(f"Entendido.")
-                    
-                    if confirmation_parts:
-                        contextual_response += " ".join(confirmation_parts) + " " + next_question_str
-                    else:
-                        contextual_response += next_question_str
-            else:
-                # Para preguntas normales, usar el LLM
-                generated_response = self.response_generator.generate_response(
-                    user_message, extracted_info, self.state, next_question_str, next_question_reason
-                )
-                contextual_response += generated_response
+            generated_response = self.response_generator.generate_response(
+                user_message, extracted_info, self.state, next_question_str, next_question_reason
+            )
+            contextual_response += generated_response
 
             return self._add_message_and_return_response("assistant", contextual_response)
         
