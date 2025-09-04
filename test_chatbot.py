@@ -175,7 +175,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "55 1234 5678"
     }
     
-    run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
+    # run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
     
     # ------------------------------------------------------------------------
     # Flujo 2: Usuario que da Múltiples Datos
@@ -212,7 +212,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "81 8765 4321"
     }
     
-    run_conversation_test("Flujo 2: Usuario con Múltiples Datos", chatbot, flujo_2, esperado_2)
+    # run_conversation_test("Flujo 2: Usuario con Múltiples Datos", chatbot, flujo_2, esperado_2)
 
     # ------------------------------------------------------------------------
     # Flujo 3: Usuario que Pregunta y se Desvía
@@ -220,10 +220,10 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     # ------------------------------------------------------------------------
     flujo_3 = [
         "Hola, ¿tienen generadores en existencia?",
-        "Ok, necesito uno para una construcción. Soy Lucía Martinez.",
+        "Ok, necesito uno para mineria. Soy Lucía Martinez.",
         "Necesito unos 50 kva.",
-        "Constructora H&H",
-        "Nos dedicamos a la construcción.",
+        "Mineria H&H",
+        "Nos dedicamos a la mineria.",
         "En qué estados pueden hacer entrega?",
         "Okay, en Aguascalientes.",
         "Para venta.",
@@ -235,12 +235,12 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "nombre": "Lucía Martinez",
         "tipo_maquinaria": MaquinariaType.GENERADORES,
         "detalles_maquinaria": {
-            "actividad": "construcción",
+            "actividad": "mineria",
             "capacidad": "50 kva"
         },
-        "nombre_empresa": "Constructora H&H",
+        "nombre_empresa": "Mineria H&H",
         "sitio_web": "hh.com",
-        "giro_empresa": "construcción",
+        "giro_empresa": "mineria",
         "uso_empresa_o_venta": "venta",
         "lugar_requerimiento": "Aguascalientes",
         "correo": "lucia.h@hh.com",

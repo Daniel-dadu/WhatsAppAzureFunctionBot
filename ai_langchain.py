@@ -391,7 +391,7 @@ class IntelligentSlotFiller:
             
             CAMPOS A EXTRAER (solo si están vacíos):
             - nombre: nombre de la persona
-            - tipo_maquinaria: soldadora, compresor, torre_iluminacion, plataforma, generador, rompedor, apisonador, montacargas, manipulador
+            - tipo_maquinaria: {maquinaria_names}
             - detalles_maquinaria: objeto con campos específicos según tipo_maquinaria
             - lugar_requerimiento: lugar donde se requiere la máquina
             - sitio_web: URL del sitio web o "No tiene" (para respuestas negativas como "no", "no tenemos", "no cuenta", etc.)
@@ -412,7 +412,7 @@ class IntelligentSlotFiller:
             - Si el usuario dice "no tengo correo", "no tengo teléfono", "no tengo empresa" → usar "No tiene" como valor
             
             REGLAS ESPECIALES PARA GIRO_EMPRESA:
-            - Si el usuario describe la actividad de su empresa → giro_empresa: [descripción de la actividad
+            - Si el usuario describe la actividad de su empresa → giro_empresa: [descripción de la actividad]
             - Si el usuario dice "nos dedicamos a la [actividad]" → giro_empresa: [actividad]
             - Ejemplos: "venta de maquinaria pesada", "construcción", "manufactura", "servicios de mantenimiento", "distribución", "logística", etc.
             - Extrae la actividad principal, no solo palabras sueltas
@@ -483,9 +483,11 @@ class IntelligentSlotFiller:
         )
         
         try:
-            # Preparar el estado actual para el prompt
-            current_detalles_str = json.dumps(current_state.get("detalles_maquinaria", {}), ensure_ascii=False)
+            # Nombres de tipos de maquinaria
+            maquinaria_names = " ".join([f"\"{name.value}\"" for name in MaquinariaType])
             
+            current_detalles_str = json.dumps(current_state.get("detalles_maquinaria", {}), ensure_ascii=False)
+
             response = self.llm.invoke(prompt.format_prompt(
                 message=message,
                 current_nombre=current_state.get("nombre", "No especificado"),
@@ -499,14 +501,15 @@ class IntelligentSlotFiller:
                 current_lugar_requerimiento=current_state.get("lugar_requerimiento", "No especificado"),
                 current_correo=current_state.get("correo", "No especificado"),
                 current_telefono=current_state.get("telefono", "No especificado"),
-                last_bot_question=last_bot_question or "No hay pregunta previa (inicio de conversación)"
+                last_bot_question=last_bot_question or "No hay pregunta previa (inicio de conversación)",
+                maquinaria_names=maquinaria_names
             ))
             
             debug_print(f"DEBUG: Respuesta completa del LLM: '{response.content}'")
             
             # Parsear la respuesta JSON
             result = self.parser.parse(response.content)
-            debug_print(f"DEBUG: Información extraída por LLM: {result}")
+            print(f"DADU>: Información extraída por LLM: {result}")
             return result
             
         except Exception as e:
@@ -675,11 +678,10 @@ class IntelligentResponseGenerator:
                 MENSAJE DEL USUARIO: {user_message}
                 
                 INSTRUCCIONES:
-                1. Si se extrajo información nueva, confirma de manera amigable
-                2. Si el usuario pregunta por qué necesitas ciertos datos, explica el propósito
-                3. Si hay una siguiente pregunta, hazla de manera natural
-                4. Mantén un tono profesional pero cálido
-                5. No repitas información que ya confirmaste anteriormente
+                1. Si el usuario pregunta por qué necesitas ciertos datos, explica el propósito
+                2. Si hay una siguiente pregunta, hazla de manera natural
+                3. Mantén un tono profesional pero cálido
+                4. No repitas información que ya confirmaste anteriormente
                 
                 Genera una respuesta natural y apropiada:
             """
@@ -978,19 +980,7 @@ class IntelligentLeadQualificationChatbot:
                 debug_print(f"DEBUG: Pregunta sobre inventario detectada, generando respuesta...")
                 inventory_response = self.inventory_responder.generate_inventory_response(user_message)
 
-                # Si es el primer mensaje, agregar saludo inicial, el cual ya se agregó al contextual_response
-                inventory_response = contextual_response + inventory_response
-                
-                # Obtener la siguiente pregunta necesaria para continuar el flujo
-                next_question = self.slot_filler.get_next_question(self.state)
-                
-                if next_question:
-                    # TODO: Usar el generador de respuestas para generar la respuesta de la siguiente pregunta cuando se haga una pregunta de inventario
-                    # Combinar respuesta de inventario con la siguiente pregunta
-                    inventory_response = inventory_response + "\n\n" + next_question["question"] + "\n\n" + next_question['reason']
-                    debug_print(f"DEBUG: Respuesta combinada (inventario + siguiente pregunta): {inventory_response}")
-                
-                return self._add_message_and_return_response("assistant", inventory_response)
+                contextual_response += inventory_response
             
             # Si no es pregunta de inventario ni de requerimientos, continuar con el flujo normal
             debug_print(f"DEBUG: Flujo normal de calificación de leads...")
@@ -1005,7 +995,7 @@ class IntelligentLeadQualificationChatbot:
             # Obtener la siguiente pregunta necesaria
             next_question = self.slot_filler.get_next_question(self.state)
 
-            if next_question == None:
+            if next_question is None:
                 debug_print(f"DEBUG: Estado completo: {self.state}")
                 final_message = "Gracias por toda la información. Estoy procesando su solicitud."
                 return self._add_message_and_return_response("assistant", final_message)
