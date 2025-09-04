@@ -509,7 +509,6 @@ class IntelligentSlotFiller:
             
             # Parsear la respuesta JSON
             result = self.parser.parse(response.content)
-            print(f"DADU>: Información extraída por LLM: {result}")
             return result
             
         except Exception as e:
