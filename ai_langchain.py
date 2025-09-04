@@ -640,7 +640,7 @@ class IntelligentResponseGenerator:
     def __init__(self, llm):
         self.llm = llm
     
-    def generate_response(self, message: str, extracted_info: Dict[str, Any], current_state: ConversationState, next_question: str = None, next_question_reason: str = None) -> str:
+    def generate_response(self, message: str, extracted_info: Dict[str, Any], current_state: ConversationState, next_question: str = None, next_question_reason: str = None, is_inventory_question: bool = False) -> str:
         """Genera una respuesta contextual apropiada usando un enfoque conversacional"""
         
         try:
@@ -675,6 +675,9 @@ class IntelligentResponseGenerator:
                 RAZÓN: {next_question_reason}
            
                 MENSAJE DEL USUARIO: {user_message}
+
+                IMPORTANTE:
+                {inventory_instruction}
                 
                 INSTRUCCIONES:
                 1. Si el usuario pregunta por qué necesitas ciertos datos, explica el propósito
@@ -700,6 +703,11 @@ class IntelligentResponseGenerator:
                         safe_info[key] = value
                 extracted_info_str = json.dumps(safe_info, ensure_ascii=False, indent=2)
 
+            if is_inventory_question:
+                inventory_instruction = "Este mensaje del usuario incluye una pregunta sobre inventario, por lo tanto, menciona que no tienes acceso a la información de inventario y haz la pregunta que corresponda."
+            else:
+                inventory_instruction = "Sigue las instrucciones dadas."
+
             formatedPrompt = prompt.format_prompt(
                 user_message=message,
                 extracted_info_str=extracted_info_str,
@@ -714,7 +722,8 @@ class IntelligentResponseGenerator:
                 current_correo=current_state.get("correo", "No especificado"),
                 current_telefono=current_state.get("telefono", "No especificado"),
                 next_question=next_question or "No hay siguiente pregunta",
-                next_question_reason=next_question_reason or "No hay razón para la siguiente pregunta"
+                next_question_reason=next_question_reason or "No hay razón para la siguiente pregunta",
+                inventory_instruction=inventory_instruction
             )
             
             response = self.llm.invoke(formatedPrompt)
@@ -766,19 +775,9 @@ class InventoryResponder:
     def is_inventory_question(self, message: str) -> bool:
         """Determina si el mensaje del usuario es una pregunta sobre el inventario"""
         try:
-            # Obtener el inventario actual
-            inventory_info = f"""
-            INVENTARIO DISPONIBLE:
-            - Tipo de maquinaria: {', '.join(self.inventory['tipo_maquinaria'])}
-            - Modelo: {self.inventory['modelo_maquinaria']}
-            - Ubicación: {self.inventory['ubicacion']}
-            """
-            
             prompt = ChatPromptTemplate.from_template(
                 """
                 Eres un asistente especializado en identificar si un mensaje del usuario es una pregunta sobre inventario de maquinaria.
-                
-                {inventory_info}
                 
                 TU TAREA:
                 Determinar si el mensaje del usuario es una pregunta sobre:
@@ -819,7 +818,6 @@ class InventoryResponder:
             )
             
             response = self.llm.invoke(prompt.format_prompt(
-                inventory_info=inventory_info,
                 message=message
             ))
             
@@ -834,28 +832,6 @@ class InventoryResponder:
             import traceback
             traceback.print_exc()
             return False
-    
-    def generate_inventory_response(self, question: str) -> str:
-        """Genera una respuesta sobre el inventario basada en la pregunta del usuario"""
-        try:
-            # TODO: Usar la pregunta para consultar inventario
-            debug_print(f"DEBUG: Generando respuesta de inventario para pregunta: '{question}'")
-
-            # Obtener el inventario actual
-            result = "Actualmente tenemos el siguiente inventario:\n"
-            result += f"- Tipo de maquinaria: {', '.join(self.inventory['tipo_maquinaria'])}\n"
-            result += f"- Modelo: {self.inventory['modelo_maquinaria']}\n"
-            result += f"- Ubicación: {self.inventory['ubicacion']}\n"
-
-            debug_print(f"DEBUG: Respuesta sobre inventario generada: '{result}'")
-            
-            return result
-            
-        except Exception as e:
-            print(f"Error generando respuesta de inventario: {e}")
-            import traceback
-            traceback.print_exc()
-            return "Contamos con un amplio inventario de maquinaria industrial."
 
 # ============================================================================
 # CLASE PRINCIPAL DEL CHATBOT CON SLOT-FILLING INTELIGENTE
@@ -974,12 +950,12 @@ class IntelligentLeadQualificationChatbot:
                 self.save_conversation()
                 return None  # No response en modo agente
             
+            is_inventory_question = False
+
             # Verificar si es una pregunta sobre inventario
             if self.inventory_responder.is_inventory_question(user_message):
-                debug_print(f"DEBUG: Pregunta sobre inventario detectada, generando respuesta...")
-                inventory_response = self.inventory_responder.generate_inventory_response(user_message)
-
-                contextual_response += inventory_response
+                debug_print(f"DEBUG: Pregunta sobre inventario detectada")
+                is_inventory_question = True
             
             # Si no es pregunta de inventario ni de requerimientos, continuar con el flujo normal
             debug_print(f"DEBUG: Flujo normal de calificación de leads...")
@@ -1007,8 +983,14 @@ class IntelligentLeadQualificationChatbot:
             next_question_type = next_question['question_type']
             debug_print(f"DEBUG: Tipo de siguiente pregunta: {next_question_type}")
 
+            # Generar respuesta con LLM
             generated_response = self.response_generator.generate_response(
-                user_message, extracted_info, self.state, next_question_str, next_question_reason
+                user_message, 
+                extracted_info, 
+                self.state, 
+                next_question_str, 
+                next_question_reason, 
+                is_inventory_question
             )
             contextual_response += generated_response
 
