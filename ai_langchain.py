@@ -371,6 +371,7 @@ class IntelligentSlotFiller:
             - uso_empresa_o_venta: {current_uso}
             - nombre_empresa: {current_nombre_empresa}
             - giro_empresa: {current_giro}
+            - lugar_requerimiento: {current_lugar_requerimiento}
             - correo: {current_correo}
             - telefono: {current_telefono}
             
@@ -434,6 +435,7 @@ class IntelligentSlotFiller:
             - Mensaje: "venta de maquinaria pesada" → {{"giro_empresa": "venta de maquinaria pesada"}}
             - Mensaje: "para venta" → {{"uso_empresa_o_venta": "venta"}}
             - Mensaje: "construcción y mantenimiento" → {{"giro_empresa": "construcción y mantenimiento"}}
+            - Mensaje: "en la Ciudad de México" → {{"lugar_requerimiento": "Ciudad de México"}}
             - Mensaje: "daniel@empresa.com" → {{"correo": "daniel@empresa.com"}}
             - Mensaje: "555-1234" → {{"telefono": "555-1234"}}
             
@@ -493,6 +495,7 @@ class IntelligentSlotFiller:
                 current_uso=current_state.get("uso_empresa_o_venta", "No especificado"),
                 current_nombre_empresa=current_state.get("nombre_empresa", "No especificado"),
                 current_giro=current_state.get("giro_empresa", "No especificado"),
+                current_lugar_requerimiento=current_state.get("lugar_requerimiento", "No especificado"),
                 current_correo=current_state.get("correo", "No especificado"),
                 current_telefono=current_state.get("telefono", "No especificado"),
                 last_bot_question=last_bot_question or "No hay pregunta previa (inicio de conversación)"
@@ -518,31 +521,39 @@ class IntelligentSlotFiller:
         try:
             # Definir el orden de prioridad de los slots con explicaciones centralizadas
             slot_priority = [
-                ("nombre", "Para brindarte atención personalizada"),
-                ("apellido", "Para completar tu información personal"), # Solo se pregunta si en nombre solo dice 1 palabra
-                ("tipo_maquinaria", "Para revisar nuestro inventario disponible"),
-                ("detalles_maquinaria", None),  # Se maneja por separado
-                ("nombre_empresa", "Para generar la cotización a nombre de su empresa"),
-                ("giro_empresa", "Para entender mejor sus necesidades específicas"), # Se pregunta junto con nombre_empresa
-                ("lugar_requerimiento", "Para coordinar la entrega del equipo"),
-                ("uso_empresa_o_venta", "Para ofrecerle los mejores precios"),
-                ("sitio_web", "Para conocer mejor su empresa y generar una cotización más precisa"),
-                ("correo", "Para enviarle la cotización"),
-                ("telefono", "Para darle seguimiento personalizado") # TODO: Solo se pregunta si está respondiendo todo de forma fluida
+                ("nombre", "¿Con quién tengo el gusto?", "Para brindarte atención personalizada"),
+                ("apellido", "¿Cuál es tu apellido?", "Para completar tu información personal"), # Solo se pregunta si en nombre solo dice 1 palabra
+                ("tipo_maquinaria", "¿Qué tipo de maquinaria requiere?", "Para revisar nuestro inventario disponible"),
+                ("detalles_maquinaria", None, None),  # Se maneja por separado
+                ("nombre_empresa", "¿Cuál es el nombre de su empresa?", "Para generar la cotización a nombre de su empresa"),
+                ("giro_empresa", "¿Cuál es el giro de su empresa?", "Para entender mejor sus necesidades específicas"), # Se pregunta junto con nombre_empresa
+                ("lugar_requerimiento", "¿En qué lugar necesita el equipo?", "Para coordinar la entrega del equipo"),
+                ("uso_empresa_o_venta", "¿El equipo es para uso de la empresa o para venta?", "Para ofrecerle los mejores precios"),
+                ("sitio_web", "¿Cuál es el sitio web de su empresa?", "Para conocer mejor su empresa y generar una cotización más precisa"),
+                ("correo", "¿Cuál es su correo electrónico?", "Para enviarle la cotización"),
+                ("telefono", "¿Cuál es su teléfono?", "Para darle seguimiento personalizado") # TODO: Solo se pregunta si está respondiendo todo de forma fluida
             ]
             
             # Verificar cada slot en orden de prioridad
-            for slot_name, reason in slot_priority:
+            for slot_name, question, reason in slot_priority:
                 if slot_name == "detalles_maquinaria":
                     # Manejar detalles específicos de maquinaria
                     question = self._get_maquinaria_detail_question_with_reason(current_state)
                     if question:
-                        return {"question": question, "question_type": "detalles_maquinaria"}
+                        return {"question": question, "reason": "", "question_type": "detalles_maquinaria"}
                 else:
                     # Verificar si el slot está vacío o tiene respuestas negativas
                     value = current_state.get(slot_name)
                     if not value:
-                        return {"question": self._generate_conversational_question(slot_name, reason, current_state), "question_type": slot_name}
+                        # Si se debe preguntar por el nombre de la empresa y no se tiene el giro, preguntar por el giro de la empresa también
+                        if slot_name == "nombre_empresa" and not current_state.get("giro_empresa"):
+                            question = "¿Cuál es el nombre y giro de su empresa?"
+                        
+                        return {
+                            "question": question, 
+                            "reason": reason, 
+                            "question_type": slot_name
+                        }
             
             # Si todos los slots están llenos
             return None
@@ -550,117 +561,6 @@ class IntelligentSlotFiller:
         except Exception as e:
             print(f"Error generando siguiente pregunta: {e}")
             return None
-    
-    def _generate_conversational_question(self, field_name: str, reason: str, current_state: ConversationState) -> str:
-        """
-        Genera una pregunta conversacional natural basándose en el campo y el contexto
-        """
-        
-        try:
-            giro_empresa = current_state.get("giro_empresa")
-
-            # Verificar si es un campo de empresa y manejar la lógica especial
-            if field_name == "nombre_empresa" and not giro_empresa:
-                return self._generate_empresa_combined_question(current_state)
-            
-            prompt = ChatPromptTemplate.from_template(
-                """
-                Eres un asesor comercial en Alpha C y asistente de ventas profesional especializado en maquinaria de la empresa.
-                
-                Tu tarea es generar UNA pregunta natural y conversacional para obtener la siguiente información:
-                
-                CAMPO A PREGUNTAR: {field_name}
-                RAZÓN POR LA QUE LO NECESITAS: {reason}
-                
-                ESTADO ACTUAL:
-                - Nombre: {current_nombre}
-                - Tipo de maquinaria: {current_tipo}
-                
-                REGLAS PARA LA PREGUNTA:
-                1. Sé amigable y profesional
-                2. Explica brevemente por qué necesitas esta información
-                3. Para campos como sitio_web, correo, teléfono: haz la pregunta completa en una sola oración
-                4. Mantén la pregunta corta pero completa (máximo 50 palabras)
-                5. Usa un tono conversacional natural
-                6. Si ya tienes el nombre del usuario, puedes usarlo para personalizar
-                
-                EJEMPLOS PARA CADA CAMPO:
-                
-                Para "nombre":
-                - "¿Con quién tengo el gusto? Esto me ayuda a personalizar nuestra conversación."
-                - "Para brindarte atención personalizada, ¿podrías decirme tu nombre?"
-                
-                Para "apellido":
-                - "¿Cuál es tu apellido? Para completar tu información personal."
-                - "¿Podrías decirme tu apellido? Así completo tu información."
-                
-                Para "tipo_maquinaria":
-                - "¿Qué tipo de maquinaria estás buscando? Esto me permite revisar nuestro inventario."
-                - "¿Qué equipo necesitas? Así puedo verificar disponibilidad."
-                
-                Para "uso_empresa_o_venta":
-                - "¿Es para uso de tu empresa o para venta? Esto me permite ofrecerte los mejores precios."
-                - "¿Lo van a usar internamente o es para comercializar? Así ajusto la propuesta."
-
-                Para "nombre_empresa":
-                - "¿Cuál es el nombre de tu empresa? La cotización irá a su nombre."
-                - "¿En qué empresa trabajas? Necesito este dato para el documento."
-                
-                Para "giro_empresa":
-                - "¿A qué se dedica tu empresa? Esto me ayuda a entender mejor sus necesidades."
-                - "¿Cuál es el giro de su negocio? Me permite personalizar la recomendación."
-
-                Para "sitio_web":
-                - "¿Su empresa cuenta con algún sitio web? Si es así, ¿me lo podría compartir?"
-                - "¿Tienen página web? Si es así, me gustaría conocerla para entender mejor su giro."
-                
-                Para "correo":
-                - "¿Cuál es su correo electrónico? Por ahí le enviaré la cotización."
-                - "Para enviarle la propuesta, ¿me comparte su email?"
-                
-                Para "lugar_requerimiento":
-                - "¿En qué lugar necesita el equipo? Esto me ayuda a coordinar la entrega."
-                - "¿Dónde van a usar la maquinaria? Necesito la ubicación para el servicio."
-                
-                Para "telefono":
-                - "¿Cuál es su número de teléfono? Así puedo darle seguimiento personalizado a su cotización."
-                - "Para contactarlo después con la propuesta, ¿me comparte su teléfono?"
-                
-                IMPORTANTE - FORMATO DE PREGUNTAS:
-                - Para sitio_web: SIEMPRE usar el formato "¿Su empresa cuenta con algún sitio web? Si es así, ¿me lo podría compartir?"
-                - Para campos que pueden no existir: incluir tanto la consulta como la solicitud del dato
-                - Hacer preguntas completas en una sola oración, no dividir en partes
-                
-                Genera SOLO la pregunta (sin explicaciones adicionales):
-                """
-            )
-            
-            response = self.llm.invoke(prompt.format_prompt(
-                field_name=field_name,
-                reason=reason,
-                current_nombre=current_state.get("nombre", "No especificado"),
-                current_tipo=current_state.get("tipo_maquinaria", "No especificado")
-            ))
-            
-            question = response.content.strip()
-            debug_print(f"DEBUG: Pregunta conversacional generada para '{field_name}': '{question}'")
-            return question
-            
-        except Exception as e:
-            print(f"Error generando pregunta conversacional: {e}")
-            # Fallback a preguntas predefinidas
-            fallback_questions = {
-                "nombre": "¿Con quién tengo el gusto?",
-                "tipo_maquinaria": "¿Qué tipo de maquinaria requiere?",
-                "lugar_requerimiento": "¿En qué lugar necesita el equipo?",
-                "nombre_empresa": "¿Cuál es el nombre de su empresa?",
-                "giro_empresa": "¿Cuál es el giro de su empresa?",
-                "sitio_web": "¿Su empresa cuenta con sitio web?",
-                "uso_empresa_o_venta": "¿Es para uso de la empresa o para venta?",
-                "correo": "¿Cuál es su correo electrónico?",
-                "telefono": "¿Cuál es su teléfono?"
-            }
-            return fallback_questions.get(field_name, "¿Podría proporcionar esa información?")
     
     def _get_maquinaria_detail_question_with_reason(self, current_state: ConversationState) -> Optional[str]:
         """Obtiene la siguiente pregunta específica sobre detalles de maquinaria de manera conversacional con el motivo"""
@@ -683,48 +583,6 @@ class IntelligentSlotFiller:
                 return full_text
 
         return None # Todos los detalles están completos
-    
-    def _generate_empresa_combined_question(self, current_state: ConversationState) -> str:
-        """Genera pregunta conversacional para ambos campos de empresa usando LLM"""
-        
-        try:
-            prompt = ChatPromptTemplate.from_template(
-                """
-                Eres un asesor comercial en Alpha C y asistente de ventas profesional especializado en maquinaria de la empresa.
-                
-                Tu tarea es generar UNA pregunta natural y conversacional para obtener tanto el nombre como el giro de la empresa.
-                
-                ESTADO ACTUAL:
-                - Nombre: {current_nombre}
-                - Tipo de maquinaria: {current_tipo}
-                
-                REGLAS PARA LA PREGUNTA:
-                1. Sé amigable y profesional
-                2. Explica brevemente por qué necesitas esta información
-                3. Pregunta por AMBOS campos (nombre y giro) en una sola pregunta natural
-                4. Mantén la pregunta corta pero completa (máximo 60 palabras)
-                5. Usa un tono conversacional natural
-                6. Si ya tienes el nombre del usuario, puedes usarlo para personalizar
-                
-                EJEMPLOS:
-                - "¿Cuál es el nombre y giro de su empresa? Esto me permite generar la cotización a nombre de su empresa."
-                - "Para generar la cotización formal, ¿podrías decirme el nombre y giro de su empresa?"
-                
-                Genera SOLO la pregunta (sin explicaciones adicionales):
-                """
-            )
-            
-            response = self.llm.invoke(prompt.format_prompt(
-                current_nombre=current_state.get("nombre", "No especificado"),
-                current_tipo=current_state.get("tipo_maquinaria", "No especificado")
-            ))
-            
-            return response.content.strip()
-                
-        except Exception as e:
-            print(f"Error generando pregunta de empresa: {e}")
-            # Fallback a preguntas predefinidas
-            return "¿Cuál es el nombre y giro de su empresa? Esto me permite generar la cotización a nombre de su empresa."
     
     def is_conversation_complete(self, current_state: ConversationState) -> bool:
         """Verifica si la conversación está completa (todos los slots llenos)"""
@@ -776,7 +634,7 @@ class IntelligentResponseGenerator:
     def __init__(self, llm):
         self.llm = llm
     
-    def generate_response(self, message: str, extracted_info: Dict[str, Any], current_state: ConversationState, next_question: str = None) -> str:
+    def generate_response(self, message: str, extracted_info: Dict[str, Any], current_state: ConversationState, next_question: str = None, next_question_reason: str = None) -> str:
         """Genera una respuesta contextual apropiada usando un enfoque conversacional"""
         
         try:
@@ -791,9 +649,6 @@ class IntelligentResponseGenerator:
                 - Mantén respuestas CORTAS (máximo 50 palabras)
                 - Explica brevemente por qué necesitas cada información cuando sea apropiado
                 - Si el usuario hace preguntas sobre por qué necesitas ciertos datos, explícaselo de manera clara
-                - Responde de manera natural y conversacional
-                - Si se extrajo información nueva, confírmala de manera amigable
-                - Si hay una siguiente pregunta, hazla de manera natural
 
                 INFORMACIÓN EXTRAÍDA DEL ÚLTIMO MENSAJE:
                 {extracted_info_str}
@@ -804,12 +659,14 @@ class IntelligentResponseGenerator:
                 - Detalles: {current_detalles}
                 - Empresa: {current_empresa}
                 - Giro: {current_giro}
+                - Lugar requerimiento: {current_lugar_requerimiento}
                 - Sitio web: {current_sitio_web}
                 - Uso: {current_uso}
                 - Correo: {current_correo}
                 - Teléfono: {current_telefono}
                 
                 SIGUIENTE PREGUNTA A HACER: {next_question}
+                RAZÓN: {next_question_reason}
            
                 MENSAJE DEL USUARIO: {user_message}
                 
@@ -820,21 +677,25 @@ class IntelligentResponseGenerator:
                 4. Mantén un tono profesional pero cálido
                 5. No repitas información que ya confirmaste anteriormente
                 
-                EJEMPLOS DE RESPUESTAS:
-                - Si se extrajo nombre: "¡Okay [nombre]!"
-                - Si se extrajo maquinaria: "Entendido."
-                - Si se extrajo empresa: "Excelente, [empresa]. Esto me permite personalizar la cotización."
-                - Para explicar por qué necesitas datos: "Necesito esta información para generar una cotización precisa y contactarlo después."
-                
                 Genera una respuesta natural y apropiada:
             """
             
             prompt = ChatPromptTemplate.from_template(prompt_str)
 
-            # Preparar información extraída como string
-            extracted_info_str = "Ninguna información nueva" if not extracted_info else json.dumps(extracted_info, ensure_ascii=False, indent=2)
-            
-            response = self.llm.invoke(prompt.format_prompt(
+            # Preparar información extraída como string de manera más segura
+            if not extracted_info:
+                extracted_info_str = "Ninguna información nueva"
+            else:
+                # Filtrar información sensible antes de enviar
+                safe_info = {}
+                for key, value in extracted_info.items():
+                    if key in ['apellido', 'correo', 'telefono']:
+                        safe_info[key] = '[INFORMACIÓN PRIVADA]'
+                    else:
+                        safe_info[key] = value
+                extracted_info_str = json.dumps(safe_info, ensure_ascii=False, indent=2)
+
+            formatedPrompt = prompt.format_prompt(
                 user_message=message,
                 extracted_info_str=extracted_info_str,
                 current_nombre=current_state.get("nombre", "No especificado"),
@@ -842,12 +703,16 @@ class IntelligentResponseGenerator:
                 current_detalles=json.dumps(current_state.get("detalles_maquinaria", {}), ensure_ascii=False),
                 current_sitio_web=current_state.get("sitio_web", "No especificado"),
                 current_uso=current_state.get("uso_empresa_o_venta", "No especificado"),
+                current_lugar_requerimiento=current_state.get("lugar_requerimiento", "No especificado"),
                 current_empresa=current_state.get("nombre_empresa", "No especificado"),
                 current_giro=current_state.get("giro_empresa", "No especificado"),
                 current_correo=current_state.get("correo", "No especificado"),
                 current_telefono=current_state.get("telefono", "No especificado"),
-                next_question=next_question or "No hay siguiente pregunta"
-            ))
+                next_question=next_question or "No hay siguiente pregunta",
+                next_question_reason=next_question_reason or "No hay razón para la siguiente pregunta"
+            )
+            
+            response = self.llm.invoke(formatedPrompt)
             
             result = response.content.strip()
             debug_print(f"DEBUG: Respuesta conversacional generada: '{result}'")
@@ -855,8 +720,11 @@ class IntelligentResponseGenerator:
             
         except Exception as e:
             print(f"Error generando respuesta conversacional: {e}")
-            # Fallback a la lógica simple anterior
-            return "En un momento le responderemos"
+            # Fallback a la lógica simple si no se puede generar la respuesta
+            if next_question and next_question_reason:
+                return next_question + " " + next_question_reason
+            else:
+                return "En un momento le responderemos."
     
     def generate_final_response(self, current_state: ConversationState) -> str:
         """Genera la respuesta final cuando la conversación está completa"""
@@ -867,10 +735,11 @@ He registrado toda su información:
 - Nombre: {current_state['nombre']}
 - Maquinaria: {current_state['tipo_maquinaria'].value}
 - Detalles: {json.dumps(current_state['detalles_maquinaria'], indent=2, ensure_ascii=False)}
-- Sitio web: {current_state['sitio_web']}
-- Uso: {current_state['uso_empresa_o_venta']}
 - Empresa: {current_state['nombre_empresa']}
 - Giro: {current_state['giro_empresa']}
+- Lugar requerimiento: {current_state['lugar_requerimiento']}
+- Uso: {current_state['uso_empresa_o_venta']}
+- Sitio web: {current_state['sitio_web']}
 - Correo: {current_state['correo']}
 - Teléfono: {current_state['telefono']}
 
@@ -1112,9 +981,9 @@ class IntelligentLeadQualificationChatbot:
                 next_question = self.slot_filler.get_next_question(self.state)
                 
                 if next_question:
-                    the_question = next_question["question"]
+                    # TODO: Usar el generador de respuestas para generar la respuesta de la siguiente pregunta cuando se haga una pregunta de inventario
                     # Combinar respuesta de inventario con la siguiente pregunta
-                    inventory_response = f"{inventory_response}\n\n{the_question}"
+                    inventory_response = inventory_response + "\n\n" + next_question["question"] + "\n\n" + next_question['reason']
                     debug_print(f"DEBUG: Respuesta combinada (inventario + siguiente pregunta): {inventory_response}")
                 
                 return self._add_message_and_return_response("assistant", inventory_response)
@@ -1138,6 +1007,7 @@ class IntelligentLeadQualificationChatbot:
                 return self._add_message_and_return_response("assistant", final_message)
 
             next_question_str = next_question["question"]
+            next_question_reason = next_question["reason"]
 
             debug_print(f"DEBUG: Siguiente pregunta: {next_question_str}")
 
@@ -1165,7 +1035,7 @@ class IntelligentLeadQualificationChatbot:
             else:
                 # Para preguntas normales, usar el LLM
                 generated_response = self.response_generator.generate_response(
-                    user_message, extracted_info, self.state, next_question_str
+                    user_message, extracted_info, self.state, next_question_str, next_question_reason
                 )
                 contextual_response += generated_response
 
@@ -1271,6 +1141,8 @@ class IntelligentLeadQualificationChatbot:
             "nombre_empresa": self.state["nombre_empresa"],
             "sitio_web": self.state["sitio_web"],
             "giro_empresa": self.state["giro_empresa"],
+            "lugar_requerimiento": self.state["lugar_requerimiento"],
+            "uso_empresa_o_venta": self.state["uso_empresa_o_venta"],
             "correo": self.state["correo"],
             "telefono": self.state["telefono"],
             "conversacion_completa": self.state["completed"],
