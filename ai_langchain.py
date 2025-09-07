@@ -386,8 +386,7 @@ class IntelligentSlotFiller:
             4. Responde SOLO en formato JSON válido
             5. IMPORTANTE: Si el mensaje del usuario no contiene información nueva para campos vacíos, responde con {{}} (JSON vacío)
             6. NO extraigas información de campos que ya están llenos, incluso si el usuario dice algo que podría interpretarse como información
-            7. CONTEXTO DE LA ÚLTIMA PREGUNTA: Usa la última pregunta del bot para interpretar mejor la respuesta del usuario
-            8. CLASIFICACIÓN INTELIGENTE: Si la última pregunta es sobre un campo específico, clasifica la respuesta en ese campo
+            7. CLASIFICACIÓN INTELIGENTE: Si la última pregunta es sobre un campo específico, clasifica la respuesta en ese campo
             
             CAMPOS A EXTRAER (solo si están vacíos):
             - nombre: nombre de la persona
@@ -640,7 +639,14 @@ class IntelligentResponseGenerator:
     def __init__(self, llm):
         self.llm = llm
     
-    def generate_response(self, message: str, extracted_info: Dict[str, Any], current_state: ConversationState, next_question: str = None, next_question_reason: str = None, is_inventory_question: bool = False) -> str:
+    def generate_response(self, 
+        message: str, 
+        extracted_info: Dict[str, Any], 
+        current_state: ConversationState, 
+        next_question: str = None, 
+        next_question_reason: str = None, 
+        is_inventory_question: bool = False
+    ) -> str:
         """Genera una respuesta contextual apropiada usando un enfoque conversacional"""
         
         try:

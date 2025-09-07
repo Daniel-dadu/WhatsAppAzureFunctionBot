@@ -212,7 +212,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "81 8765 4321"
     }
     
-    # run_conversation_test("Flujo 2: Usuario con Múltiples Datos", chatbot, flujo_2, esperado_2)
+    run_conversation_test("Flujo 2: Usuario con Múltiples Datos", chatbot, flujo_2, esperado_2)
 
     # ------------------------------------------------------------------------
     # Flujo 3: Usuario que Pregunta y se Desvía
