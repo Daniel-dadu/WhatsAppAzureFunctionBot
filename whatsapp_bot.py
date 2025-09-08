@@ -108,7 +108,7 @@ class WhatsAppBot:
             if safety_result:
                 response_for_lead = "No me queda claro lo que dices. ¿Podrías explicarme mejor?"
                 # Guardar mensajes de seguridad en la base de datos
-                self._save_safety_messages(wa_id, safety_result["message"], message_text, response_for_lead)
+                self._save_safety_messages(wa_id, safety_result["message"], response_for_lead)
                 return response_for_lead
 
             # Verificar si es un comando especial
@@ -146,7 +146,7 @@ class WhatsAppBot:
         ]
         return wa_id in authorized_ids
     
-    def _save_safety_messages(self, wa_id: str, safety_message: str, original_message: str, response_for_lead: str) -> None:
+    def _save_safety_messages(self, wa_id: str, safety_message: str, response_for_lead: str) -> None:
         """
         Guarda los mensajes de seguridad en la base de datos usando _append_messages.
         Guarda el mensaje de seguridad del bot y la respuesta genérica.
