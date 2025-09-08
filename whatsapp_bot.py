@@ -10,6 +10,7 @@ from ai_langchain import AzureOpenAIConfig, IntelligentLeadQualificationChatbot
 from state_management import ConversationStateStore
 from typing import Optional
 from hubspot_manager import HubSpotManager
+from check_guardrails import ContentSafetyGuardrails
 
 # ============================================================================
 # CLASE PRINCIPAL DEL BOT DE WHATSAPP
@@ -30,6 +31,9 @@ class WhatsAppBot:
 
         # Una sola instancia del chatbot que manejará todos los usuarios
         self.chatbot = IntelligentLeadQualificationChatbot(self.langchain_config, self.state_store)
+
+        # Una sola instancia del guardrails
+        self.guardrails = ContentSafetyGuardrails()
         
     def _initialize_langchain_config(self):
         """Inicializa la configuración de LangChain con Azure OpenAI"""
@@ -98,6 +102,14 @@ class WhatsAppBot:
         Procesa un mensaje entrante y retorna la respuesta usando LangChain.
         """
         try:
+            # Verificar si el mensaje es seguro
+            safety_result = self.guardrails.check_message_safety(message_text)
+            if safety_result:
+                response_for_lead = "No me queda claro lo que dices. ¿Podrías explicarme mejor?"
+                # Guardar mensajes de seguridad en la base de datos
+                self._save_safety_messages(wa_id, safety_result["message"], message_text, response_for_lead)
+                return response_for_lead
+
             # Verificar si es un comando especial
             if message_text.lower() == "reset":
                 hubspot_manager.delete_contact()
@@ -133,11 +145,36 @@ class WhatsAppBot:
         ]
         return wa_id in authorized_ids
     
-    def get_conversation_summary(self, wa_id: str) -> dict:
-        """Obtiene un resumen de la conversación actual del usuario."""
-        self.chatbot.load_conversation(wa_id)
-        return self.chatbot.get_conversation_summary()
-    
+    def _save_safety_messages(self, wa_id: str, safety_message: str, original_message: str, response_for_lead: str) -> None:
+        """
+        Guarda los mensajes de seguridad en la base de datos usando _append_messages.
+        Guarda el mensaje de seguridad del bot y la respuesta genérica.
+        """
+        try:
+            # Asegurar que el usuario tenga una conversación cargada
+            self.chatbot.save_conversation()
+
+            # Preparar los dos mensajes a guardar
+            safety_messages = [
+                {
+                    "content": safety_message,
+                    "role": "user",
+                    "timestamp": None  # Se generará automáticamente en _append_messages
+                },
+                {
+                    "content": response_for_lead,
+                    "role": "bot",
+                    "timestamp": None  # Se generará automáticamente en _append_messages
+                }
+            ]
+            
+            # Usar _append_messages para guardar los mensajes
+            self.state_store._append_messages(wa_id, safety_messages)
+            logging.info(f"Mensajes de seguridad guardados para usuario {wa_id}")
+            
+        except Exception as e:
+            logging.error(f"Error guardando mensajes de seguridad para usuario {wa_id}: {e}")
+
     def _get_conversation_status(self, wa_id: str) -> str:
         """Obtiene el estado actual de la conversación del usuario."""
         try:

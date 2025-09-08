@@ -101,39 +101,34 @@ class ContentSafetyGuardrails:
             return None
 
     def check_conversation_safety(self, message: str):
+        """
+        Clasifica un mensaje en: valido, competencia_prohibido, fuera_de_dominio.
+        Devuelve True si el mensaje no es valido, False si es valido.
+        """
         clasificacion = clasificar_mensaje(message)
-        if clasificacion == "valido":
-            return None
-
-        result = {
-            "type": "invalid_conversation",
-            "message": ""
-        }
-        if clasificacion == "competencia_prohibido":
-            result["message"] = "El mensaje contiene una consulta sobre competencia, es decir, el usuario probablemente está buscando información sobre otros proveedores"
-        elif clasificacion == "fuera_de_dominio":
-            result["message"] = "El mensaje contiene contenido fuera de dominio, es decir, el usuario probablemente está preguntando sobre algo que no es de maquinaria"
-        return result
+        return clasificacion != "valido"
 
     def check_message_safety(self, message: str):
         if self.detect_code_injection(message):
             return {
                 "type": "code_injection",
-                "message": "Se ha detectado un posible intento de inyección de código en el mensaje."
+                "message": "MENSAJE INVÁLIDO: Se ha detectado un posible intento de inyección de código en el mensaje."
             }
         if self.check_content_safety(message):
             return {
                 "type": "content_safety", 
-                "message": "El mensaje contiene contenido inapropiado, es decir, el usuario probablemente usó lenguaje inapropiado"
+                "message": "MENSAJE INVÁLIDO: El mensaje contiene contenido inapropiado, es decir, el usuario probablemente usó lenguaje con contenido sexual, violento, de odio o autoagresión."
             }
         if self.detect_groundness_result(message):
             return {
                 "type": "groundness", 
-                "message": "El mensaje contiene un ataque de groundness, es decir, el usuario probablemente intentó cambiar el comportamiento del bot"
+                "message": "MENSAJE INVÁLIDO: El mensaje contiene un ataque de groundness, es decir, el usuario probablemente intentó cambiar el comportamiento del bot."
             }
-        conversation_safety = self.check_conversation_safety(message)
-        if conversation_safety:
-            return conversation_safety
+        if self.check_conversation_safety(message):
+            return {
+                "type": "invalid_conversation",
+                "message": "MENSAJE INVÁLIDO: El mensaje contiene contenido fuera de dominio, es decir, el usuario probablemente está preguntando sobre algo que no es de maquinaria o quiere información que no se le debe dar."
+            }
         return None
 
 """
