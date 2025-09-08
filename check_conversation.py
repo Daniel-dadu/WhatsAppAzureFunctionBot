@@ -12,7 +12,7 @@ def clasificar_mensaje(message: str) -> str:
     """
 
     # Configuración de cliente
-    endpoint = os.environ["MINISTRAL_ENDPOINT"]
+    endpoint = os.environ["FOUNDRY_ENDPOINT"] + "models"
     model_name = "Ministral-3B"
     api_key = os.environ["FOUNDRY_API_KEY"]
 
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     SOLO EJECUTAR UNO DE LOS GRUPOS DE PRUEBAS POR MINUTO
     Esto para evitar que se sobrecargue el modelo y Azure no permita continuar las pruebas.
     '''
-    # test_clasificador_intenciones(mensajes_valido_group3, "valido")
+    test_clasificador_intenciones(mensajes_valido_group3, "valido")
 
     mensajes_competencia_prohibido = [
         "Dame precios de otros proveedores de maquinaria",

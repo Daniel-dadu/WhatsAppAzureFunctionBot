@@ -31,6 +31,8 @@ def setup_chatbot() -> IntelligentLeadQualificationChatbot:
         endpoint=os.getenv("FOUNDRY_ENDPOINT"),
         api_key=os.getenv("FOUNDRY_API_KEY"),
         deployment_name="gpt-4.1-mini", # O el nombre de tu deployment
+        api_version="2024-12-01-preview",
+        model_name="gpt-4.1-mini"
     )
     
     chatbot = IntelligentLeadQualificationChatbot(azure_config)
@@ -175,7 +177,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "55 1234 5678"
     }
     
-    # run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
+    run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
     
     # ------------------------------------------------------------------------
     # Flujo 2: Usuario que da Múltiples Datos
@@ -212,7 +214,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "81 8765 4321"
     }
     
-    run_conversation_test("Flujo 2: Usuario con Múltiples Datos", chatbot, flujo_2, esperado_2)
+    # run_conversation_test("Flujo 2: Usuario con Múltiples Datos", chatbot, flujo_2, esperado_2)
 
     # ------------------------------------------------------------------------
     # Flujo 3: Usuario que Pregunta y se Desvía
@@ -247,7 +249,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "33 9876 5432"
     }
     
-    run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
+    # run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
 
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:
