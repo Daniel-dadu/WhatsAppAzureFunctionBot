@@ -9,6 +9,7 @@ import requests
 from ai_langchain import AzureOpenAIConfig, IntelligentLeadQualificationChatbot
 from state_management import ConversationStateStore
 from typing import Optional
+from datetime import datetime, timezone
 from hubspot_manager import HubSpotManager
 from check_guardrails import ContentSafetyGuardrails
 
@@ -159,12 +160,12 @@ class WhatsAppBot:
                 {
                     "content": safety_message,
                     "role": "user",
-                    "timestamp": None  # Se generará automáticamente en _append_messages
+                    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # Se generará automáticamente en _append_messages
                 },
                 {
                     "content": response_for_lead,
                     "role": "bot",
-                    "timestamp": None  # Se generará automáticamente en _append_messages
+                    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # Se generará automáticamente en _append_messages
                 }
             ]
             

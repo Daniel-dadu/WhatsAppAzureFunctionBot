@@ -11,6 +11,9 @@ load_dotenv()
 # Importa las clases necesarias de tu archivo de chatbot
 from ai_langchain import IntelligentLeadQualificationChatbot, AzureOpenAIConfig, MaquinariaType
 
+# Importar la clase de los guardrails
+from check_guardrails import ContentSafetyGuardrails
+
 # ============================================================================
 # CONFIGURACIÓN INICIAL
 # ============================================================================
@@ -69,10 +72,18 @@ def run_conversation_test(
     
     # Reinicia el estado del chatbot para una prueba limpia
     chatbot.reset_conversation()
+
+    # Una sola instancia del guardrails
+    guardrails = ContentSafetyGuardrails()
     
     # Simula la conversación
     for i, user_message in enumerate(conversation_flow):
         output_lines.append(f"👤 Usuario: {user_message}")
+
+        safety_result = guardrails.check_message_safety(user_message)
+        if safety_result:
+            output_lines.append(f"❌ Bot: {safety_result['message']}")
+            continue
         
         bot_response = chatbot.send_message(user_message)
         output_lines.append(f"🤖 Bot: {bot_response}\n")
@@ -177,7 +188,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "55 1234 5678"
     }
     
-    run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
+    # run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
     
     # ------------------------------------------------------------------------
     # Flujo 2: Usuario que da Múltiples Datos
@@ -242,14 +253,14 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         },
         "nombre_empresa": "Mineria H&H",
         "sitio_web": "hh.com",
-        "giro_empresa": "mineria",
+        "giro_empresa": "Mineria",
         "uso_empresa_o_venta": "venta",
         "lugar_requerimiento": "Aguascalientes",
         "correo": "lucia.h@hh.com",
         "telefono": "33 9876 5432"
     }
     
-    # run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
+    run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
 
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:

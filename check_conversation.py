@@ -3,6 +3,7 @@ import json
 from azure.ai.inference import ChatCompletionsClient
 from azure.ai.inference.models import SystemMessage, UserMessage
 from azure.core.credentials import AzureKeyCredential
+from state_management import MaquinariaType
 
 def clasificar_mensaje(message: str) -> str:
     """
@@ -22,18 +23,20 @@ def clasificar_mensaje(message: str) -> str:
         api_version="2024-05-01-preview"
     )   
 
+    maquinaria_types = [maquinaria_type.value for maquinaria_type in MaquinariaType]
+
     system_prompt = (
         "Eres un clasificador de intenciones para un chatbot de ventas de maquinaria.\n\n"
         "Clasifica cada mensaje en UNA de estas tres categorías:\n\n"
         
         "1. VALIDO - Incluye CUALQUIER consulta con las siguientes características:\n"
-        "   - Preguntas sobre tipos de maquinaria (soldadoras, compresores, generadores, plataformas, etc.)\n"
+        "   - Preguntas sobre tipos de maquinaria:" + ", ".join(maquinaria_types) + "\n"
         "   - Consultas sobre PRECIOS de maquinaria específica\n"
         "   - Preguntas sobre disponibilidad de inventario\n"
         "   - Preguntas sobre características y especificaciones\n"
         "   - Consultas sobre marcas de maquinaria\n"
         "   - Solicitudes de cotización\n"
-        "   - Información personal del cliente (nombre, empresa, contacto)\n"
+        "   - Información personal del cliente (nombre, empresa, contacto, lugar de requerimiento)\n"
         "   - Detalles sobre proyectos que requieren maquinaria\n\n"
         
         "2. COMPETENCIA_PROHIBIDO - Consultas sobre otros proveedores:\n"
@@ -43,7 +46,7 @@ def clasificar_mensaje(message: str) -> str:
         "   - Consultas sobre alternativas a Alpha C\n\n"
         
         "3. FUERA_DE_DOMINIO - Cualquier tema no relacionado con maquinaria:\n"
-        "   - Geografía, historia, ciencia general\n"
+        "   - Historia, ciencia general\n"
         "   - Entretenimiento, deportes, cultura\n"
         "   - Tecnología no relacionada con maquinaria\n"
         "   - Chistes, conversación casual\n"
@@ -180,13 +183,16 @@ if __name__ == "__main__":
         "También necesito repuestos",
         "¿Incluye mantenimiento?",
         "¿Dan capacitación?",
-        "¿Tienen servicio técnico?"
+        "¿Tienen servicio técnico?",
+    ]
+    mensajes_valido_group5 = [
+        "Quiero una torre de luz"
     ]
     '''
     SOLO EJECUTAR UNO DE LOS GRUPOS DE PRUEBAS POR MINUTO
     Esto para evitar que se sobrecargue el modelo y Azure no permita continuar las pruebas.
     '''
-    test_clasificador_intenciones(mensajes_valido_group3, "valido")
+    test_clasificador_intenciones(mensajes_valido_group5, "valido")
 
     mensajes_competencia_prohibido = [
         "Dame precios de otros proveedores de maquinaria",
