@@ -6,6 +6,8 @@ import requests
 from typing import Dict, Optional
 import logging
 import json
+from maquinaria_config import MAQUINARIA_CONFIG
+from state_management import MaquinariaType
 
 # Lista de productos de interés registrados en HubSpot
 PRODUCTO_INTERESADO = [
@@ -148,7 +150,7 @@ class HubSpotManager:
 
             for key, value in extracted_info.items():
                 current_value = state.get(key)
-                if key != "detalles_maquinaria" and current_value and current_value not in ["No especificado", "No tiene", None, ""]:
+                if key not in ["detalles_maquinaria", "apellido"] and current_value and current_value not in ["No especificado", "No tiene", None, ""]:
                     continue
 
                 if key == "nombre":
@@ -159,6 +161,8 @@ class HubSpotManager:
                     nombre_actual = state.get("nombre", "")
                     if nombre_actual and value:
                         properties["firstname"] = f"{nombre_actual} {value}".strip()
+                    else:
+                        properties["firstname"] = extracted_info["nombre"] + " " + value
 
                 elif key == "tipo_maquinaria":
                     # TODO: mejorar con el valor real
@@ -167,9 +171,10 @@ class HubSpotManager:
                 elif key == "detalles_maquinaria" and isinstance(value, dict):
                     current_detalles = state.get("detalles_maquinaria", {})
                     current_detalles.update(value)
-                    # Convertir detalles_maquinaria a string
-                    current_detalles_str = json.dumps(current_detalles)
-                    properties["caracteristicas_de_maquinaria_de_interes"] = current_detalles_str
+                    
+                    # Convertir detalles_maquinaria a texto legible usando MAQUINARIA_CONFIG
+                    current_detalles_text = self._convert_detalles_to_text(current_detalles, state.get("tipo_maquinaria"))
+                    properties["caracteristicas_de_maquinaria_de_interes"] = current_detalles_text
 
                 elif key == "nombre_empresa":
                     properties["company"] = value
@@ -236,3 +241,46 @@ class HubSpotManager:
         except Exception as e:
             logging.error(f"Error eliminando contacto: {e}")
             return None
+
+    def _convert_detalles_to_text(self, detalles: Dict, tipo_maquinaria) -> str:
+        """Convierte los detalles de maquinaria a texto legible usando las preguntas de MAQUINARIA_CONFIG"""
+        
+        if not tipo_maquinaria or not detalles:
+            return json.dumps(detalles, ensure_ascii=False)
+        
+        try:
+            # Obtener el tipo de maquinaria como enum
+            tipo_enum = None
+            if isinstance(tipo_maquinaria, str):
+                tipo_enum = MaquinariaType(tipo_maquinaria)
+            else:
+                # Si ya es un enum, usar directamente
+                tipo_enum = tipo_maquinaria
+            
+            # Obtener la configuración para este tipo
+            if tipo_enum not in MAQUINARIA_CONFIG:
+                return json.dumps(detalles, ensure_ascii=False)
+            
+            config = MAQUINARIA_CONFIG[tipo_enum]
+            text_parts = []
+            
+            # Para cada campo en los detalles, buscar su pregunta correspondiente
+            for field_name, field_value in detalles.items():
+                if field_value:
+                    # Buscar la pregunta para este campo
+                    question = None
+                    for field_config in config["fields"]:
+                        if field_config["name"] == field_name:
+                            question = field_config["question"]
+                            break
+                    
+                    if question:
+                        text_parts.append(f"{question} Respuesta: {field_value}")
+                    else:
+                        text_parts.append(f"{field_name}: {field_value}")
+            
+            return ". ".join(text_parts) + "." if text_parts else ""
+            
+        except Exception as e:
+            logging.error(f"Error convirtiendo detalles a texto: {e}")
+            return json.dumps(detalles, ensure_ascii=False)
