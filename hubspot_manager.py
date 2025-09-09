@@ -145,6 +145,10 @@ class HubSpotManager:
 
         properties = {}
 
+        # Si no hay información extraída, no actualizar el contacto
+        if not extracted_info:
+            return None
+
         try:
             logging.info(f"Actualizando contacto en HubSpot con información: {extracted_info}")
 
