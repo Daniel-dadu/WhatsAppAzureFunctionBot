@@ -245,12 +245,13 @@ def agent_message(req: func.HttpRequest) -> func.HttpResponse:
         whatsapp_bot = create_whatsapp_bot()
         
         # Enviar mensaje al lead vía WhatsApp
-        success = whatsapp_bot.send_message(wa_id, message)
-        
-        if success:
-            return func.HttpResponse("Agent message processed successfully", status_code=200)
+        whatsapp_message_id = whatsapp_bot.send_message(wa_id, message)
+
+        if whatsapp_message_id:
+            # Regresar el ID de WhatsApp del mensaje
+            return func.HttpResponse(whatsapp_message_id, status_code=200)
         else:
-            return func.HttpResponse("Error processing agent message", status_code=500)
+            return func.HttpResponse("Error sending agent message", status_code=500)
             
     except Exception as e:
         logging.error(f"Error en endpoint agent-message: {e}")
