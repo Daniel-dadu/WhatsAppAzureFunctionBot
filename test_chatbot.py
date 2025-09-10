@@ -268,6 +268,9 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
         print("✅ ¡Chatbot iniciado correctamente!")
         print("📝 Escriba 'salir' para terminar.")
         print("💬 ¡Usted inicia la conversación! Escriba su mensaje:\n")
+
+        # Una sola instancia del guardrails
+        guardrails = ContentSafetyGuardrails()
         
         # Loop de conversación
         while True:
@@ -284,6 +287,11 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
                     continue
 
                 if user_input:
+                    safety_result = guardrails.check_message_safety(user_input)
+                    if safety_result:
+                        print(f"❌ Bot: {safety_result['message']}")
+                        continue
+                    
                     response = chatbot.send_message(user_input)
                     print(f"🤖 Bot: {response}")
                     
@@ -324,6 +332,6 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
 
 if __name__ == "__main__":
     chatbot_instance = setup_chatbot()
-    define_test_flows(chatbot_instance)
-    # test_manually(chatbot_instance)
+    # define_test_flows(chatbot_instance)
+    test_manually(chatbot_instance)
     print("\n🎉 Todas las pruebas han finalizado.")

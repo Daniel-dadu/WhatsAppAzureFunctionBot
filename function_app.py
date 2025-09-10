@@ -112,7 +112,7 @@ def handle_message(req):
     """
 
     body = req.get_json()
-    # logging.info(f"request body: {body}")
+    logging.info(f"request body: {body}")
 
     # Check if it's a WhatsApp status update (ignore these)
     if (
@@ -176,9 +176,10 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
     logging.info(f"message: {message}")
 
     if "text" in message:
-        # Handle text messages with AI conversation manager
+        # Extraer el contenido en texto del mensaje
         message_body = message["text"]["body"]
-        # logging.info(f"message_body: {message_body}")
+        # Extraer el id del mensaje asignado por WhatsApp
+        whatsapp_message_id = message["id"]
 
         # Cargar conversación
         whatsapp_bot.chatbot.load_conversation(wa_id)
@@ -203,7 +204,7 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
             logging.info(f"Timeout de agente detectado para {wa_id}, regresando a modo bot")
 
         # Ejecutar slot-filling usando el contexto del último mensaje (agente o bot)
-        response = whatsapp_bot.process_message(wa_id, message_body, hubspot_manager)
+        response = whatsapp_bot.process_message(wa_id, message_body, whatsapp_message_id, hubspot_manager)
         
         # Solo se genera respuesta en modo bot
         if response is not None:
@@ -217,6 +218,7 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
                 whatsapp_bot.send_message(wa_id, error_message)
         
     else:
+        # TODO: Esto se debería registrar en Cosmos DB
         # Handle non-text messages with a help message
         logging.info(f"Message Type: NON-TEXT")
         help_text = "¡Hola! Solo puedo procesar mensajes de texto. Por favor, envíame un mensaje de texto y te responderé con información sobre maquinaria."

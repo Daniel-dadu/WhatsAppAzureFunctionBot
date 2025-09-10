@@ -658,7 +658,7 @@ class IntelligentLeadQualificationChatbot:
             self.state_store.delete_conversation_state(self.current_user_id)
         self.state = self._create_empty_state()
     
-    def send_message(self, user_message: str, hubspot_manager: HubSpotManager = None) -> str:
+    def send_message(self, user_message: str, whatsapp_message_id: str = None, hubspot_manager: HubSpotManager = None) -> str:
         """
         Procesa un mensaje del usuario con slot-filling inteligente.
         Si hubspot_manager es None, no se actualiza el contacto en HubSpot (para poder usar test_chatbot.py)
@@ -681,6 +681,7 @@ class IntelligentLeadQualificationChatbot:
             # Agregar mensaje del usuario
             self.state["messages"].append({
                 "role": "user", 
+                "whatsapp_message_id": whatsapp_message_id,
                 "content": user_message,
                 "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "sender": "lead"

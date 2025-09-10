@@ -158,6 +158,7 @@ class CosmosDBStateStore(ConversationStateStore):
         for msg in state["messages"]:
             msg_formatted = {
                 "id": f"msg_{len(messages_formatted)+1}",
+                "whatsapp_message_id": msg.get("whatsapp_message_id", ""),
                 "sender": msg.get("sender", "lead" if msg["role"] == "user" else "bot"),
                 "text": msg["content"],
                 "timestamp": msg.get("timestamp", now),

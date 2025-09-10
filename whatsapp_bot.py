@@ -91,14 +91,15 @@ class WhatsAppBot:
             response = requests.post(url, data=data, headers=headers, timeout=10)
             response.raise_for_status()
             
-            # logging.info(f"Mensaje enviado exitosamente a {wa_id}")
+            logging.info(f"Mensaje enviado exitosamente, response: {response.json()}")
+            # Mensaje enviado exitosamente, response: {'messaging_product': 'whatsapp', 'contacts': [{'input': '529931340372', 'wa_id': '5219931340372'}], 'messages': [{'id': 'wamid.HBgNNTIxOTkzMTM0MDM3MhUCABEYEjNDMUE3QkFFRjBGQjMxNzBGNQA='}]}
             return True
             
         except Exception as e:
             logging.error(f"Error enviando mensaje a {wa_id}: {e}")
             return False
     
-    def process_message(self, wa_id: str, message_text: str, hubspot_manager: HubSpotManager) -> str:
+    def process_message(self, wa_id: str, message_text: str, whatsapp_message_id: str, hubspot_manager: HubSpotManager) -> str:
         """
         Procesa un mensaje entrante y retorna la respuesta usando LangChain.
         """
@@ -119,7 +120,7 @@ class WhatsAppBot:
                 return self._get_conversation_status(wa_id)
             
             # Procesar mensaje con LangChain
-            response = self.chatbot.send_message(message_text, hubspot_manager)
+            response = self.chatbot.send_message(message_text, whatsapp_message_id, hubspot_manager)
                 
             return response
             
@@ -140,9 +141,7 @@ class WhatsAppBot:
         """
         authorized_ids = [
             os.environ['RECIPIENT_WAID'],
-            "5212212122080",
-            "5219512397285",
-            "5217821730008"
+            os.environ['RECIPIENT_WAID_2']
         ]
         return wa_id in authorized_ids
     
