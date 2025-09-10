@@ -599,7 +599,7 @@ class InventoryResponder:
 class IntelligentLeadQualificationChatbot:
     """Chatbot con slot-filling inteligente que detecta información ya proporcionada"""
     
-    def __init__(self, azure_config: AzureOpenAIConfig, state_store: Optional[ConversationStateStore] = None):
+    def __init__(self, azure_config: AzureOpenAIConfig, state_store: Optional[ConversationStateStore] = None, send_message_callback=None):
         self.azure_config = azure_config
         self.llm = azure_config.create_llm()
         self.slot_filler = IntelligentSlotFiller(self.llm)
@@ -609,6 +609,9 @@ class IntelligentLeadQualificationChatbot:
         # Usar el state_store proporcionado o crear uno en memoria por defecto
         self.state_store = state_store or InMemoryStateStore()
         self.current_user_id = None
+        
+        # Callback para enviar mensajes por WhatsApp
+        self.send_message_callback = send_message_callback
         
         # El estado local sigue existiendo para compatibilidad con código existente
         self.state = self._create_empty_state()
@@ -725,7 +728,7 @@ class IntelligentLeadQualificationChatbot:
                 debug_print(f"DEBUG: Conversación completa!")
                 self.state["completed"] = True
                 final_response = self.response_generator.generate_final_response(self.state)
-                return self._add_message_and_return_response("assistant", final_response)
+                return self._add_message_and_return_response(final_response)
             
             # Obtener la siguiente pregunta necesaria
             next_question = self.slot_filler.get_next_question(self.state)
@@ -733,7 +736,7 @@ class IntelligentLeadQualificationChatbot:
             if next_question is None:
                 debug_print(f"DEBUG: Estado completo: {self.state}")
                 final_message = "Gracias por toda la información. Estoy procesando su solicitud."
-                return self._add_message_and_return_response("assistant", final_message)
+                return self._add_message_and_return_response(final_message)
 
             next_question_str = next_question["question"]
             next_question_reason = next_question["reason"]
@@ -754,21 +757,34 @@ class IntelligentLeadQualificationChatbot:
             )
             contextual_response += generated_response
 
-            return self._add_message_and_return_response("assistant", contextual_response)
+            return self._add_message_and_return_response(contextual_response)
         
         except Exception as e:
             print(f"Error procesando mensaje: {e}")
             return "Disculpe, hubo un error técnico. ¿Podría intentar de nuevo?"
         
-    def _add_message_and_return_response(self, message_type: str, response: str) -> str:
+    def _add_message_and_return_response(self, response: str) -> str:
         """
         Añade un mensaje al estado y devuelve la respuesta final
+        Si es un mensaje del bot y hay callback disponible, envía por WhatsApp primero
         """
+        whatsapp_message_id = ""
+        
+        # Enviar mensaje por WhatsApp primero
+        try:
+            whatsapp_message_id = self.send_message_callback(self.current_user_id, response)
+            debug_print(f"DEBUG: Mensaje enviado por WhatsApp con ID: {whatsapp_message_id}")
+        except Exception as e:
+            debug_print(f"DEBUG: Error enviando mensaje por WhatsApp: {e}")
+            # Continuar sin el ID si hay error
+        
+        # Crear el mensaje con el ID de WhatsApp       
         self.state["messages"].append({
-            "role": message_type, 
+            "role": "assistant", 
+            "whatsapp_message_id": whatsapp_message_id,
             "content": response,
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "sender": "bot" if message_type == "assistant" else "lead"
+            "sender": "bot"
         })
         
         # Al final, guardar el estado

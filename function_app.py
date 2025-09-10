@@ -204,18 +204,8 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
             logging.info(f"Timeout de agente detectado para {wa_id}, regresando a modo bot")
 
         # Ejecutar slot-filling usando el contexto del último mensaje (agente o bot)
-        response = whatsapp_bot.process_message(wa_id, message_body, whatsapp_message_id, hubspot_manager)
-        
-        # Solo se genera respuesta en modo bot
-        if response is not None:
-            # Modo bot: procesar normalmente con respuesta automática
-            logging.info(f"Modo bot activo para {wa_id}, procesando normalmente")
-            try:
-                whatsapp_bot.send_message(wa_id, response)
-            except Exception as e:
-                logging.error(f"Error processing message: {e}")
-                error_message = "Disculpa, hubo un problema técnico. ¿Podrías repetir tu mensaje?"
-                whatsapp_bot.send_message(wa_id, error_message)
+        # Ahora el chatbot envía automáticamente las respuestas por WhatsApp
+        whatsapp_bot.process_message(wa_id, message_body, whatsapp_message_id, hubspot_manager)
         
     else:
         # TODO: Esto se debería registrar en Cosmos DB
