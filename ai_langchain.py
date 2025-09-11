@@ -1,5 +1,6 @@
 import json
 import os
+import random
 from typing import Dict, Any, Optional
 from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -30,6 +31,35 @@ def debug_print(*args, **kwargs):
         print(*args, **kwargs)
 
 # ============================================================================
+# SISTEMA DE FRASES ALEATORIAS
+# ============================================================================
+
+# Lista de frases de confirmación/agradecimiento
+CONFIRMATION_PHRASES = [
+    "Muy bien",
+    "Gracias por la información", 
+    "Excelente",
+    "Entendido",
+    "Perfecto"
+]
+
+# Lista de conectores para preguntas
+QUESTION_CONNECTORS = [
+    "Ahora me podrías decir",
+    "También me podrías compartir",
+    "Ahora puedes decirme",
+    "También necesito saber"
+]
+
+def get_random_confirmation_phrase() -> str:
+    """Selecciona aleatoriamente una frase de confirmación"""
+    return random.choice(CONFIRMATION_PHRASES)
+
+def get_random_question_connector() -> str:
+    """Selecciona aleatoriamente un conector para preguntas"""
+    return random.choice(QUESTION_CONNECTORS)
+
+# ============================================================================
 # INVENTARIO FAKE
 # ============================================================================
 
@@ -55,7 +85,7 @@ def get_inventory():
 # ============================================================================
 
 class AzureOpenAIConfig:
-    """Clase para manejar la configuración de Azure OpenAI"""
+    """Clase para manejar la configuración de Azure OpenAI con diferentes configuraciones según el propósito"""
     
     def __init__(self, 
                  endpoint: str,
@@ -74,8 +104,8 @@ class AzureOpenAIConfig:
         os.environ["FOUNDRY_API_KEY"] = api_key
         os.environ["OPENAI_API_VERSION"] = api_version
     
-    def create_llm(self, temperature: float = 0.3, max_tokens: int = 1000):
-        """Crea una instancia de AzureChatOpenAI"""
+    def create_llm(self, temperature: float = 0.3, max_tokens: int = 1000, top_p: float = 1.0):
+        """Crea una instancia de AzureChatOpenAI con parámetros personalizados"""
         return AzureChatOpenAI(
             azure_endpoint=self.endpoint,
             api_key=self.api_key,
@@ -83,10 +113,35 @@ class AzureOpenAIConfig:
             api_version=self.api_version,
             model_name=self.model_name,
             temperature=temperature,
+            top_p=top_p,
             max_tokens=max_tokens,
             timeout=60,
             max_retries=3,
             verbose=True
+        )
+    
+    def create_extraction_llm(self):
+        """Crea un LLM optimizado para extracción de información (temperatura baja para mayor precisión)"""
+        return self.create_llm(
+            temperature=0.1,  # Temperatura muy baja para extracción precisa
+            top_p=0.9,        # Top-p moderado para consistencia
+            max_tokens=1000
+        )
+    
+    def create_conversational_llm(self):
+        """Crea un LLM optimizado para generación conversacional (temperatura alta para mayor creatividad)"""
+        return self.create_llm(
+            temperature=0.7,  # Temperatura alta para respuestas más creativas y variadas
+            top_p=0.95,       # Top-p alto para mayor diversidad
+            max_tokens=1000
+        )
+    
+    def create_inventory_llm(self):
+        """Crea un LLM para responder preguntas sobre inventario (temperatura moderada)"""
+        return self.create_llm(
+            temperature=0.5,  # Temperatura moderada para balance entre precisión y creatividad
+            top_p=0.9,       # Top-p moderado
+            max_tokens=1000
         )
 
 # ============================================================================
@@ -96,8 +151,8 @@ class AzureOpenAIConfig:
 class IntelligentSlotFiller:
     """Sistema inteligente de slot-filling que detecta información ya proporcionada"""
     
-    def __init__(self, llm):
-        self.llm = llm
+    def __init__(self, azure_config: AzureOpenAIConfig):
+        self.llm = azure_config.create_extraction_llm()  # Usar LLM optimizado para extracción
         self.parser = JsonOutputParser()
         
     def extract_all_information(self, message: str, current_state: ConversationState, last_bot_question: Optional[str] = None) -> Dict[str, Any]:
@@ -389,8 +444,8 @@ class IntelligentSlotFiller:
 class IntelligentResponseGenerator:
     """Genera respuestas inteligentes basadas en el contexto y la información extraída"""
     
-    def __init__(self, llm):
-        self.llm = llm
+    def __init__(self, azure_config: AzureOpenAIConfig):
+        self.llm = azure_config.create_conversational_llm()  # Usar LLM optimizado para conversación
     
     def generate_response(self, 
         message: str, 
@@ -412,8 +467,6 @@ class IntelligentResponseGenerator:
                 - Sé amigable pero profesional
                 - No te presentes, ni digas palabras como "Hola", "Soy un asesor comercial en Alpha C"
                 - Mantén respuestas CORTAS (máximo 50 palabras)
-                - No menciones expliques por qué necesitas cada información pero...
-                - Si el usuario hace preguntas sobre por qué necesitas ciertos datos, explícaselo de manera clara
 
                 INFORMACIÓN EXTRAÍDA DEL ÚLTIMO MENSAJE:
                 {extracted_info_str}
@@ -431,8 +484,7 @@ class IntelligentResponseGenerator:
                 - Teléfono: {current_telefono}
                 
                 SIGUIENTE PREGUNTA A HACER: {next_question}
-                SOLO MENCIONA LA RAZÓN DE LA SIGUIENTE PREGUNTA SI EL USUARIO LO PREGUNTA: 
-                {next_question_reason}
+                SOLO MENCIONA LA RAZÓN DE LA SIGUIENTE PREGUNTA SI EL USUARIO LO PREGUNTA: {next_question_reason}
            
                 MENSAJE DEL USUARIO: {user_message}
 
@@ -440,9 +492,9 @@ class IntelligentResponseGenerator:
                 {inventory_instruction}
                 
                 INSTRUCCIONES:
-                1. Si hay una siguiente pregunta, hazla de manera natural
-                2. No repitas información que ya confirmaste anteriormente
-                3. Si el mensaje del usuario proporciona alguna información solicitada, puedes iniciar los mensajes diciendo "Muy bien, {current_nombre}", "Gracias, {current_nombre}", "Perfecto, {current_nombre}", etc.
+                1. No repitas información que ya confirmaste anteriormente
+                2. {conectors_instruction}
+                3. Si hay una siguiente pregunta, hazla de manera natural
                 
                 Genera una respuesta natural y apropiada:
             """
@@ -463,14 +515,41 @@ class IntelligentResponseGenerator:
                 extracted_info_str = json.dumps(safe_info, ensure_ascii=False, indent=2)
 
             if is_inventory_question:
-                inventory_instruction = "Este mensaje del usuario incluye una pregunta sobre inventario, por lo tanto, menciona que sí cuentan con la maquinaria que necesita y haz la pregunta que corresponda."
+                # Nombres de tipos de maquinaria
+                maquinaria_names = ", ".join([f"\"{name.value}\"" for name in MaquinariaType])
+                # Cambiar torre_iluminacion por torre de iluminación y plataforma por plataforma de elevación
+                maquinaria_names = maquinaria_names.replace("torre_iluminacion", "torre de iluminación")
+                maquinaria_names = maquinaria_names.replace("plataforma", "plataforma de elevación")
+
+                inventory_instruction = "Este mensaje del usuario incluye una pregunta sobre inventario, por lo tanto, a continuación te comparto los tipos de maquinaria que tenemos:" + maquinaria_names
             else:
                 inventory_instruction = "Sigue las instrucciones dadas."
+
+            # Obtener el primer nombre del usuario
+            primer_nombre = current_state.get("nombre", "No especificado")
+            conectors_instruction = ""
+            if primer_nombre:
+                primer_nombre = primer_nombre.split()[0]
+                
+                # Seleccionar frases aleatorias
+                confirmation_phrase = get_random_confirmation_phrase()
+                question_connector = get_random_question_connector()
+                
+                conectors_instruction = f"""
+                Si el mensaje del usuario proporciona alguna información solicitada, puedes iniciar el mensaje con una expresión breve de confirmación o agradecimiento según creas que sea apropiado, usando una frase como esta:
+                - {confirmation_phrase}, {primer_nombre}
+                
+                También, haz las preguntas como si fueran parte de una charla, usando un conector natural como este:
+                - '{question_connector}...'
+                """
+            else:
+                conectors_instruction = "Si solo cuentas con el teléfono en el ESTADO ACTUAL DE LA CONVERSACIÓN, agradece por habernos contactado."
 
             formatedPrompt = prompt.format_prompt(
                 user_message=message,
                 extracted_info_str=extracted_info_str,
                 current_nombre=current_state.get("nombre", "No especificado"),
+                primer_nombre=primer_nombre,
                 current_tipo=current_state.get("tipo_maquinaria", "No especificado"),
                 current_detalles=json.dumps(current_state.get("detalles_maquinaria", {}), ensure_ascii=False),
                 current_sitio_web=current_state.get("sitio_web", "No especificado"),
@@ -482,7 +561,8 @@ class IntelligentResponseGenerator:
                 current_telefono=current_state.get("telefono", "No especificado"),
                 next_question=next_question or "No hay siguiente pregunta",
                 next_question_reason=next_question_reason or "No hay razón para la siguiente pregunta",
-                inventory_instruction=inventory_instruction
+                inventory_instruction=inventory_instruction,
+                conectors_instruction=conectors_instruction
             )
             
             response = self.llm.invoke(formatedPrompt)
@@ -527,8 +607,8 @@ Procederé a generar su cotización. Nos pondremos en contacto con usted pronto.
 class InventoryResponder:
     """Responde preguntas sobre el inventario de maquinaria"""
     
-    def __init__(self, llm):
-        self.llm = llm
+    def __init__(self, azure_config: AzureOpenAIConfig):
+        self.llm = azure_config.create_inventory_llm()  # Usar LLM optimizado para inventario
         self.inventory = get_inventory()
     
     def is_inventory_question(self, message: str) -> bool:
@@ -601,10 +681,10 @@ class IntelligentLeadQualificationChatbot:
     
     def __init__(self, azure_config: AzureOpenAIConfig, state_store: Optional[ConversationStateStore] = None, send_message_callback=None):
         self.azure_config = azure_config
-        self.llm = azure_config.create_llm()
-        self.slot_filler = IntelligentSlotFiller(self.llm)
-        self.response_generator = IntelligentResponseGenerator(self.llm)
-        self.inventory_responder = InventoryResponder(self.llm)
+        # Crear instancias con configuraciones específicas para cada propósito
+        self.slot_filler = IntelligentSlotFiller(azure_config)
+        self.response_generator = IntelligentResponseGenerator(azure_config)
+        self.inventory_responder = InventoryResponder(azure_config)
         
         # Usar el state_store proporcionado o crear uno en memoria por defecto
         self.state_store = state_store or InMemoryStateStore()

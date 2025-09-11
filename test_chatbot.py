@@ -14,6 +14,15 @@ from ai_langchain import IntelligentLeadQualificationChatbot, AzureOpenAIConfig,
 # Importar la clase de los guardrails
 from check_guardrails import ContentSafetyGuardrails
 
+# Agregar después de la línea 6 (from datetime import datetime)
+import time
+
+# Agregar después de la función _sanitize_filename (línea 51)
+def _get_timestamp() -> str:
+    """Genera un timestamp en formato HH:MM:SS.MS"""
+    now = datetime.now()
+    return now.strftime("%H:%M:%S") + f".{now.microsecond // 10000:02d}"
+
 # ============================================================================
 # CONFIGURACIÓN INICIAL
 # ============================================================================
@@ -78,16 +87,19 @@ def run_conversation_test(
     
     # Simula la conversación
     for i, user_message in enumerate(conversation_flow):
-        output_lines.append(f"👤 Usuario: {user_message}")
+        timestamp = _get_timestamp()
+        output_lines.append(f"[{timestamp}] 👤 Usuario: {user_message}")
 
         safety_result = guardrails.check_message_safety(user_message)
         if safety_result:
-            output_lines.append(f"❌ Bot: {safety_result['message']}")
+            timestamp = _get_timestamp()
+            output_lines.append(f"[{timestamp}] ❌ Bot: {safety_result['message']}")
             continue
         
         bot_response = chatbot.send_message(user_message)
-        output_lines.append(f"🤖 Bot: {bot_response}\n")
-
+        timestamp = _get_timestamp()
+        output_lines.append(f"[{timestamp}] 🤖 Bot: {bot_response}\n")
+    
     # Al final del flujo, obtenemos el estado final
     final_state = chatbot.state
     
@@ -188,7 +200,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "55 1234 5678"
     }
     
-    run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
+    # run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
     
     # ------------------------------------------------------------------------
     # Flujo 2: Usuario que da Múltiples Datos
@@ -260,7 +272,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "33 9876 5432"
     }
     
-    # run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
+    run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
 
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:
@@ -287,13 +299,18 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
                     continue
 
                 if user_input:
+                    timestamp = _get_timestamp()
+                    print(f"[{timestamp}] 👤 Usuario: {user_input}")
+                    
                     safety_result = guardrails.check_message_safety(user_input)
                     if safety_result:
-                        print(f"❌ Bot: {safety_result['message']}")
+                        timestamp = _get_timestamp()
+                        print(f"[{timestamp}] ❌ Bot: {safety_result['message']}")
                         continue
                     
                     response = chatbot.send_message(user_input)
-                    print(f"🤖 Bot: {response}")
+                    timestamp = _get_timestamp()
+                    print(f"[{timestamp}] 🤖 Bot: {response}")
                     
                     # Mostrar resumen si la conversación está completa
                     if chatbot.state["completed"]:
@@ -332,6 +349,6 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
 
 if __name__ == "__main__":
     chatbot_instance = setup_chatbot()
-    define_test_flows(chatbot_instance)
-    # test_manually(chatbot_instance)
+    # define_test_flows(chatbot_instance)
+    test_manually(chatbot_instance)
     print("\n🎉 Todas las pruebas han finalizado.")
