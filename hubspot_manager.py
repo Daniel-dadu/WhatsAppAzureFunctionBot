@@ -158,15 +158,15 @@ class HubSpotManager:
                     continue
 
                 if key == "nombre":
-                    properties["firstname"] = value
+                    properties["firstname"] = value + " Prueba Bot"
 
                 elif key == "apellido":
                     # Combinar nombre y apellido en el campo nombre
                     nombre_actual = state.get("nombre", "")
                     if nombre_actual and value:
-                        properties["firstname"] = f"{nombre_actual} {value}".strip()
+                        properties["firstname"] = f"{nombre_actual} {value}".strip() + " Prueba Bot"
                     else:
-                        properties["firstname"] = extracted_info["nombre"] + " " + value
+                        properties["firstname"] = extracted_info["nombre"] + " " + value + " Prueba Bot"
 
                 elif key == "tipo_maquinaria":
                     # TODO: mejorar con el valor real

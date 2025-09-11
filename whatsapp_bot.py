@@ -163,9 +163,12 @@ class WhatsAppBot:
         """
         authorized_ids = [
             os.environ['RECIPIENT_WAID'],
-            os.environ['RECIPIENT_WAID_2'],
-            os.environ['RECIPIENT_WAID_3']
         ]
+        if os.environ['RECIPIENT_WAID_2']:
+            authorized_ids.append(os.environ['RECIPIENT_WAID_2'])
+        if os.environ['RECIPIENT_WAID_3']:
+            authorized_ids.append(os.environ['RECIPIENT_WAID_3'])
+            
         return wa_id in authorized_ids
     
     def _save_safety_messages(self, wa_id: str, safety_message: str, response_for_lead: str, whatsapp_ids: Dict[str, str]) -> None:
@@ -226,14 +229,3 @@ class WhatsAppBot:
         except Exception as e:
             logging.error(f"Error obteniendo estado de conversación: {e}")
             return f"❌ Error obteniendo estado: {str(e)}"
-    
-# ============================================================================
-# COMANDOS DISPONIBLES PARA EL USUARIO
-# ============================================================================
-# 
-# Comandos especiales que puedes enviar por WhatsApp:
-# 
-# 🔄 "reset" - Reinicia la conversación actual
-# 📊 "status" - Muestra el estado actual de la conversación
-# 
-# ============================================================================
