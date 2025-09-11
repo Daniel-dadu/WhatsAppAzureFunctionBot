@@ -188,7 +188,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "55 1234 5678"
     }
     
-    # run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
+    run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
     
     # ------------------------------------------------------------------------
     # Flujo 2: Usuario que da Múltiples Datos
@@ -260,7 +260,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "33 9876 5432"
     }
     
-    run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
+    # run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
 
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:
@@ -332,6 +332,6 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
 
 if __name__ == "__main__":
     chatbot_instance = setup_chatbot()
-    # define_test_flows(chatbot_instance)
-    test_manually(chatbot_instance)
+    define_test_flows(chatbot_instance)
+    # test_manually(chatbot_instance)
     print("\n🎉 Todas las pruebas han finalizado.")

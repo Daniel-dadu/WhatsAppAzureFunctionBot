@@ -412,7 +412,7 @@ class IntelligentResponseGenerator:
                 - Sé amigable pero profesional
                 - No te presentes, ni digas palabras como "Hola", "Soy un asesor comercial en Alpha C"
                 - Mantén respuestas CORTAS (máximo 50 palabras)
-                - Explica brevemente por qué necesitas cada información cuando sea apropiado
+                - No menciones expliques por qué necesitas cada información pero...
                 - Si el usuario hace preguntas sobre por qué necesitas ciertos datos, explícaselo de manera clara
 
                 INFORMACIÓN EXTRAÍDA DEL ÚLTIMO MENSAJE:
@@ -431,7 +431,8 @@ class IntelligentResponseGenerator:
                 - Teléfono: {current_telefono}
                 
                 SIGUIENTE PREGUNTA A HACER: {next_question}
-                RAZÓN: {next_question_reason}
+                SOLO MENCIONA LA RAZÓN DE LA SIGUIENTE PREGUNTA SI EL USUARIO LO PREGUNTA: 
+                {next_question_reason}
            
                 MENSAJE DEL USUARIO: {user_message}
 
@@ -439,10 +440,9 @@ class IntelligentResponseGenerator:
                 {inventory_instruction}
                 
                 INSTRUCCIONES:
-                1. Si el usuario pregunta por qué necesitas ciertos datos, explica el propósito
-                2. Si hay una siguiente pregunta, hazla de manera natural
-                3. Mantén un tono profesional pero cálido
-                4. No repitas información que ya confirmaste anteriormente
+                1. Si hay una siguiente pregunta, hazla de manera natural
+                2. No repitas información que ya confirmaste anteriormente
+                3. Si el mensaje del usuario proporciona alguna información solicitada, puedes iniciar los mensajes diciendo "Muy bien, {current_nombre}", "Gracias, {current_nombre}", "Perfecto, {current_nombre}", etc.
                 
                 Genera una respuesta natural y apropiada:
             """
@@ -463,7 +463,7 @@ class IntelligentResponseGenerator:
                 extracted_info_str = json.dumps(safe_info, ensure_ascii=False, indent=2)
 
             if is_inventory_question:
-                inventory_instruction = "Este mensaje del usuario incluye una pregunta sobre inventario, por lo tanto, menciona que no tienes acceso a la información de inventario y haz la pregunta que corresponda."
+                inventory_instruction = "Este mensaje del usuario incluye una pregunta sobre inventario, por lo tanto, menciona que sí cuentan con la maquinaria que necesita y haz la pregunta que corresponda."
             else:
                 inventory_instruction = "Sigue las instrucciones dadas."
 

@@ -35,8 +35,10 @@ def clasificar_mensaje(message: str) -> str:
         "   - Preguntas sobre disponibilidad de inventario\n"
         "   - Preguntas sobre características y especificaciones\n"
         "   - Consultas sobre marcas de maquinaria\n"
+        "   - Información sobre características y especificaciones de maquinaria (capacidad, altura, etc.)\n"
         "   - Solicitudes de cotización\n"
         "   - Información personal del cliente (nombre, empresa, contacto, lugar de requerimiento)\n"
+        "   - Preguntas sobre por qué necesita ciertos datos\n"
         "   - Detalles sobre proyectos que requieren maquinaria\n\n"
         
         "2. COMPETENCIA_PROHIBIDO - Consultas sobre otros proveedores:\n"
@@ -54,7 +56,7 @@ def clasificar_mensaje(message: str) -> str:
         
         "EJEMPLOS IMPORTANTES:\n"
         "- '¿Cuál es el precio de la soldadora Shindaiwa?' → valido\n"
-        "- '¿Manejan plataformas de elevación?' → valido\n"
+        "- 'Lo necesito de 20 litros' → valido\n"
         "- '¿Cuál es la capital de México?' → fuera_de_dominio\n"
         "- 'Dame precios de otros proveedores' → competencia_prohibido\n\n"
         
