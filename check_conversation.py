@@ -4,6 +4,8 @@ from azure.ai.inference import ChatCompletionsClient
 from azure.ai.inference.models import SystemMessage, UserMessage
 from azure.core.credentials import AzureKeyCredential
 from state_management import MaquinariaType
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+
 
 def clasificar_mensaje(message: str) -> str:
     """
@@ -12,60 +14,60 @@ def clasificar_mensaje(message: str) -> str:
     Se usa el modelo Ministral-3B de Foundry porque es el más económico.
     """
 
-    # Configuración de cliente
-    endpoint = os.environ["FOUNDRY_ENDPOINT"] + "models"
-    model_name = "Ministral-3B"
-    api_key = os.environ["FOUNDRY_API_KEY"]
+    def _clasificar():
+        # Configuración de cliente
+        endpoint = os.environ["FOUNDRY_ENDPOINT"] + "models"
+        model_name = "Ministral-3B"
+        api_key = os.environ["FOUNDRY_API_KEY"]
 
-    client = ChatCompletionsClient(
-        endpoint=endpoint,
-        credential=AzureKeyCredential(api_key),
-        api_version="2024-05-01-preview"
-    )   
+        client = ChatCompletionsClient(
+            endpoint=endpoint,
+            credential=AzureKeyCredential(api_key),
+            api_version="2024-05-01-preview"
+        )   
 
-    maquinaria_types = [maquinaria_type.value for maquinaria_type in MaquinariaType]
+        maquinaria_types = [maquinaria_type.value for maquinaria_type in MaquinariaType]
 
-    system_prompt = (
-        "Eres un clasificador de intenciones para un chatbot de ventas de maquinaria.\n\n"
-        "Clasifica cada mensaje en UNA de estas tres categorías:\n\n"
-        
-        "1. VALIDO - Incluye CUALQUIER consulta con las siguientes características:\n"
-        "   - Preguntas sobre tipos de maquinaria:" + ", ".join(maquinaria_types) + "\n"
-        "   - Consultas sobre PRECIOS de maquinaria específica\n"
-        "   - Preguntas sobre disponibilidad de inventario\n"
-        "   - Preguntas sobre características y especificaciones\n"
-        "   - Consultas sobre marcas de maquinaria\n"
-        "   - Información sobre características y especificaciones de maquinaria (capacidad, altura, etc.)\n"
-        "   - Solicitudes de cotización\n"
-        "   - Información personal del cliente (nombre, empresa, contacto, lugar de requerimiento)\n"
-        "   - Preguntas sobre por qué necesita ciertos datos\n"
-        "   - Detalles sobre proyectos que requieren maquinaria\n\n"
-        
-        "2. COMPETENCIA_PROHIBIDO - Consultas sobre otros proveedores:\n"
-        "   - Preguntas sobre precios de competidores\n"
-        "   - Comparativas con otros proveedores\n"
-        "   - Recomendaciones de proveedores externos\n"
-        "   - Consultas sobre alternativas a Alpha C\n\n"
-        
-        "3. FUERA_DE_DOMINIO - Cualquier tema no relacionado con maquinaria:\n"
-        "   - Historia, ciencia general\n"
-        "   - Entretenimiento, deportes, cultura\n"
-        "   - Tecnología no relacionada con maquinaria\n"
-        "   - Chistes, conversación casual\n"
-        "   - Política, religión, temas controversiales\n\n"
-        
-        "EJEMPLOS IMPORTANTES:\n"
-        "- '¿Cuál es el precio de la soldadora Shindaiwa?' → valido\n"
-        "- 'Lo necesito de 20 litros' → valido\n"
-        "- '¿Cuál es la capital de México?' → fuera_de_dominio\n"
-        "- 'Dame precios de otros proveedores' → competencia_prohibido\n\n"
-        
-        "Responde ÚNICAMENTE con un JSON valido. Ejemplo:\n"
-        "{\"label\":\"valido\"}\n"
-        "No agregues texto adicional."
-    )
+        system_prompt = (
+            "Eres un clasificador de intenciones para un chatbot de ventas de maquinaria.\n\n"
+            "Clasifica cada mensaje en UNA de estas tres categorías:\n\n"
+            
+            "1. VALIDO - Incluye CUALQUIER consulta con las siguientes características:\n"
+            "   - Preguntas sobre tipos de maquinaria:" + ", ".join(maquinaria_types) + "\n"
+            "   - Consultas sobre PRECIOS de maquinaria específica\n"
+            "   - Preguntas sobre disponibilidad de inventario\n"
+            "   - Preguntas sobre características y especificaciones\n"
+            "   - Consultas sobre marcas de maquinaria\n"
+            "   - Información sobre características y especificaciones de maquinaria (capacidad, altura, etc.)\n"
+            "   - Solicitudes de cotización\n"
+            "   - Información personal del cliente (nombre, empresa, contacto, lugar de requerimiento)\n"
+            "   - Preguntas sobre por qué necesita ciertos datos\n"
+            "   - Detalles sobre proyectos que requieren maquinaria\n\n"
+            
+            "2. COMPETENCIA_PROHIBIDO - Consultas sobre otros proveedores:\n"
+            "   - Preguntas sobre precios de competidores\n"
+            "   - Comparativas con otros proveedores\n"
+            "   - Recomendaciones de proveedores externos\n"
+            "   - Consultas sobre alternativas a Alpha C\n\n"
+            
+            "3. FUERA_DE_DOMINIO - Cualquier tema no relacionado con maquinaria:\n"
+            "   - Historia, ciencia general\n"
+            "   - Entretenimiento, deportes, cultura\n"
+            "   - Tecnología no relacionada con maquinaria\n"
+            "   - Chistes, conversación casual\n"
+            "   - Política, religión, temas controversiales\n\n"
+            
+            "EJEMPLOS IMPORTANTES:\n"
+            "- '¿Cuál es el precio de la soldadora Shindaiwa?' → valido\n"
+            "- 'Lo necesito de 20 litros' → valido\n"
+            "- '¿Cuál es la capital de México?' → fuera_de_dominio\n"
+            "- 'Dame precios de otros proveedores' → competencia_prohibido\n\n"
+            
+            "Responde ÚNICAMENTE con un JSON valido. Ejemplo:\n"
+            "{\"label\":\"valido\"}\n"
+            "No agregues texto adicional."
+        )
 
-    try:
         response = client.complete(
             messages=[
                 SystemMessage(content=system_prompt),
@@ -91,9 +93,18 @@ def clasificar_mensaje(message: str) -> str:
 
         result = json.loads(raw_output)
         return result.get("label", "fuera_de_dominio")
+
+    try:
+        # Usar ThreadPoolExecutor con timeout para Azure Functions
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_clasificar)
+            result = future.result(timeout=30)  # 30 segundos timeout
+            return result
+    except FutureTimeoutError:
+        print("Timeout en clasificar_mensaje después de 30 segundos")
+        return "fuera_de_dominio"  # En caso de timeout, considerar como fuera de dominio por seguridad
     except Exception as e:
         print("Error parseando respuesta:", e)
-        print("Respuesta cruda:", raw_output)
         return "fuera_de_dominio"
 
 """

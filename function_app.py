@@ -184,6 +184,14 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
         # Cargar conversación
         whatsapp_bot.chatbot.load_conversation(wa_id)
 
+        # Verificar que en los ids de los últimos 3 mensajes no esté el id del mensaje actual
+        # Esto es para evitar procesar mensajes duplicados
+        # En algunas ocasiones, WhatsApp envía mensajes duplicados (parece que cuando un guardrail se tarda en procesar, envía el mismo mensaje duplicado)
+        last_3_messages = whatsapp_bot.chatbot.state.get("messages", [])[-3:]
+        if whatsapp_message_id in [msg.get("whatsapp_message_id") for msg in last_3_messages]:
+            logging.info(f"Mensaje duplicado detectado: {whatsapp_message_id}")
+            return
+
         # Crear instancia de HubSpotManager
         hubspot_manager = HubSpotManager(os.environ["HUBSPOT_ACCESS_TOKEN"])
 
