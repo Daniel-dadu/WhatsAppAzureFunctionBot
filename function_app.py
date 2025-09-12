@@ -26,8 +26,8 @@ def whatsappbot1(req: func.HttpRequest) -> func.HttpResponse:
     Main Azure Function entry point for WhatsApp webhook.
     Handles both GET (verification) and POST (message) requests.
     """
-    # logging.info('Python HTTP trigger function processed a request')
-    # logging.info(f"req.method: {req.method}")
+    logging.info('NUEVA HTTP REQUEST: whatsappbot1')
+    logging.info(f"req.method: {req.method}")
 
     if req.method == 'POST':
         return handle_message(req)
@@ -158,28 +158,28 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
     Uses the conversation manager and WhatsApp bot for intelligent responses.
     """
 
-    # Extract sender information
-    wa_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
-    # name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
-    logging.info(f"wa_id: {wa_id}")
-    # logging.info(f"name: {name}")
-    # logging.info(f"Saved wa_id: {os.environ['RECIPIENT_WAID']}") # Debugging line
+    message_info = body["entry"][0]["changes"][0]["value"]
 
-    # Safeguard against unauthorized users
+    # Extraer el wa_id del lead
+    wa_id = message_info["contacts"][0]["wa_id"]
+    logging.info(f"wa_id del lead: {wa_id}")
+
+    # Verificar que quien manda el mensaje esté autorizado
+    # TODO: Eliminar en producción
     if not whatsapp_bot.is_authorized_user(wa_id):
         logging.error("Unauthorized user!!!")
         return
 
-    # Extract message content
-    message = body["entry"][0]["changes"][0]["value"]["messages"][0]
-    phone_number = message["from"] # Número de WhatsApp del lead empezando por 521
-    logging.info(f"message: {message}")
+    # Extraer el contenido del mensaje
+    message_details = message_info["messages"][0]
+    logging.info(f"Detalles del mensaje: {message_details}")
+    phone_number = message_details["from"] # Número de WhatsApp del lead empezando por 521
 
-    if "text" in message:
+    if "text" in message_details:
         # Extraer el contenido en texto del mensaje
-        message_body = message["text"]["body"]
+        message_text = message_details["text"]["body"]
         # Extraer el id del mensaje asignado por WhatsApp
-        whatsapp_message_id = message["id"]
+        whatsapp_message_id = message_details["id"]
 
         # Cargar conversación
         whatsapp_bot.chatbot.load_conversation(wa_id)
@@ -213,7 +213,7 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
 
         # Ejecutar slot-filling usando el contexto del último mensaje (agente o bot)
         # Ahora el chatbot envía automáticamente las respuestas por WhatsApp
-        whatsapp_bot.process_message(wa_id, message_body, whatsapp_message_id, hubspot_manager)
+        whatsapp_bot.process_message(wa_id, message_text, whatsapp_message_id, hubspot_manager)
         
     else:
         # TODO: Esto se debería registrar en Cosmos DB

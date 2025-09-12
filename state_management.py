@@ -80,14 +80,29 @@ class CosmosDBStateStore(ConversationStateStore):
     def get_conversation_state(self, user_id: str) -> Optional[ConversationState]:
         """Recupera el estado de conversación desde Cosmos DB"""
         try:
-            # Buscar el documento por wa_id (partition key)
-            response = self.container.read_item(item=f"conv_{user_id}", partition_key=user_id)
+            # Primero verificar si el documento existe
+            item_id = f"conv_{user_id}"
+            
+            # Usar query para verificar existencia sin generar error
+            query = "SELECT c.id FROM c WHERE c.id = @item_id"
+            parameters = [{"name": "@item_id", "value": item_id}]
+            
+            items = list(self.container.query_items(
+                query=query,
+                parameters=parameters,
+                partition_key=user_id
+            ))
+            
+            if not items:
+                logging.info(f"Lead nuevo detectado: {user_id}")
+                return None
+            
+            # Si existe, leer el documento completo
+            response = self.container.read_item(item=item_id, partition_key=user_id)
             logging.info(f"Estado existente cargado para usuario {user_id}")
             return self._cosmos_to_conversation_state(response)
+            
         except Exception as e:
-            if "Not Found" in str(e):
-                logging.info(f"Lead nuevo detectado: {user_id}")  # ✅ Log explícito
-                return None
             logging.error(f"Error recuperando estado de Cosmos DB: {e}")
             return None
     
