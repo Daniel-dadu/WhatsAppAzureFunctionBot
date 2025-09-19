@@ -726,24 +726,24 @@ class IntelligentLeadQualificationChatbot:
 
     def _create_empty_state(self) -> ConversationState:
         """Crea un estado vacío"""
-        return {
-            "messages": [],
-            "nombre": None,
-            "apellido": None,
-            "tipo_maquinaria": None,
-            "detalles_maquinaria": {},
-            "sitio_web": None,
-            "uso_empresa_o_venta": None,
-            "nombre_empresa": None,
-            "giro_empresa": None,
-            "correo": None,
-            "telefono": None,
+        state = {
+            # Campos que no se preguntan al usuario
             "completed": False,
-            "lugar_requerimiento": None,
+            "messages": [],
             "conversation_mode": "bot",
             "asignado_asesor": None,
             "hubspot_contact_id": None
         }
+        
+        # Agregamos los campos que se preguntan al usuario desde el FIELDS_CONFIG_PRIORITY
+        fields_to_ask = [field for field in FIELDS_CONFIG_PRIORITY.keys()]
+        for field in fields_to_ask:
+            if field == "detalles_maquinaria":
+                state[field] = {}
+            else:
+                state[field] = None
+
+        return state
     
     def load_conversation(self, user_id: str):
         """Carga la conversación de un usuario específico"""
