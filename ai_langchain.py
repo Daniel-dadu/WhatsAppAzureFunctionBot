@@ -155,12 +155,102 @@ class IntelligentSlotFiller:
         self.llm = azure_config.create_extraction_llm()  # Usar LLM optimizado para extracción
         self.parser = JsonOutputParser()
         
+    def detect_negative_response(self, message: str, last_bot_question: Optional[str] = None) -> Optional[Dict[str, str]]:
+        """
+        Detecta si el usuario está dando una respuesta negativa o de incertidumbre.
+        Retorna un diccionario con el tipo de respuesta y el campo específico, o None si no es una respuesta negativa.
+        Formato: {"response_type": "No tiene" o "No especificado", "field": "nombre_del_campo"}
+        """
+        prompt = ChatPromptTemplate.from_template(
+            """
+            Eres un asistente experto en detectar respuestas negativas o de incertidumbre y determinar a qué campo específico pertenecen.
+            
+            ÚLTIMA PREGUNTA DEL BOT: {last_bot_question}
+            MENSAJE DEL USUARIO: {message}
+            
+            INSTRUCCIONES:
+            Analiza si el usuario está dando una respuesta negativa o de incertidumbre y determina a qué campo específico pertenece.
+            
+            RESPUESTAS NEGATIVAS (response_type: "No tiene"):
+            - "no", "no tenemos", "no hay", "no tengo", "no cuenta con"
+            - "no tenemos página", "no tengo pagina web", "no tenemos sitio web"
+            - "no tengo correo", "no tengo teléfono", "no tengo empresa"
+            - "solo facebook", "solo instagram", "solo redes sociales"
+            - Cualquier variación de "no" + el objeto de la pregunta
+            
+            RESPUESTAS DE INCERTIDUMBRE (response_type: "No especificado"):
+            - "no sé", "no estoy seguro", "no lo sé", "no tengo idea"
+            - "no quiero dar esa información", "prefiero no decir", "es confidencial"
+            - "no estoy seguro", "tal vez", "posiblemente", "creo que no"
+            
+            CAMPOS DISPONIBLES:
+            - nombre: información personal del usuario
+            - apellido: apellido del usuario
+            - tipo_maquinaria: tipo de máquina que necesita
+            - detalles_maquinaria: detalles específicos de la máquina
+            - nombre_empresa: nombre de la empresa
+            - giro_empresa: actividad o giro de la empresa
+            - lugar_requerimiento: lugar donde se necesita la máquina
+            - sitio_web: sitio web de la empresa
+            - uso_empresa_o_venta: si es para uso interno o venta
+            - correo: dirección de email
+            - telefono: número telefónico
+            
+            Si NO es una respuesta negativa ni de incertidumbre, retorna "None".
+            
+            IMPORTANTE: Responde EXACTAMENTE en formato JSON:
+            - Si es respuesta negativa: {{"response_type": "No tiene", "field": "nombre_del_campo"}}
+            - Si es respuesta de incertidumbre: {{"response_type": "No especificado", "field": "nombre_del_campo"}}
+            - Si no es respuesta negativa: "None"
+            """
+        )
+        
+        try:
+            response = self.llm.invoke(prompt.format_prompt(
+                message=message,
+                last_bot_question=last_bot_question or "No hay pregunta previa"
+            ))
+            
+            result = response.content.strip()
+            
+            # Intentar parsear como JSON
+            try:
+                import json
+                parsed_result = json.loads(result)
+                if isinstance(parsed_result, dict) and "response_type" in parsed_result and "field" in parsed_result:
+                    return parsed_result
+                else:
+                    return None
+            except json.JSONDecodeError:
+                # Si no es JSON válido, verificar si es "None"
+                if result.lower() == "none":
+                    return None
+                else:
+                    return None
+                
+        except Exception as e:
+            logging.error(f"Error detectando respuesta negativa: {e}")
+            return None
+
     def extract_all_information(self, message: str, current_state: ConversationState, last_bot_question: Optional[str] = None) -> Dict[str, Any]:
         """
         Extrae TODA la información disponible en un solo mensaje
         Detecta qué slots se pueden llenar y cuáles ya están completos
         Incluye el contexto de la última pregunta del bot para mejor interpretación
         """
+        
+        # PRIMERO: Detectar si es una respuesta negativa o de incertidumbre
+        negative_response = self.detect_negative_response(message, last_bot_question)
+        
+        if negative_response:
+            # Si es una respuesta negativa, usar directamente el campo y valor proporcionados por el LLM
+            field_name = negative_response.get("field")
+            response_type = negative_response.get("response_type")
+            
+            if field_name and response_type:
+                return {field_name: response_type}
+            else:
+                return {}
         
         # Crear prompt que considere el estado actual y la última pregunta del bot
         prompt = ChatPromptTemplate.from_template(
@@ -189,34 +279,23 @@ class IntelligentSlotFiller:
             
             INSTRUCCIONES:
             1. Solo extrae campos que estén VACÍOS en el estado actual
-            2. Si un campo ya tiene valor, NO lo incluyas en la respuesta
-            3. Para detalles_maquinaria, solo incluye campos específicos que no estén ya llenos
-            4. Responde SOLO en formato JSON válido
-            5. IMPORTANTE: Si el mensaje del usuario no contiene información nueva para campos vacíos, responde con {{}} (JSON vacío)
-            6. NO extraigas información de campos que ya están llenos, incluso si el usuario dice algo que podría interpretarse como información
-            7. CLASIFICACIÓN INTELIGENTE: Si la última pregunta es sobre un campo específico, clasifica la respuesta en ese campo
+            2. Para detalles_maquinaria, solo incluye campos específicos que no estén ya llenos
+            3. Responde SOLO en formato JSON válido
+            4. IMPORTANTE: Si el mensaje del usuario no contiene información nueva para campos vacíos, responde con {{}} (JSON vacío)
+            5. NO extraigas información de campos que ya están llenos, incluso si el usuario dice algo que podría interpretarse como información
+            6. CLASIFICACIÓN INTELIGENTE: Si la última pregunta es sobre un campo específico, clasifica la respuesta en ese campo
             
             CAMPOS A EXTRAER (solo si están vacíos):
             - nombre: nombre de la persona
             - tipo_maquinaria: {maquinaria_names}
             - detalles_maquinaria: objeto con campos específicos según tipo_maquinaria
             - lugar_requerimiento: lugar donde se requiere la máquina
-            - sitio_web: URL del sitio web o "No tiene" (para respuestas negativas como "no", "no tenemos", "no cuenta", etc.)
+            - sitio_web: URL del sitio web
             - uso_empresa_o_venta: "uso empresa" o "venta"
             - nombre_empresa: nombre de la empresa
             - giro_empresa: giro o actividad de la empresa (ej: "venta de maquinaria", "construcción", "manufactura", "servicios", etc.)
             - correo: dirección de email
             - telefono: número telefónico
-            
-            REGLAS ESPECIALES PARA SITIO_WEB:
-            - Si el usuario dice algo como "no", "no tenemos", "no hay", "no tenemos página", "no tenemos sitio", "no tenemos página web" → sitio_web: "No tiene"
-            - Si el usuario proporciona una URL o sitio web → sitio_web: [URL]
-            - Si el usuario dice "solo facebook", "solo instagram", "solo redes sociales" → sitio_web: "No tiene"
-            
-            REGLAS ESPECIALES PARA TODOS LOS CAMPOS:
-            - Si el usuario dice "no tengo", "no sé", "no estoy seguro", "no lo sé", "no tengo idea", "aún no lo he decidido" → usar "No especificado" como valor
-            - Si el usuario dice "no quiero dar esa información", "prefiero no decir", "es confidencial" → usar "No especificado" como valor
-            - Si el usuario dice "no tengo correo", "no tengo teléfono", "no tengo empresa" → usar "No tiene" como valor
             
             REGLAS ESPECIALES PARA GIRO_EMPRESA:
             - Si el usuario describe la actividad de su empresa → giro_empresa: [descripción de la actividad]
@@ -239,26 +318,20 @@ class IntelligentSlotFiller:
             EJEMPLOS DE EXTRACCIÓN:
             - Mensaje: "soy Renato Fuentes" → {{"nombre": "Renato", "apellido": "Fuentes"}}
             - Mensaje: "me llamo Mauricio Martinez Rodriguez" → {{"nombre": "Mauricio", "apellido": "Martinez Rodriguez"}}
-            - Mensaje: "no hay pagina web" → {{"sitio_web": "No tiene"}}
             - Mensaje: "venta de maquinaria pesada" → {{"giro_empresa": "venta de maquinaria pesada"}}
             - Mensaje: "para venta" → {{"uso_empresa_o_venta": "venta"}}
             - Mensaje: "construcción y mantenimiento" → {{"giro_empresa": "construcción y mantenimiento"}}
             - Mensaje: "en la Ciudad de México" → {{"lugar_requerimiento": "Ciudad de México"}}
             - Mensaje: "daniel@empresa.com" → {{"correo": "daniel@empresa.com"}}
             - Mensaje: "555-1234" → {{"telefono": "555-1234"}}
-            
-            EJEMPLOS DE RESPUESTAS SIN INFORMACIÓN NUEVA:
-            - Mensaje: "no se" → {{}} (no hay información nueva)
-            - Mensaje: "aun no lo he decidido" → {{}} (no hay información nueva)
-            - Mensaje: "no estoy seguro" → {{}} (no hay información nueva)
-            - Mensaje: "no tengo idea" → {{}} (no hay información nueva)
+            - Mensaje: "www.empresa.com" → {{"sitio_web": "www.empresa.com"}}
             
             EJEMPLOS DE USO DEL CONTEXTO DE LA ÚLTIMA PREGUNTA:
             - Última pregunta: "¿En qué compañía trabajas?" + Mensaje: "Facebook" → {{"nombre_empresa": "Facebook"}}
             - Última pregunta: "¿Cuál es el giro de su empresa?" + Mensaje: "Construcción" → {{"giro_empresa": "Construcción"}}
             - Última pregunta: "¿Cuál es su correo electrónico?" + Mensaje: "daniel@empresa.com" → {{"correo": "daniel@empresa.com"}}
             - Última pregunta: "¿Es para uso de la empresa o para venta?" + Mensaje: "Para venta" → {{"uso_empresa_o_venta": "venta"}}
-            - Última pregunta: "¿Su empresa cuenta con algún sitio web?" + Mensaje: "Solo Facebook" → {{"sitio_web": "No tiene"}}
+            - Última pregunta: "¿Cuál es el sitio web de su empresa?" + Mensaje: "www.empresa.com" → {{"sitio_web": "www.empresa.com"}}
 
             REGLAS ESPECIALES PARA PREGUNTAS SOBRE INVENTARIO:
             - Si el usuario pregunta "¿tienen [tipo]?" → extraer [tipo] como tipo_maquinaria
@@ -415,9 +488,6 @@ class IntelligentSlotFiller:
             value = current_state.get(field)
             if not value or value == "":
                 return False
-            # Solo considerar válidos los campos con información real, no respuestas negativas
-            if value in ["No tiene", "No especificado"]:
-                return False
         
         # Verificar detalles de maquinaria
         tipo = current_state.get("tipo_maquinaria")
@@ -432,8 +502,7 @@ class IntelligentSlotFiller:
         return all(
             field in detalles and 
             detalles[field] is not None and 
-            detalles[field] != "" and 
-            detalles[field] != "No especificado" 
+            detalles[field] != ""
             for field in required_fields
         )
 
@@ -495,6 +564,8 @@ class IntelligentResponseGenerator:
                 1. No repitas información que ya confirmaste anteriormente
                 2. {conectors_instruction}
                 3. Si hay una siguiente pregunta, hazla de manera natural
+                4. NO inventes preguntas adicionales
+                5. Si no hay siguiente pregunta, simplemente confirma la información recibida
                 
                 Genera una respuesta natural y apropiada:
             """
@@ -815,6 +886,7 @@ class IntelligentLeadQualificationChatbot:
 
             if next_question is None:
                 debug_print(f"DEBUG: Estado completo: {self.state}")
+                self.state["completed"] = True
                 final_message = "Gracias por toda la información. Estoy procesando su solicitud."
                 return self._add_message_and_return_response(final_message)
 
@@ -888,7 +960,7 @@ class IntelligentLeadQualificationChatbot:
             # Esto es clave para evitar que una respuesta ambigua posterior
             # borre un dato que ya se había confirmado.
             current_value = self.state.get(key)
-            if key != "detalles_maquinaria" and current_value and current_value not in ["No especificado", "No tiene", None, ""]:
+            if key != "detalles_maquinaria" and current_value:
                 debug_print(f"DEBUG: Campo '{key}' ya tiene valor válido '{current_value}', no se sobrescribe.")
                 continue
 

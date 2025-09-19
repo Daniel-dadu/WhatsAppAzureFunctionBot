@@ -272,7 +272,37 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "33 9876 5432"
     }
     
-    run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
+    # run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
+
+    # ------------------------------------------------------------------------
+    # Flujo 4: Usuario que dice que no tiene varios campos
+    # ------------------------------------------------------------------------
+    flujo_4 = [
+        "Hola, soy Daniel Marquez y quiero comprar una torre de iluminación.",
+        "Que sea de LED",
+        "Trabajo para MachinesCorp",
+        "No conozco el giro de la empresa.",
+        "No estoy seguro.",
+        "Es para venderlo a un cliente.",
+        "No tenemos pagina web.",
+        "mi correo es daniel.marquez@machinescorp.com y mi teléfono es 33 9876 5432"
+    ]
+
+    esperado_4 = {
+        "nombre": "Daniel Marquez",
+        "apellido": "Marquez",
+        "tipo_maquinaria": MaquinariaType.TORRE_ILUMINACION,
+        "detalles_maquinaria": {"es_led": True},
+        "sitio_web": "No tiene",
+        "uso_empresa_o_venta": "venta",
+        "nombre_empresa": "MachinesCorp",
+        "giro_empresa": "No especificado",
+        "lugar_requerimiento": "No especificado",
+        "correo": "daniel.marquez@machinescorp.com",
+        "telefono": "33 9876 5432"
+    }
+
+    run_conversation_test("Flujo 4: Usuario que dice que no tiene pagina web", chatbot, flujo_4, esperado_4)
 
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:
@@ -349,6 +379,6 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
 
 if __name__ == "__main__":
     chatbot_instance = setup_chatbot()
-    # define_test_flows(chatbot_instance)
-    test_manually(chatbot_instance)
+    define_test_flows(chatbot_instance)
+    # test_manually(chatbot_instance)
     print("\n🎉 Todas las pruebas han finalizado.")
