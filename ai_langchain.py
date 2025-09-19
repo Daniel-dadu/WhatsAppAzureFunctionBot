@@ -747,6 +747,7 @@ class IntelligentLeadQualificationChatbot:
     
     def load_conversation(self, user_id: str):
         """Carga la conversación de un usuario específico"""
+        logging.info(f"Cargando conversación para usuario {user_id}")
         self.current_user_id = user_id
         stored_state = self.state_store.get_conversation_state(user_id)
         
@@ -754,6 +755,7 @@ class IntelligentLeadQualificationChatbot:
             self.state = stored_state
             debug_print(f"DEBUG: Estado cargado para usuario {user_id}")
         else:
+            logging.info(f"No hay estado existente para usuario {user_id}, creando nuevo estado")
             self.state = self._create_empty_state()
             debug_print(f"DEBUG: Nuevo estado creado para usuario {user_id}")
 

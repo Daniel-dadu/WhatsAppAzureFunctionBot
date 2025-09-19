@@ -161,15 +161,20 @@ class WhatsAppBot:
         """
         Verifica si el usuario está autorizado para usar el bot.
         """
-        authorized_ids = [
-            os.environ['RECIPIENT_WAID'],
-        ]
-        if os.environ['RECIPIENT_WAID_2']:
-            authorized_ids.append(os.environ['RECIPIENT_WAID_2'])
-        if os.environ['RECIPIENT_WAID_3']:
-            authorized_ids.append(os.environ['RECIPIENT_WAID_3'])
-            
-        return wa_id in authorized_ids
+        try:
+            logging.info(f"Verificando si el usuario {wa_id} está autorizado")
+            authorized_ids = []
+            if "RECIPIENT_WAID" in os.environ:
+                authorized_ids.append(os.environ['RECIPIENT_WAID'])
+            if "RECIPIENT_WAID_2" in os.environ:
+                authorized_ids.append(os.environ['RECIPIENT_WAID_2'])
+            # if "RECIPIENT_WAID_3" in os.environ:
+            #     authorized_ids.append(os.environ['RECIPIENT_WAID_3'])
+                
+            return wa_id in authorized_ids
+        except Exception as e:
+            logging.error(f"Error verificando si el usuario {wa_id} está autorizado: {e}")
+            return False
     
     def _save_safety_messages(self, wa_id: str, safety_message: str, response_for_lead: str, whatsapp_ids: Dict[str, str]) -> None:
         """
