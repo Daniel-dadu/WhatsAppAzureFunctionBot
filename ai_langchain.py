@@ -7,7 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 import langchain
 from maquinaria_config import MAQUINARIA_CONFIG, get_required_fields_for_tipo
-from state_management import MaquinariaType, ConversationState, ConversationStateStore, InMemoryStateStore
+from state_management import MaquinariaType, ConversationState, ConversationStateStore, InMemoryStateStore, FIELDS_CONFIG_PRIORITY
 from datetime import datetime, timezone
 import logging
 from hubspot_manager import HubSpotManager
@@ -79,6 +79,21 @@ def get_inventory():
         "modelo_maquinaria": "Cualquier modelo",
         "ubicacion": "Cualquier ubicación en México",
     }
+
+# ============================================================================
+# OBTENER EL ESTADO ACTUAL DE LOS CAMPOS EN UN STRING
+# ============================================================================
+
+def get_current_state_str(current_state: ConversationState) -> str:
+    """Obtiene el estado actual de los campos como una cadena de texto"""
+    field_names = [field for field in FIELDS_CONFIG_PRIORITY.keys()]
+    fields_str = ""
+    for field in field_names:
+        if field == "detalles_maquinaria":
+            fields_str += f"- {field}: " + json.dumps(current_state.get(field) or {}) + "\n"
+        else:
+            fields_str += f"- {field}: " + (current_state.get(field) or "") + "\n"
+    return fields_str
 
 # ============================================================================
 # CONFIGURACIÓN DE AZURE OPENAI
@@ -184,17 +199,7 @@ class IntelligentSlotFiller:
             - "no estoy seguro", "tal vez", "posiblemente", "creo que no"
             
             CAMPOS DISPONIBLES:
-            - nombre: información personal del usuario
-            - apellido: apellido del usuario
-            - tipo_maquinaria: tipo de máquina que necesita
-            - detalles_maquinaria: detalles específicos de la máquina
-            - nombre_empresa: nombre de la empresa
-            - giro_empresa: actividad o giro de la empresa
-            - lugar_requerimiento: lugar donde se necesita la máquina
-            - sitio_web: sitio web de la empresa
-            - uso_empresa_o_venta: si es para uso interno o venta
-            - correo: dirección de email
-            - telefono: número telefónico
+            {fields_available}
             
             Si NO es una respuesta negativa ni de incertidumbre, retorna "None".
             
@@ -206,9 +211,13 @@ class IntelligentSlotFiller:
         )
         
         try:
+            # Obtener campos disponibles desde el FIELDS_CONFIG_PRIORITY
+            fields_available = self._get_fields_available_str()
+
             response = self.llm.invoke(prompt.format_prompt(
                 message=message,
-                last_bot_question=last_bot_question or "No hay pregunta previa"
+                last_bot_question=last_bot_question or "No hay pregunta previa",
+                fields_available=fields_available
             ))
             
             result = response.content.strip()
@@ -261,17 +270,7 @@ class IntelligentSlotFiller:
             Solo extrae campos que NO estén ya completos en el estado actual.
             
             ESTADO ACTUAL:
-            - nombre: {current_nombre}
-            - apellido: {current_apellido}
-            - tipo_maquinaria: {current_tipo}
-            - detalles_maquinaria: {current_detalles}
-            - sitio_web: {current_sitio_web}
-            - uso_empresa_o_venta: {current_uso}
-            - nombre_empresa: {current_nombre_empresa}
-            - giro_empresa: {current_giro}
-            - lugar_requerimiento: {current_lugar_requerimiento}
-            - correo: {current_correo}
-            - telefono: {current_telefono}
+            {current_state_str}
             
             ÚLTIMA PREGUNTA DEL BOT: {last_bot_question}
             
@@ -286,23 +285,8 @@ class IntelligentSlotFiller:
             6. CLASIFICACIÓN INTELIGENTE: Si la última pregunta es sobre un campo específico, clasifica la respuesta en ese campo
             
             CAMPOS A EXTRAER (solo si están vacíos):
-            - nombre: nombre de la persona
-            - tipo_maquinaria: {maquinaria_names}
-            - detalles_maquinaria: objeto con campos específicos según tipo_maquinaria
-            - lugar_requerimiento: lugar donde se requiere la máquina
-            - sitio_web: URL del sitio web
-            - uso_empresa_o_venta: "uso empresa" o "venta"
-            - nombre_empresa: nombre de la empresa
-            - giro_empresa: giro o actividad de la empresa (ej: "venta de maquinaria", "construcción", "manufactura", "servicios", etc.)
-            - correo: dirección de email
-            - telefono: número telefónico
-            
-            REGLAS ESPECIALES PARA GIRO_EMPRESA:
-            - Si el usuario describe la actividad de su empresa → giro_empresa: [descripción de la actividad]
-            - Si el usuario dice "nos dedicamos a la [actividad]" → giro_empresa: [actividad]
-            - Ejemplos: "venta de maquinaria pesada", "construcción", "manufactura", "servicios de mantenimiento", "distribución", "logística", etc.
-            - Extrae la actividad principal, no solo palabras sueltas
-            
+            {fields_available}
+
             REGLAS ESPECIALES PARA NOMBRES:
             - Si el usuario dice "soy [nombre]", "me llamo [nombre]", "hola, soy [nombre]" → extraer nombre y apellido
             - Para nombres de 1 palabra: llenar solo "nombre"
@@ -310,6 +294,29 @@ class IntelligentSlotFiller:
             - Ejemplos: "soy Paco" → nombre: "Paco"
             - Ejemplos: "soy Paco Perez" → nombre: "Paco", apellido: "Perez"
             - Ejemplos: "soy Paco Perez Diaz" → nombre: "Paco", apellido: "Perez Diaz"
+
+            Los tipos de maquinaria disponibles para el campo tipo_maquinaria son:
+            {maquinaria_names}
+            
+            REGLAS ADICIONALES PARA DETALLES DE MAQUINARIA - USA ESTOS NOMBRES EXACTOS:
+            - Para TORRE_ILUMINACION: es_led (true/false para LED)
+            - Para SOLDADORAS: amperaje, electrodo
+            - Para COMPRESOR: capacidad_volumen, herramientas_conectar
+            - Para PLATAFORMA: altura_trabajo, actividad, ubicacion
+            - Para GENERADORES: actividad, capacidad
+            - Para ROMPEDORES: uso, tipo
+            - Para APISONADOR: uso, motor, es_diafragma
+            - Para MONTACARGAS: capacidad, tipo_energia, posicion_operador, altura
+            - Para MANIPULADOR: capacidad, altura, actividad, tipo_energia
+            - IMPORTANTE: Usa exactamente estos nombres de campos, NO inventes nombres alternativos
+            - NO extraer campos que no estén en esta lista exacta
+            - NO inventar campos adicionales como "proyecto", "aplicación", "capacidad_de_volumen", etc.
+            
+            REGLAS ESPECIALES PARA GIRO_EMPRESA:
+            - Si el usuario describe la actividad de su empresa → giro_empresa: [descripción de la actividad]
+            - Si el usuario dice "nos dedicamos a la [actividad]" → giro_empresa: [actividad]
+            - Ejemplos: "venta de maquinaria pesada", "construcción", "manufactura", "servicios de mantenimiento", "distribución", "logística", etc.
+            - Extrae la actividad principal, no solo palabras sueltas
             
             REGLAS ESPECIALES PARA USO_EMPRESA_O_VENTA:
             - Si el usuario dice "para venta", "es para vender", "para comercializar" → uso_empresa_o_venta: "venta"
@@ -318,13 +325,13 @@ class IntelligentSlotFiller:
             EJEMPLOS DE EXTRACCIÓN:
             - Mensaje: "soy Renato Fuentes" → {{"nombre": "Renato", "apellido": "Fuentes"}}
             - Mensaje: "me llamo Mauricio Martinez Rodriguez" → {{"nombre": "Mauricio", "apellido": "Martinez Rodriguez"}}
-            - Mensaje: "venta de maquinaria pesada" → {{"giro_empresa": "venta de maquinaria pesada"}}
-            - Mensaje: "para venta" → {{"uso_empresa_o_venta": "venta"}}
+            - Mensaje: "venta de maquinaria" → {{"giro_empresa": "venta de maquinaria"}}
             - Mensaje: "construcción y mantenimiento" → {{"giro_empresa": "construcción y mantenimiento"}}
+            - Mensaje: "para venta" → {{"uso_empresa_o_venta": "venta"}}
+            - Mensaje: "www.empresa.com" → {{"sitio_web": "www.empresa.com"}}
             - Mensaje: "en la Ciudad de México" → {{"lugar_requerimiento": "Ciudad de México"}}
             - Mensaje: "daniel@empresa.com" → {{"correo": "daniel@empresa.com"}}
             - Mensaje: "555-1234" → {{"telefono": "555-1234"}}
-            - Mensaje: "www.empresa.com" → {{"sitio_web": "www.empresa.com"}}
             
             EJEMPLOS DE USO DEL CONTEXTO DE LA ÚLTIMA PREGUNTA:
             - Última pregunta: "¿En qué compañía trabajas?" + Mensaje: "Facebook" → {{"nombre_empresa": "Facebook"}}
@@ -342,20 +349,6 @@ class IntelligentSlotFiller:
             - Ejemplos: "necesito un compresor" → {{"tipo_maquinaria": "compresor"}}
             IMPORTANTE: Incluso en preguntas sobre inventario, SIEMPRE extraer tipo_maquinaria si se menciona
             
-            REGLAS ADICIONALES PARA DETALLES DE MAQUINARIA - USA ESTOS NOMBRES EXACTOS:
-            - Para TORRE_ILUMINACION: es_led (true/false para LED)
-            - Para SOLDADORAS: amperaje, electrodo
-            - Para COMPRESOR: capacidad_volumen, herramientas_conectar
-            - Para PLATAFORMA: altura_trabajo, actividad, ubicacion
-            - Para GENERADORES: actividad, capacidad
-            - Para ROMPEDORES: uso, tipo
-            - Para APISONADOR: uso, motor, es_diafragma
-            - Para MONTACARGAS: capacidad, tipo_energia, posicion_operador, altura
-            - Para MANIPULADOR: capacidad, altura, actividad, tipo_energia
-            - IMPORTANTE: Usa exactamente estos nombres de campos, NO inventes nombres alternativos
-            - NO extraer campos que no estén en esta lista exacta
-            - NO inventar campos adicionales como "proyecto", "aplicación", "capacidad_de_volumen", etc.
-            
             IMPORTANTE: Analiza cuidadosamente el mensaje y extrae TODA la información disponible que corresponda a campos vacíos.
             
             Respuesta (solo JSON):
@@ -365,24 +358,16 @@ class IntelligentSlotFiller:
         try:
             # Nombres de tipos de maquinaria
             maquinaria_names = " ".join([f"\"{name.value}\"" for name in MaquinariaType])
-            
-            current_detalles_str = json.dumps(current_state.get("detalles_maquinaria", {}), ensure_ascii=False)
+
+            # Obtener campos disponibles desde el FIELDS_CONFIG_PRIORITY
+            fields_available = self._get_fields_available_str()
 
             response = self.llm.invoke(prompt.format_prompt(
                 message=message,
-                current_nombre=current_state.get("nombre", "No especificado"),
-                current_apellido=current_state.get("apellido", "No especificado"),
-                current_tipo=current_state.get("tipo_maquinaria", "No especificado"),
-                current_detalles=current_detalles_str,
-                current_sitio_web=current_state.get("sitio_web", "No especificado"),
-                current_uso=current_state.get("uso_empresa_o_venta", "No especificado"),
-                current_nombre_empresa=current_state.get("nombre_empresa", "No especificado"),
-                current_giro=current_state.get("giro_empresa", "No especificado"),
-                current_lugar_requerimiento=current_state.get("lugar_requerimiento", "No especificado"),
-                current_correo=current_state.get("correo", "No especificado"),
-                current_telefono=current_state.get("telefono", "No especificado"),
+                current_state_str=get_current_state_str(current_state),
                 last_bot_question=last_bot_question or "No hay pregunta previa (inicio de conversación)",
-                maquinaria_names=maquinaria_names
+                maquinaria_names=maquinaria_names,
+                fields_available=fields_available
             ))
             
             debug_print(f"DEBUG: Respuesta completa del LLM: '{response.content}'")
@@ -402,23 +387,11 @@ class IntelligentSlotFiller:
         """
         
         try:
-            # Definir el orden de prioridad de los slots con explicaciones centralizadas
-            slot_priority = [
-                ("nombre", "¿Con quién tengo el gusto?", "Para brindarte atención personalizada"),
-                ("apellido", "¿Cuál es tu apellido?", "Para completar tu información personal"), # Solo se pregunta si en nombre solo dice 1 palabra
-                ("tipo_maquinaria", "¿Qué tipo de maquinaria requiere?", "Para revisar nuestro inventario disponible"),
-                ("detalles_maquinaria", None, None),  # Se maneja por separado
-                ("nombre_empresa", "¿Cuál es el nombre de su empresa?", "Para generar la cotización a nombre de su empresa"),
-                ("giro_empresa", "¿Cuál es el giro de su empresa?", "Para entender mejor sus necesidades específicas"), # Se pregunta junto con nombre_empresa
-                ("lugar_requerimiento", "¿En qué lugar necesita el equipo?", "Para coordinar la entrega del equipo"),
-                ("uso_empresa_o_venta", "¿El equipo es para uso de la empresa o para venta?", "Para ofrecerle los mejores precios"),
-                ("sitio_web", "¿Cuál es el sitio web de su empresa?", "Para conocer mejor su empresa y generar una cotización más precisa"),
-                ("correo", "¿Cuál es su correo electrónico?", "Para enviarle la cotización"),
-                ("telefono", "¿Cuál es su teléfono?", "Para darle seguimiento personalizado") # TODO: Solo se pregunta si está respondiendo todo de forma fluida
-            ]
-            
             # Verificar cada slot en orden de prioridad
-            for slot_name, question, reason in slot_priority:
+            for slot_name, data in FIELDS_CONFIG_PRIORITY.items():
+                question = data["question"]
+                reason = data["reason"]
+                
                 if slot_name == "detalles_maquinaria":
                     # Manejar detalles específicos de maquinaria
                     question_details = self._get_maquinaria_detail_question_with_reason(current_state)
@@ -428,7 +401,8 @@ class IntelligentSlotFiller:
                     # Verificar si el slot está vacío o tiene respuestas negativas
                     value = current_state.get(slot_name)
                     if not value:
-                        # Si se debe preguntar por el nombre de la empresa y no se tiene el giro, preguntar por el giro de la empresa también
+                        # Si se debe preguntar por el nombre de la empresa y no se tiene el giro,
+                        # preguntar por el giro de la empresa también.
                         if slot_name == "nombre_empresa" and not current_state.get("giro_empresa"):
                             question = "¿Cuál es el nombre y giro de su empresa?"
                         
@@ -444,6 +418,14 @@ class IntelligentSlotFiller:
         except Exception as e:
             logging.error(f"Error generando siguiente pregunta: {e}")
             return None
+
+    def _get_fields_available_str(self) -> str:
+        """Obtiene los campos disponibles como una lista de strings con su descripción"""
+        fields_available = [field for field in FIELDS_CONFIG_PRIORITY.keys()]
+        fields_available_str = ""
+        for field in fields_available:
+            fields_available_str += f"- {field}: " + FIELDS_CONFIG_PRIORITY[field]['description'] + "\n"
+        return fields_available_str
     
     def _get_maquinaria_detail_question_with_reason(self, current_state: ConversationState) -> Optional[dict]:
         """Obtiene la siguiente pregunta específica sobre detalles de maquinaria de manera conversacional con el motivo"""
@@ -477,11 +459,9 @@ class IntelligentSlotFiller:
         nombre = current_state.get("nombre", "")
         if not nombre or len(nombre.split()) < 2:
             return False
-        
-        required_fields = [
-            "tipo_maquinaria", "lugar_requerimiento", "nombre_empresa", "giro_empresa",
-            "sitio_web", "uso_empresa_o_venta", "correo", "telefono"
-        ]
+
+        # Obtener campos obligatorios desde el FIELDS_CONFIG_PRIORITY
+        required_fields = [field for field in FIELDS_CONFIG_PRIORITY.keys() if FIELDS_CONFIG_PRIORITY[field]["required"]]
         
         # Verificar campos básicos
         for field in required_fields:
@@ -490,13 +470,13 @@ class IntelligentSlotFiller:
                 return False
         
         # Verificar detalles de maquinaria
-        tipo = current_state.get("tipo_maquinaria")
         detalles = current_state.get("detalles_maquinaria", {})
         
-        if not tipo or not detalles:
+        if not detalles:
             return False
         
         # Usar la configuración centralizada para obtener campos obligatorios
+        tipo = current_state.get("tipo_maquinaria")
         required_fields = get_required_fields_for_tipo(tipo)
         
         return all(
@@ -541,16 +521,7 @@ class IntelligentResponseGenerator:
                 {extracted_info_str}
                 
                 ESTADO ACTUAL DE LA CONVERSACIÓN:
-                - Nombre: {current_nombre}
-                - Tipo de maquinaria: {current_tipo}
-                - Detalles: {current_detalles}
-                - Empresa: {current_empresa}
-                - Giro: {current_giro}
-                - Lugar requerimiento: {current_lugar_requerimiento}
-                - Sitio web: {current_sitio_web}
-                - Uso: {current_uso}
-                - Correo: {current_correo}
-                - Teléfono: {current_telefono}
+                {current_state_str}
                 
                 SIGUIENTE PREGUNTA A HACER: {next_question}
                 SOLO MENCIONA LA RAZÓN DE LA SIGUIENTE PREGUNTA SI EL USUARIO LO PREGUNTA: {next_question_reason}
@@ -616,20 +587,13 @@ class IntelligentResponseGenerator:
             else:
                 conectors_instruction = "Si solo cuentas con el teléfono en el ESTADO ACTUAL DE LA CONVERSACIÓN, agradece por habernos contactado."
 
+            current_state_str = get_current_state_str(current_state)
+            print(f"DEBUG: current_state_str: {current_state_str}")
             formatedPrompt = prompt.format_prompt(
                 user_message=message,
+                current_state_str=current_state_str,
                 extracted_info_str=extracted_info_str,
-                current_nombre=current_state.get("nombre", "No especificado"),
                 primer_nombre=primer_nombre,
-                current_tipo=current_state.get("tipo_maquinaria", "No especificado"),
-                current_detalles=json.dumps(current_state.get("detalles_maquinaria", {}), ensure_ascii=False),
-                current_sitio_web=current_state.get("sitio_web", "No especificado"),
-                current_uso=current_state.get("uso_empresa_o_venta", "No especificado"),
-                current_lugar_requerimiento=current_state.get("lugar_requerimiento", "No especificado"),
-                current_empresa=current_state.get("nombre_empresa", "No especificado"),
-                current_giro=current_state.get("giro_empresa", "No especificado"),
-                current_correo=current_state.get("correo", "No especificado"),
-                current_telefono=current_state.get("telefono", "No especificado"),
                 next_question=next_question or "No hay siguiente pregunta",
                 next_question_reason=next_question_reason or "No hay razón para la siguiente pregunta",
                 inventory_instruction=inventory_instruction,
@@ -652,20 +616,13 @@ class IntelligentResponseGenerator:
     
     def generate_final_response(self, current_state: ConversationState) -> str:
         """Genera la respuesta final cuando la conversación está completa"""
+
+        current_state_str = get_current_state_str(current_state)
         
         return f"""¡Perfecto, {current_state['nombre']}! 
 
 He registrado toda su información:
-- Nombre: {current_state['nombre']}
-- Maquinaria: {current_state['tipo_maquinaria'].value}
-- Detalles: {json.dumps(current_state['detalles_maquinaria'], indent=2, ensure_ascii=False)}
-- Empresa: {current_state['nombre_empresa']}
-- Giro: {current_state['giro_empresa']}
-- Lugar requerimiento: {current_state['lugar_requerimiento']}
-- Uso: {current_state['uso_empresa_o_venta']}
-- Sitio web: {current_state['sitio_web']}
-- Correo: {current_state['correo']}
-- Teléfono: {current_state['telefono']}
+{current_state_str}
 
 Procederé a generar su cotización. Nos pondremos en contacto con usted pronto.
 
@@ -1014,24 +971,6 @@ class IntelligentLeadQualificationChatbot:
                 return content
         return None
     
-    def get_conversation_summary(self) -> Dict[str, Any]:
-        """Obtiene un resumen completo del lead calificado"""
-        return {
-            "nombre": self.state["nombre"],
-            "apellido": self.state["apellido"],
-            "tipo_maquinaria": self.state["tipo_maquinaria"],
-            "detalles_maquinaria": self.state["detalles_maquinaria"],
-            "nombre_empresa": self.state["nombre_empresa"],
-            "sitio_web": self.state["sitio_web"],
-            "giro_empresa": self.state["giro_empresa"],
-            "lugar_requerimiento": self.state["lugar_requerimiento"],
-            "uso_empresa_o_venta": self.state["uso_empresa_o_venta"],
-            "correo": self.state["correo"],
-            "telefono": self.state["telefono"],
-            "conversacion_completa": self.state["completed"],
-            "mensajes_total": len(self.state["messages"])
-        }
-    
     def get_lead_data_json(self) -> str:
         """Obtiene los datos del lead en formato JSON"""
-        return json.dumps(self.get_conversation_summary(), indent=2, ensure_ascii=False)
+        return json.dumps(get_current_state_str(self.state), indent=2, ensure_ascii=False)
