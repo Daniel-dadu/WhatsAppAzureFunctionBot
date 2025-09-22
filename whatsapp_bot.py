@@ -168,8 +168,8 @@ class WhatsAppBot:
                 authorized_ids.append(os.environ['RECIPIENT_WAID'])
             if "RECIPIENT_WAID_2" in os.environ:
                 authorized_ids.append(os.environ['RECIPIENT_WAID_2'])
-            # if "RECIPIENT_WAID_3" in os.environ:
-            #     authorized_ids.append(os.environ['RECIPIENT_WAID_3'])
+            if "RECIPIENT_WAID_3" in os.environ:
+                authorized_ids.append(os.environ['RECIPIENT_WAID_3'])
                 
             return wa_id in authorized_ids
         except Exception as e:
