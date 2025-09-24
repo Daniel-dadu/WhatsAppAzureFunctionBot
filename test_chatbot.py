@@ -200,7 +200,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "55 1234 5678"
     }
     
-    run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
+    # run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
     
     # ------------------------------------------------------------------------
     # Flujo 2: Usuario que da Múltiples Datos
@@ -302,7 +302,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "33 9876 5432"
     }
 
-    # run_conversation_test("Flujo 4: Usuario que dice que no tiene varios campos", chatbot, flujo_4, esperado_4)
+    run_conversation_test("Flujo 4: Usuario que dice que no tiene varios campos", chatbot, flujo_4, esperado_4)
 
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:
