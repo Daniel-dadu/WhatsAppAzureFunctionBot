@@ -736,10 +736,6 @@ class IntelligentLeadQualificationChatbot:
             
             # Mensaje que se regresa
             contextual_response = ""
-
-            # Si es el primer mensaje (no hay mensajes anteriores), generar saludo inicial
-            # if not self.state["messages"]:
-            #     contextual_response += "¡Hola! Soy Juan, un asesor comercial en Alpha C. "
             
             # Agregar mensaje del usuario
             self.state["messages"].append({

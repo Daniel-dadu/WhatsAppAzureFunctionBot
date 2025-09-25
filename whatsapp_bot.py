@@ -113,6 +113,18 @@ class WhatsAppBot:
         El chatbot ahora envía automáticamente las respuestas por WhatsApp.
         """
         try:
+            # Verificar si es un comando especial
+            if message_text.lower() == "reset":
+                reset_response = self._handle_reset_command(wa_id, hubspot_manager)
+                # Ignorar el Id de WhatsApp porque no se guarda en la base de datos
+                self.send_message(wa_id, reset_response)
+                return
+            elif message_text.lower() == "status":
+                status_response = self._get_conversation_status(wa_id)
+                # Ignorar el Id de WhatsApp porque no se guarda en la base de datos
+                self.send_message(wa_id, status_response)
+                return
+
             # Verificar si el mensaje es seguro
             safety_result = self.guardrails.check_message_safety(message_text)
             if safety_result:
@@ -129,17 +141,9 @@ class WhatsAppBot:
                 self._save_safety_messages(wa_id, safety_result["message"], response_for_lead, whatsapp_ids)
                 return
 
-            # Verificar si es un comando especial
-            if message_text.lower() == "reset":
-                reset_response = self._handle_reset_command(wa_id, hubspot_manager)
-                # Ignorar el Id de WhatsApp porque no se guarda en la base de datos
-                self.send_message(wa_id, reset_response)
-                return
-            elif message_text.lower() == "status":
-                status_response = self._get_conversation_status(wa_id)
-                # Ignorar el Id de WhatsApp porque no se guarda en la base de datos
-                self.send_message(wa_id, status_response)
-                return
+            logging.info(f"DADU Estado actual 2: {self.chatbot.state}")
+            # Guardamos el mensaje en la base de datos
+            self.state_store.add_single_message(wa_id, message_text, whatsapp_message_id, self.chatbot.state)
             
             # Procesar mensaje con LangChain (ahora envía automáticamente por WhatsApp)
             self.chatbot.send_message(message_text, whatsapp_message_id, hubspot_manager)

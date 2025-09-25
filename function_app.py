@@ -105,6 +105,19 @@ def create_state_store():
         logging.warning(f"Error configurando Cosmos DB, usando InMemoryStateStore: {e}")
         return InMemoryStateStore()
 
+def is_valid_whatsapp_message(body):
+    """
+    Check if the incoming webhook event has a valid WhatsApp message structure.
+    """
+    return (
+        body.get("object")
+        and body.get("entry")
+        and body["entry"][0].get("changes")
+        and body["entry"][0]["changes"][0].get("value")
+        and body["entry"][0]["changes"][0]["value"].get("messages")
+        and body["entry"][0]["changes"][0]["value"]["messages"][0]
+    )
+    
 def handle_message(req):
     """
     Handles incoming WhatsApp messages (POST requests).
@@ -139,18 +152,54 @@ def handle_message(req):
         logging.error("Failed to decode JSON")
         return func.HttpResponse("Invalid JSON provided", status_code=400)
 
-def is_valid_whatsapp_message(body):
+def check_agent_timeout(wa_id: str, whatsapp_bot: WhatsAppBot) -> bool:
     """
-    Check if the incoming webhook event has a valid WhatsApp message structure.
+    Verifica si han pasado 30 minutos desde el último mensaje del agente.
+    Si es así, cambia el modo de conversación de vuelta a 'bot'.
+    Retorna True si se cambió el modo, False si no.
     """
-    return (
-        body.get("object")
-        and body.get("entry")
-        and body["entry"][0].get("changes")
-        and body["entry"][0]["changes"][0].get("value")
-        and body["entry"][0]["changes"][0]["value"].get("messages")
-        and body["entry"][0]["changes"][0]["value"]["messages"][0]
-    )
+    try:
+        current_state = whatsapp_bot.chatbot.state
+        
+        # Solo verificar si está en modo agente
+        if current_state.get("conversation_mode") != "agente":
+            return False
+        
+        # Buscar el último mensaje del agente
+        last_agent_message_time = None
+        
+        for msg in reversed(current_state.get("messages", [])):
+            if msg.get("sender") == "agente":
+                last_agent_message_time = msg.get("timestamp")
+                break
+        
+        if not last_agent_message_time:
+            # No hay mensajes del agente, cambiar a bot
+            current_state["conversation_mode"] = "bot"
+            whatsapp_bot.chatbot.save_conversation()
+            logging.info(f"Modo cambiado a 'bot' para {wa_id} (no hay mensajes de agente)")
+            return True
+        
+        # Verificar si han pasado 30 minutos
+        try:
+            last_time = datetime.fromisoformat(last_agent_message_time.replace('Z', '+00:00'))
+            now = datetime.now(timezone.utc)
+            time_diff = now - last_time
+            
+            if time_diff > timedelta(minutes=30):
+                current_state["conversation_mode"] = "bot"
+                whatsapp_bot.chatbot.save_conversation()
+                logging.info(f"Modo cambiado a 'bot' para {wa_id} (timeout de 30 minutos)")
+                return True
+                
+        except Exception as e:
+            logging.error(f"Error parseando timestamp: {e}")
+            
+        return False
+        
+    except Exception as e:
+        logging.error(f"Error verificando timeout de agente: {e}")
+        return False
 
 def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
     """
@@ -187,10 +236,16 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
 
             logging.info(f"Conversación cargada para usuario {wa_id}")
 
+            # Actualizar número de WhatsApp en estado si no se ha guardado
+            # Esto solo se ejecuta cuando se inicia una conversación
+            current_state = whatsapp_bot.chatbot.state
+
+            logging.info(f"DADU Estado actual 1: {current_state}")
+
             # Verificar que en los ids de los últimos 3 mensajes no esté el id del mensaje actual
             # Esto es para evitar procesar mensajes duplicados
             # En algunas ocasiones, WhatsApp envía mensajes duplicados (parece que cuando un guardrail se tarda en procesar, envía el mismo mensaje duplicado)
-            last_3_messages = whatsapp_bot.chatbot.state.get("messages", [])[-3:]
+            last_3_messages = current_state.get("messages", [])[-3:]
             if whatsapp_message_id in [msg.get("whatsapp_message_id") for msg in last_3_messages]:
                 logging.info(f"Mensaje duplicado detectado: {whatsapp_message_id}")
                 return
@@ -202,9 +257,6 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
 
             logging.info(f"HubSpotManager creado para usuario {wa_id}")
 
-            # Actualizar número de WhatsApp en estado si no se ha guardado
-            # Esto solo se ejecuta cuando se inicia una conversación
-            current_state = whatsapp_bot.chatbot.state
             if not current_state.get("telefono"):
                 # Normalizar número de WhatsApp
                 phone_number = whatsapp_bot.normalize_mexican_number(phone_number)
@@ -275,52 +327,3 @@ def agent_message(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         logging.error(f"Error en endpoint agent-message: {e}")
         return func.HttpResponse("Internal server error", status_code=500)
-
-def check_agent_timeout(wa_id: str, whatsapp_bot: WhatsAppBot) -> bool:
-    """
-    Verifica si han pasado 30 minutos desde el último mensaje del agente.
-    Si es así, cambia el modo de conversación de vuelta a 'bot'.
-    Retorna True si se cambió el modo, False si no.
-    """
-    try:
-        current_state = whatsapp_bot.chatbot.state
-        
-        # Solo verificar si está en modo agente
-        if current_state.get("conversation_mode") != "agente":
-            return False
-        
-        # Buscar el último mensaje del agente
-        last_agent_message_time = None
-        
-        for msg in reversed(current_state.get("messages", [])):
-            if msg.get("sender") == "agente":
-                last_agent_message_time = msg.get("timestamp")
-                break
-        
-        if not last_agent_message_time:
-            # No hay mensajes del agente, cambiar a bot
-            current_state["conversation_mode"] = "bot"
-            whatsapp_bot.chatbot.save_conversation()
-            logging.info(f"Modo cambiado a 'bot' para {wa_id} (no hay mensajes de agente)")
-            return True
-        
-        # Verificar si han pasado 30 minutos
-        try:
-            last_time = datetime.fromisoformat(last_agent_message_time.replace('Z', '+00:00'))
-            now = datetime.now(timezone.utc)
-            time_diff = now - last_time
-            
-            if time_diff > timedelta(minutes=30):
-                current_state["conversation_mode"] = "bot"
-                whatsapp_bot.chatbot.save_conversation()
-                logging.info(f"Modo cambiado a 'bot' para {wa_id} (timeout de 30 minutos)")
-                return True
-                
-        except Exception as e:
-            logging.error(f"Error parseando timestamp: {e}")
-            
-        return False
-        
-    except Exception as e:
-        logging.error(f"Error verificando timeout de agente: {e}")
-        return False
