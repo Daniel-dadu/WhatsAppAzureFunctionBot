@@ -240,8 +240,6 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
             # Esto solo se ejecuta cuando se inicia una conversación
             current_state = whatsapp_bot.chatbot.state
 
-            logging.info(f"DADU Estado actual 1: {current_state}")
-
             # Verificar que en los ids de los últimos 3 mensajes no esté el id del mensaje actual
             # Esto es para evitar procesar mensajes duplicados
             # En algunas ocasiones, WhatsApp envía mensajes duplicados (parece que cuando un guardrail se tarda en procesar, envía el mismo mensaje duplicado)

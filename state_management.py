@@ -229,7 +229,6 @@ class CosmosDBStateStore(ConversationStateStore):
     def add_single_message(self, user_id: str, message_text: str, whatsapp_message_id: str, state: ConversationState) -> None:
         """Agrega un mensaje único al estado de conversación"""
         try: 
-            logging.info(f"DADU Estado actual 3: {state}")
             # Si es una nueva conversación, crear un nuevo documento
             if state.get("messages") == []:
                 self._create_new_conversation_state(user_id, state)
@@ -263,7 +262,6 @@ class CosmosDBStateStore(ConversationStateStore):
 
     def _create_new_conversation_state(self, user_id: str, state: ConversationState) -> None:
         """Crea un nuevo estado de conversación"""
-        logging.info(f"DADU creando nuevo estado de conversación")
         cosmos_doc = self._conversation_state_to_cosmos(user_id, state)
         self.container.upsert_item(cosmos_doc)
         logging.info(f"Documento inicial creado para usuario {user_id}")

@@ -141,7 +141,6 @@ class WhatsAppBot:
                 self._save_safety_messages(wa_id, safety_result["message"], response_for_lead, whatsapp_ids)
                 return
 
-            logging.info(f"DADU Estado actual 2: {self.chatbot.state}")
             # Guardamos el mensaje en la base de datos
             self.state_store.add_single_message(wa_id, message_text, whatsapp_message_id, self.chatbot.state)
             
