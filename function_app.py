@@ -201,6 +201,35 @@ def check_agent_timeout(wa_id: str, whatsapp_bot: WhatsAppBot) -> bool:
         logging.error(f"Error verificando timeout de agente: {e}")
         return False
 
+def process_multimedia_message(wa_id: str, message_details: dict, whatsapp_bot: WhatsAppBot):
+    """
+    Processes the WhatsApp multimedia message and sends appropriate response.
+    """
+    try:
+        multimedia = {}
+
+        # TODO: considerar todos los tipos "image", "video", "audio", "document", "sticker", "location", "contacts"
+        message_type = message_details.get("type")
+
+        multimedia["type"] = message_type
+
+        logging.info(f"Message Type: {message_type}")
+        message_id = message_details.get("id")
+
+        multimedia_details = message_details.get(message_type, {})
+        logging.info(f"Detalles del mensaje multimedia: {message_details}")
+
+        multimedia_id = multimedia_details.get("id")
+        multimedia["multimedia_id"] = multimedia_id
+        if "caption" in multimedia_details:
+            caption = multimedia_details.get("caption")
+            multimedia["caption"] = caption
+
+        whatsapp_bot.process_multimedia_msg(wa_id, multimedia, message_id)
+    except Exception as e:
+        logging.error(f"Error procesando mensaje multimedia: {e}")
+        return func.HttpResponse("Internal server error", status_code=500)
+        
 def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
     """
     Processes the WhatsApp message and sends appropriate response.
@@ -225,16 +254,16 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
         logging.info(f"Detalles del mensaje: {message_details}")
         phone_number = message_details["from"] # Número de WhatsApp del lead empezando por 521
 
+        # Cargar conversación
+        whatsapp_bot.chatbot.load_conversation(wa_id)
+
+        logging.info(f"Conversación cargada para usuario {wa_id}")
+
         if "text" in message_details:
             # Extraer el contenido en texto del mensaje
             message_text = message_details["text"]["body"]
             # Extraer el id del mensaje asignado por WhatsApp
             whatsapp_message_id = message_details["id"]
-
-            # Cargar conversación
-            whatsapp_bot.chatbot.load_conversation(wa_id)
-
-            logging.info(f"Conversación cargada para usuario {wa_id}")
 
             # Actualizar número de WhatsApp en estado si no se ha guardado
             # Esto solo se ejecuta cuando se inicia una conversación
@@ -276,8 +305,7 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
             # TODO: Esto se debería registrar en Cosmos DB
             # Handle non-text messages with a help message
             logging.info(f"Message Type: NON-TEXT")
-            help_text = "¡Hola! Solo puedo procesar mensajes de texto. Por favor, envíame un mensaje de texto y te responderé con información sobre maquinaria."
-            whatsapp_bot.send_message(wa_id, help_text)
+            process_multimedia_message(wa_id, message_details, whatsapp_bot)
 
     except Exception as e:
         logging.error(f"Error procesando mensaje: {e}")

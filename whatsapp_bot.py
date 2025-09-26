@@ -8,7 +8,7 @@ import os
 import requests
 from ai_langchain import AzureOpenAIConfig, IntelligentLeadQualificationChatbot
 from state_management import ConversationStateStore
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from datetime import datetime, timezone
 from hubspot_manager import HubSpotManager
 from check_guardrails import ContentSafetyGuardrails
@@ -151,7 +151,18 @@ class WhatsAppBot:
             logging.error(f"Error procesando mensaje: {e}")
             error_message = "Disculpa, hubo un problema técnico. ¿Podrías repetir tu mensaje?"
             self.send_message(wa_id, error_message)
-    
+
+    def process_multimedia_msg(self, wa_id: str, multimedia: Dict[str, Any], whatsapp_message_id: str) -> None:
+        """
+        Procesa un mensaje multimedia entrante.
+        Actualmente solo responde que no se soportan mensajes multimedia.
+        """
+        try:
+            logging.info(f"Mensaje multimedia recibido de {wa_id}. Tipo: " + multimedia.get('type') + ".")
+            self.state_store.add_single_message(wa_id, multimedia, whatsapp_message_id, self.chatbot.state)
+        except Exception as e:
+            logging.error(f"Error procesando mensaje multimedia: {e}")
+
     def _handle_reset_command(self, wa_id: str, hubspot_manager: HubSpotManager) -> str:
         """Maneja el comando de reset"""
         hubspot_manager.delete_contact()

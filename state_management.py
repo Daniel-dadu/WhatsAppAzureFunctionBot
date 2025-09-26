@@ -226,7 +226,7 @@ class CosmosDBStateStore(ConversationStateStore):
             self.container.upsert_item(cosmos_doc)
             # logging.info(f"Estado guardado con fallback completo para usuario {user_id}")
 
-    def add_single_message(self, user_id: str, message_text: str, whatsapp_message_id: str, state: ConversationState) -> None:
+    def add_single_message(self, user_id: str, message_content: Any, whatsapp_message_id: str, state: ConversationState) -> None:
         """Agrega un mensaje único al estado de conversación"""
         try: 
             # Si es una nueva conversación, crear un nuevo documento
@@ -238,10 +238,16 @@ class CosmosDBStateStore(ConversationStateStore):
                 "whatsapp_message_id": whatsapp_message_id,
                 "sender": "lead",
                 "role": "user",
-                "content": message_text,
+                "content": "",
                 "question_type": "",
                 "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             }
+
+            # Si es texto, agregar el texto en content, si es multimedia, agregar nuevo elemento "multimedia"
+            if isinstance(message_content, str):
+                new_message["content"] = message_content
+            else:
+                new_message["multimedia"] = message_content
 
             logging.info(f"Agregando mensaje del usuario {user_id}: {new_message}")
             
@@ -414,6 +420,10 @@ class CosmosDBStateStore(ConversationStateStore):
                     "delivered": True,
                     "read": False
                 }
+
+                if msg.get("multimedia"):
+                    msg_formatted["text"] = None
+                    msg_formatted["multimedia"] = msg["multimedia"]
                 formatted_messages.append(msg_formatted)
             
             # Usar patch operation para agregar mensajes
