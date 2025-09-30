@@ -339,8 +339,8 @@ def agent_message(req: func.HttpRequest) -> func.HttpResponse:
         multimedia = body.get("multimedia")
         logging.info(f"Multimedia: {multimedia}")
         
-        if not wa_id or message is None:
-            return func.HttpResponse("Missing wa_id or message", status_code=400)
+        if not wa_id:
+            return func.HttpResponse("Missing wa_id", status_code=400)
         
         # Crear instancia de WhatsAppBot
         whatsapp_bot = create_whatsapp_bot()

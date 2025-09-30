@@ -101,6 +101,8 @@ class WhatsAppBot:
                 data = self.get_text_message_input(wa_id, multimedia["type"], multimedia["multimedia_id"])
             else:
                 data = self.get_text_message_input(wa_id, "text", text)
+
+            logging.info(f"Data of message sent to WhatsApp API: {data}")
             headers = {
                 "Content-type": "application/json",
                 "Authorization": f"Bearer {self.access_token}",
