@@ -505,10 +505,11 @@ class IntelligentResponseGenerator:
                 
                 INSTRUCCIONES:
                 1. No repitas información que ya confirmaste anteriormente
-                2. Si ya mencionaste el nombre del usuario, no lo menciones nuevamente
-                3. Si hay una siguiente pregunta, hazla de manera natural
-                4. NO inventes preguntas adicionales
-                5. Si no hay siguiente pregunta, simplemente confirma la información recibida
+                2. Si estás respondiendo al primer mensaje del usuario, presentate como Juan, asesor comercial de Alpha C
+                3. Si ya mencionaste el nombre del usuario, no lo menciones nuevamente
+                4. Si hay una siguiente pregunta, hazla de manera natural
+                5. NO inventes preguntas adicionales
+                6. Si no hay siguiente pregunta, simplemente confirma la información recibida
                 
                 Genera una respuesta natural y apropiada:
             """

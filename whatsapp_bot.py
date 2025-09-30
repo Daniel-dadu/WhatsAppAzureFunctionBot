@@ -65,28 +65,42 @@ class WhatsAppBot:
             return "52" + phone_number[3:]
         return phone_number
     
-    def get_text_message_input(self, recipient: str, text: str) -> str:
+    def get_text_message_input(self, recipient: str, message_type: str, content: str) -> str:
         """
         Crea el payload JSON para enviar un mensaje de texto vía WhatsApp API.
         """
         normalized_recipient = self.normalize_mexican_number(recipient)
-        return json.dumps({
+        payload = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": normalized_recipient,
-            "type": "text",
-            "text": {
+            "type": message_type
+        }
+        if message_type == "text":
+            payload["text"] = {
                 "preview_url": False,
-                "body": text
-            },
-        })
+                "body": content
+            }
+        elif message_type == "image":
+            payload["image"] = {
+                "id": content
+            }
+        elif message_type == "audio":
+            payload["audio"] = {
+                "id": content
+            }
+        return json.dumps(payload)
     
-    def send_message(self, wa_id: str, text: str) -> Optional[str]:
+    def send_message(self, wa_id: str, text: str, multimedia: Dict[str, Any] = None) -> Optional[str]:
         """
         Envía un mensaje a través de WhatsApp API.
         """
         try:
-            data = self.get_text_message_input(wa_id, text)
+            data = None
+            if multimedia:
+                data = self.get_text_message_input(wa_id, multimedia["type"], multimedia["multimedia_id"])
+            else:
+                data = self.get_text_message_input(wa_id, "text", text)
             headers = {
                 "Content-type": "application/json",
                 "Authorization": f"Bearer {self.access_token}",

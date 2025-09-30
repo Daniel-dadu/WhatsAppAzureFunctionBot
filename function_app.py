@@ -334,15 +334,19 @@ def agent_message(req: func.HttpRequest) -> func.HttpResponse:
         # Validar campos requeridos
         wa_id = body.get("wa_id")
         message = body.get("message")
+
+        # Obtener el campo de multimedia
+        multimedia = body.get("multimedia")
+        logging.info(f"Multimedia: {multimedia}")
         
-        if not wa_id or not message:
+        if not wa_id or message is None:
             return func.HttpResponse("Missing wa_id or message", status_code=400)
         
         # Crear instancia de WhatsAppBot
         whatsapp_bot = create_whatsapp_bot()
         
         # Enviar mensaje al lead vía WhatsApp
-        whatsapp_message_id = whatsapp_bot.send_message(wa_id, message)
+        whatsapp_message_id = whatsapp_bot.send_message(wa_id, message, multimedia)
 
         if whatsapp_message_id:
             # Regresar el ID de WhatsApp del mensaje
