@@ -341,8 +341,6 @@ class IntelligentSlotFiller:
                 fields_available=fields_available
             ))
             
-            debug_print(f"DEBUG: Respuesta completa del LLM: '{response.content}'")
-            
             # Parsear la respuesta JSON
             result = self.parser.parse(response.content)
             return result
@@ -681,7 +679,7 @@ class IntelligentLeadQualificationChatbot:
             # Campos que no se preguntan al usuario
             "completed": False,
             "messages": [],
-            "conversation_mode": "bot",
+            "conversation_mode": "agente",
             "asignado_asesor": None,
             "hubspot_contact_id": None
         }
@@ -784,7 +782,8 @@ class IntelligentLeadQualificationChatbot:
             if self.slot_filler.is_conversation_complete(self.state):
                 debug_print(f"DEBUG: Conversación completa!")
                 self.state["completed"] = True
-                final_response = self.response_generator.generate_final_response(self.state)
+                # final_response = self.response_generator.generate_final_response(self.state)
+                final_response = "Gracias por la información. Pronto te contactará nuestro asesor especializado."
                 return self._add_message_and_return_response(final_response, "")
             
             # Obtener la siguiente pregunta necesaria
@@ -793,7 +792,7 @@ class IntelligentLeadQualificationChatbot:
             if next_question is None:
                 debug_print(f"DEBUG: Estado completo: {self.state}")
                 self.state["completed"] = True
-                final_message = "Gracias por toda la información. Estoy procesando su solicitud."
+                final_message = "Gracias por la información. Pronto te contactará nuestro asesor especializado."
                 return self._add_message_and_return_response(final_message, "")
 
             next_question_str = next_question["question"]

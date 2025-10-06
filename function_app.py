@@ -174,10 +174,8 @@ def check_agent_timeout(wa_id: str, whatsapp_bot: WhatsAppBot) -> bool:
                 break
         
         if not last_agent_message_time:
-            # No hay mensajes del agente, cambiar a bot
-            current_state["conversation_mode"] = "bot"
-            whatsapp_bot.chatbot.save_conversation()
-            logging.info(f"Modo cambiado a 'bot' para {wa_id} (no hay mensajes de agente)")
+            # No hay mensajes del agente, pero mantenemos el modo agente
+            logging.info(f"Modo mantenido en 'agente' para {wa_id} (no hay mensajes de agente)")
             return True
         
         # Verificar si han pasado 30 minutos
@@ -292,10 +290,14 @@ def process_whatsapp_message(body, whatsapp_bot: WhatsAppBot):
             else:
                 hubspot_manager.contact_id = current_state["hubspot_contact_id"]
             
+            # -------------------
+            # Función desactivada para desplegar en producción
+            # -------------------
             # Verificar timeout de agente antes de procesar
-            timeout_occurred = check_agent_timeout(wa_id, whatsapp_bot)
-            if timeout_occurred:
-                logging.info(f"Timeout de agente detectado para {wa_id}, regresando a modo bot")
+            # timeout_occurred = check_agent_timeout(wa_id, whatsapp_bot)
+            # if timeout_occurred:
+            #     logging.info(f"Timeout de agente detectado para {wa_id}, regresando a modo bot")
+            # -------------------
 
             # Ejecutar slot-filling usando el contexto del último mensaje (agente o bot)
             # Ahora el chatbot envía automáticamente las respuestas por WhatsApp
