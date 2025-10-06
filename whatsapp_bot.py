@@ -89,6 +89,11 @@ class WhatsAppBot:
             payload["audio"] = {
                 "id": content
             }
+        elif message_type == "document":
+            payload["document"] = {
+                "id": content,
+                "filename": "archivo"
+            }
         return json.dumps(payload)
     
     def send_message(self, wa_id: str, text: str, multimedia: Dict[str, Any] = None) -> Optional[str]:

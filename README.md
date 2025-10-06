@@ -1,5 +1,26 @@
 # Bot de WhatsApp para Calificación de Leads de Maquinaria
 
+## Variables de entorno:
+```python
+# WHATSAPP
+VERIFY_TOKEN
+RECIPIENT_WAID # Se eliminará en producción
+RECIPIENT_WAID_2 # (opcional)
+RECIPIENT_WAID_3 # (opcional)
+WHATSAPP_ACCESS_TOKEN
+PHONE_NUMBER_ID
+WHATSAPP_API_VERSION
+
+# AI FOUNDRY
+FOUNDRY_ENDPOINT
+FOUNDRY_API_KEY
+
+# COSMOS DB
+COSMOS_CONNECTION_STRING
+COSMOS_DB_NAME
+COSMOS_CONTAINER_NAME
+```
+
 ## Descripción del Proyecto
 
 Este proyecto implementa un chatbot inteligente automatizado para la calificación de leads de maquinaria ligera, integrando WhatsApp Business API con Azure OpenAI GPT-4.1-mini y LangChain. El sistema está diseñado como una Azure Function que procesa webhooks de WhatsApp y gestiona conversaciones de manera inteligente para recopilar información de clientes potenciales.
