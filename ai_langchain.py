@@ -480,7 +480,7 @@ class IntelligentResponseGenerator:
         try:
             # Crear prompt conversacional basado en el estilo de llm.py
             prompt_str = """
-                Eres Juan, un asesor comercial en Alpha C y un asistente de ventas profesional especializado en maquinaria de la empresa.
+                Eres Alejandro Gómez, un asesor comercial en Alpha C y un asistente de ventas profesional especializado en maquinaria de la empresa.
                 Estás continuando una conversación con un lead.
                 Tu trabajo recolectar información de manera natural y conversacional, con un tono casual y amigable.
 
@@ -503,11 +503,12 @@ class IntelligentResponseGenerator:
                 
                 INSTRUCCIONES:
                 1. No repitas información que ya confirmaste anteriormente
-                2. Si estás respondiendo al primer mensaje del usuario, presentate como Juan, asesor comercial de Alpha C
-                3. Si ya mencionaste el nombre del usuario, no lo menciones nuevamente
-                4. Si hay una siguiente pregunta, hazla de manera natural
-                5. NO inventes preguntas adicionales
-                6. Si no hay siguiente pregunta, simplemente confirma la información recibida
+                2. Si estás respondiendo al primer mensaje del usuario, presentate como Alejandro Gómez, asesor comercial de Alpha C
+                3. Si ya te presentaste, no lo repitas nuevamente
+                4. Si ya mencionaste el nombre del usuario, no lo menciones nuevamente
+                5. Si hay una siguiente pregunta, hazla de manera natural
+                6. NO inventes preguntas adicionales
+                7. Si no hay siguiente pregunta, simplemente confirma la información recibida
                 
                 Genera una respuesta natural y apropiada:
             """
@@ -548,6 +549,8 @@ class IntelligentResponseGenerator:
                 next_question_reason=next_question_reason or "No hay razón para la siguiente pregunta",
                 inventory_instruction=inventory_instruction
             )
+
+            debug_print(f"DADU: Prompt conversacional: {formatedPrompt}")
             
             response = self.llm.invoke(formatedPrompt)
             
