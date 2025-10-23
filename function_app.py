@@ -362,3 +362,57 @@ def agent_message(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         logging.error(f"Error en endpoint agent-message: {e}")
         return func.HttpResponse("Internal server error", status_code=500)
+
+@app.route(route="start-bot-mode", methods=["POST"])
+def start_bot_mode(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Endpoint para activar el modo bot y procesar el último mensaje del lead.
+    Verifica si el último mensaje fue enviado por el lead y, si es así,
+    lo procesa y genera una respuesta contextual.
+    """
+    logging.info('Endpoint start-bot-mode activado')
+    
+    try:
+        # Validar que sea POST
+        if req.method != 'POST':
+            return func.HttpResponse("Method not allowed", status_code=405)
+        
+        # Obtener datos del request
+        body = req.get_json()
+        if not body:
+            return func.HttpResponse("Invalid JSON", status_code=400)
+        
+        # Validar campo requerido
+        wa_id = body.get("wa_id")
+        if not wa_id:
+            return func.HttpResponse("Missing wa_id", status_code=400)
+        
+        logging.info(f"Procesando start-bot-mode para wa_id: {wa_id}")
+        
+        # Crear instancia de WhatsAppBot
+        whatsapp_bot = create_whatsapp_bot()
+        
+        # Procesar el último mensaje del lead
+        response = whatsapp_bot.chatbot.process_last_lead_message(wa_id)
+        
+        if response:
+            logging.info(f"Respuesta generada para {wa_id}: {response}")
+            return func.HttpResponse(json.dumps({
+                "success": True,
+                "message": "Bot mode activated and response generated",
+                "response": response
+            }), status_code=200, mimetype="application/json")
+        else:
+            logging.info(f"No se generó respuesta para {wa_id} - último mensaje no es del lead")
+            return func.HttpResponse(json.dumps({
+                "success": False,
+                "message": "No response generated - last message was not from lead"
+            }), status_code=200, mimetype="application/json")
+            
+    except Exception as e:
+        logging.error(f"Error en endpoint start-bot-mode: {e}")
+        return func.HttpResponse(json.dumps({
+            "success": False,
+            "message": "Internal server error",
+            "error": str(e)
+        }), status_code=500, mimetype="application/json")
