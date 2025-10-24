@@ -75,7 +75,9 @@ class WhatsAppBot:
         if template_name == "seguimiento_formulario":
             return f"Hola {lead_name}, mi nombre es Alejandro Gómez asesor comercial de Alpha C. Me pongo en contacto contigo para dar seguimiento a tu interés en la siguiente maquinaria: {lead_machine_type}. Para continuar con tu solicitud, ¿me podrías confirmar si la maquinaria la requieres  para venta o uso propio?"
         elif template_name == "seguimiento_conversacion":
-            return f"Hola {lead_name}, quedamos pendientes de tu consulta sobre {lead_machine_type}. Podemos continuar con la información que estaba pendiente de tu solicitud."
+            return f"""Hola {lead_name}, intentamos comunicarnos contigo para brindarte la información del equipo que solicitaste.
+            ¿Sigues interesado en recibir la información o una cotización?
+            Quedamos a tus órdenes para cotizar o resolver cualquier duda que tengas."""
 
     def get_template_components(self, wa_id: str, template_name: str) -> List[Dict[str, Any]]:
         """
@@ -252,6 +254,8 @@ class WhatsAppBot:
                 authorized_ids.append(os.environ['RECIPIENT_WAID_2'])
             if "RECIPIENT_WAID_3" in os.environ:
                 authorized_ids.append(os.environ['RECIPIENT_WAID_3'])
+            if "RECIPIENT_WAID_4" in os.environ:
+                authorized_ids.append(os.environ['RECIPIENT_WAID_4'])
                 
             return wa_id in authorized_ids
         except Exception as e:
