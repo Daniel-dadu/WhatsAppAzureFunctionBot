@@ -416,3 +416,34 @@ def start_bot_mode(req: func.HttpRequest) -> func.HttpResponse:
             "message": "Internal server error",
             "error": str(e)
         }), status_code=500, mimetype="application/json")
+
+@app.route(route="new-lead-form", methods=["POST"])
+def new_lead_form(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Endpoint para procesar el formulario de nuevo lead.
+    """
+    logging.info('Endpoint new-lead-form activado')
+    
+    try:
+        # Validar que sea POST
+        if req.method != 'POST':
+            return func.HttpResponse("Method not allowed", status_code=405)
+        
+        # Obtener datos del request
+        body = req.get_json()
+        if not body:
+            return func.HttpResponse("Invalid JSON", status_code=400)
+        
+        logging.info(f"Body: {body}")
+        
+        # Validar campo requerido
+        email_body = body.get("email_body")
+        if not email_body:
+            return func.HttpResponse("Missing email_body", status_code=400)
+
+        logging.info(f"Procesando new-lead-form para email_body: {email_body}")
+
+        return func.HttpResponse("OK", status_code=200)
+    except Exception as e:
+        logging.error(f"Error en endpoint new-lead-form: {e}")
+        return func.HttpResponse("Internal server error", status_code=500)
