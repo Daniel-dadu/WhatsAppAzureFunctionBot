@@ -72,8 +72,8 @@ class WhatsAppBot:
         lead_name = self.chatbot.state.get("nombre", "") if self.chatbot.state.get("nombre") else ""
         lead_machine_type = self.chatbot.state.get("tipo_maquinaria", "") if self.chatbot.state.get("tipo_maquinaria") else "nuestra maquinaria"
 
-        if template_name == "seguimiento_formulario":
-            return f"Hola {lead_name}, mi nombre es Alejandro Gómez asesor comercial de Alpha C. Me pongo en contacto contigo para dar seguimiento a tu interés en la siguiente maquinaria: {lead_machine_type}. Para continuar con tu solicitud, ¿me podrías confirmar si la maquinaria la requieres  para venta o uso propio?"
+        if template_name == "notificacion_de_leads":
+            return f"Hola {lead_name}, mi nombre es Alejandro Gómez asesor comercial de Alpha C. Me pongo en contacto contigo para dar seguimiento a tu interés en la siguiente maquinaria: {lead_machine_type}. Para continuar con tu solicitud, ¿me podrías confirmar si la maquinaria la requieres para venta o uso propio?"
         elif template_name == "seguimiento_conversacion":
             return f"""Hola {lead_name}, intentamos comunicarnos contigo para brindarte la información del equipo que solicitaste.
             ¿Sigues interesado en recibir la información o una cotización?
