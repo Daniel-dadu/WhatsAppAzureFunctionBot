@@ -293,6 +293,14 @@ class IntelligentSlotFiller:
             - Si el usuario dice "para venta", "es para vender", "para comercializar" → uso_empresa_o_venta: "venta"
             - Si el usuario dice "para uso", "para usar", "para trabajo interno" → uso_empresa_o_venta: "uso empresa"
             
+            REGLAS ESPECIALES PARA TIPO_AYUDA:
+            - Si la última pregunta es "¿En qué te puedo ayudar?" o similar, analiza si el usuario menciona:
+              * MAQUINARIA: Si menciona cualquier tipo de maquinaria (soldadora, compresor, generador, montacargas, etc.), o cualquier cosa relacionada con equipos/máquinas → tipo_ayuda: "maquinaria"
+              * OTRO: Si menciona refacciones (sin contexto de maquinaria), créditos, financiamiento, información general, servicios, o cualquier otra cosa que NO sea maquinaria → tipo_ayuda: "otro"
+            - Ejemplos de MAQUINARIA: "necesito una soldadora", "quiero un compresor", "busco generadores", "equipos de construcción", "quiero una maquina pesada"
+            - Ejemplos de OTRO: "refacciones" (sin contexto), "créditos", "financiamiento", "servicios", "cotización de refacciones" (sin mencionar maquinaria específica)
+            - IMPORTANTE: Si el usuario menciona maquinaria específica o tipos de maquinaria, SIEMPRE es "maquinaria"
+            
             EJEMPLOS DE EXTRACCIÓN:
             - Mensaje: "soy Renato Fuentes" → {{"nombre": "Renato", "apellido": "Fuentes"}}
             - Mensaje: "me llamo Mauricio Martinez Rodriguez" → {{"nombre": "Mauricio", "apellido": "Martinez Rodriguez"}}
@@ -310,6 +318,10 @@ class IntelligentSlotFiller:
             - Última pregunta: "¿Cuál es su correo electrónico?" + Mensaje: "daniel@empresa.com" → {{"correo": "daniel@empresa.com"}}
             - Última pregunta: "¿Es para uso de la empresa o para venta?" + Mensaje: "Para venta" → {{"uso_empresa_o_venta": "venta"}}
             - Última pregunta: "¿Cuál es el sitio web de su empresa?" + Mensaje: "www.empresa.com" → {{"sitio_web": "www.empresa.com"}}
+            - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Necesito una soldadora" → {{"tipo_ayuda": "maquinaria"}}
+            - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Quiero información sobre créditos" → {{"tipo_ayuda": "otro"}}
+            - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Refacciones" → {{"tipo_ayuda": "otro"}}
+            - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Refacciones para mi compresor" → {{"tipo_ayuda": "maquinaria"}}
 
             REGLAS ESPECIALES PARA PREGUNTAS SOBRE INVENTARIO:
             - Si el usuario pregunta "¿tienen [tipo]?" → extraer [tipo] como tipo_maquinaria
@@ -356,16 +368,55 @@ class IntelligentSlotFiller:
         """
         
         try:
+            # Verificar primero si tipo_ayuda está vacío
+            tipo_ayuda = current_state.get("tipo_ayuda")
+            
+            # Si tipo_ayuda es "otro", solo preguntar por nombre y apellido
+            if tipo_ayuda == "otro":
+                # Solo verificar nombre y apellido
+                nombre = current_state.get("nombre", "")
+                if not nombre or len(nombre.split()) < 2:
+                    # Buscar la pregunta de nombre o apellido
+                    for slot_name, data in FIELDS_CONFIG_PRIORITY.items():
+                        if slot_name in ["nombre", "apellido"]:
+                            value = current_state.get(slot_name)
+                            if not value:
+                                return {
+                                    "question": data["question"], 
+                                    "reason": data["reason"], 
+                                    "question_type": slot_name
+                                }
+                # Si nombre y apellido están completos, retornar None para terminar
+                return None
+            
             # Verificar cada slot en orden de prioridad
             for slot_name, data in FIELDS_CONFIG_PRIORITY.items():
                 question = data["question"]
                 reason = data["reason"]
                 
+                # Si tipo_ayuda es "otro", saltar tipo_maquinaria y detalles_maquinaria
+                if tipo_ayuda == "otro" and slot_name in ["tipo_maquinaria", "detalles_maquinaria"]:
+                    continue
+                
                 if slot_name == "detalles_maquinaria":
+                    # Solo preguntar detalles si tipo_ayuda es "maquinaria"
+                    if tipo_ayuda != "maquinaria":
+                        continue
                     # Manejar detalles específicos de maquinaria
                     question_details = self._get_maquinaria_detail_question_with_reason(current_state)
                     if question_details:
                         return question_details
+                elif slot_name == "tipo_maquinaria":
+                    # Solo preguntar tipo_maquinaria si tipo_ayuda es "maquinaria"
+                    if tipo_ayuda != "maquinaria":
+                        continue
+                    value = current_state.get(slot_name)
+                    if not value:
+                        return {
+                            "question": question, 
+                            "reason": reason, 
+                            "question_type": slot_name
+                        }
                 else:
                     # Verificar si el slot está vacío o tiene respuestas negativas
                     value = current_state.get(slot_name)
@@ -429,6 +480,21 @@ class IntelligentSlotFiller:
         if not nombre or len(nombre.split()) < 2:
             return False
 
+        # Verificar tipo_ayuda
+        tipo_ayuda = current_state.get("tipo_ayuda")
+        if not tipo_ayuda:
+            return False
+        
+        # Si tipo_ayuda es "otro", solo se requiere nombre y apellido
+        if tipo_ayuda == "otro":
+            # Solo verificar nombre y apellido
+            nombre = current_state.get("nombre", "")
+            if not nombre or len(nombre.split()) < 2:
+                return False
+            
+            return True
+        
+        # Si tipo_ayuda es "maquinaria", verificar también tipo_maquinaria y detalles_maquinaria
         # Obtener campos obligatorios desde el FIELDS_CONFIG_PRIORITY
         required_fields = [field for field in FIELDS_CONFIG_PRIORITY.keys() if FIELDS_CONFIG_PRIORITY[field]["required"]]
         
@@ -437,6 +503,11 @@ class IntelligentSlotFiller:
             value = current_state.get(field)
             if not value or value == "":
                 return False
+        
+        # Verificar tipo_maquinaria
+        tipo_maquinaria = current_state.get("tipo_maquinaria")
+        if not tipo_maquinaria:
+            return False
         
         # Verificar detalles de maquinaria
         detalles = current_state.get("detalles_maquinaria", {})
@@ -471,9 +542,7 @@ class IntelligentResponseGenerator:
         extracted_info: Dict[str, Any], 
         current_state: ConversationState, 
         next_question: str = None, 
-        next_question_reason: str = None, 
-        is_inventory_question: bool = False,
-        is_same_last_question: bool = False # Si la pregunta anterior es la misma que la última pregunta
+        is_inventory_question: bool = False
     ) -> str:
         """Genera una respuesta contextual apropiada usando un enfoque conversacional"""
         
@@ -494,26 +563,36 @@ class IntelligentResponseGenerator:
                 {current_state_str}
                 
                 SIGUIENTE PREGUNTA A HACER: {next_question}
-                SOLO MENCIONA LA RAZÓN DE LA SIGUIENTE PREGUNTA SI EL USUARIO LO PREGUNTA: {next_question_reason}
            
                 MENSAJE DEL USUARIO: {user_message}
 
                 IMPORTANTE:
                 {inventory_instruction}
+                {presentation_instruction}
                 
                 INSTRUCCIONES:
-                1. No repitas información que ya confirmaste anteriormente
-                2. Si estás respondiendo al primer mensaje del usuario, presentate como Alejandro Gómez, asesor comercial de Alpha C
-                3. Si ya te presentaste, no lo repitas nuevamente
-                4. Si ya mencionaste el nombre del usuario, no lo menciones nuevamente
-                5. Si hay una siguiente pregunta, hazla de manera natural
-                6. NO inventes preguntas adicionales
-                7. Si no hay siguiente pregunta, simplemente confirma la información recibida
+                1. No repitas información que ya confirmaste anteriormente ni menciones el nombre del usuario.
+                2. Si hay una siguiente pregunta, hazla de manera natural
+                3. NO inventes preguntas adicionales
+                4. Si no hay siguiente pregunta, simplemente confirma la información recibida y termina la conversación.
                 
                 Genera una respuesta natural y apropiada:
             """
             
             prompt = ChatPromptTemplate.from_template(prompt_str)
+
+            # Verificar si es el inicio de la conversación (menos de 2 elementos en history_messages)
+            is_initial_conversation = len(history_messages) < 2
+            
+            # Instrucción de presentación obligatoria si es el inicio
+            presentation_instruction = ""
+            if is_initial_conversation:
+                presentation_instruction = """
+                
+                PRESENTACIÓN:
+                Presentate como Alejandro Gómez, asesor comercial de Alpha C.
+                Si en el primer mensaje del usuario este menciona que requiere algún producto o servicio, o solo quiere más información, dile "Hola, sí claro, puedo ayudarte con eso." y luego preséntate y haz la pregunta correspondiente. Si solo es un saludo, dile "Hola, soy Alejandro Gómez, asesor comercial de Alpha C." y luego haz la pregunta correspondiente.
+                """
 
             # Preparar información extraída como string de manera más segura
             if not extracted_info:
@@ -546,9 +625,11 @@ class IntelligentResponseGenerator:
                 history_messages=history_messages,
                 extracted_info_str=extracted_info_str,
                 next_question=next_question or "No hay siguiente pregunta",
-                next_question_reason=next_question_reason or "No hay razón para la siguiente pregunta",
-                inventory_instruction=inventory_instruction
+                inventory_instruction=inventory_instruction,
+                presentation_instruction=presentation_instruction
             )
+
+            debug_print(f"DEBUG: Prompt conversacional: {formatedPrompt}")
             
             response = self.llm.invoke(formatedPrompt)
             
@@ -559,8 +640,8 @@ class IntelligentResponseGenerator:
         except Exception as e:
             logging.error(f"Error generando respuesta conversacional: {e}")
             # Fallback a la lógica simple si no se puede generar la respuesta
-            if next_question and next_question_reason:
-                return next_question + " " + next_question_reason
+            if next_question:
+                return next_question
             else:
                 return "En un momento le responderemos."
     
@@ -680,7 +761,7 @@ class IntelligentLeadQualificationChatbot:
             # Campos que no se preguntan al usuario
             "completed": False,
             "messages": [],
-            "conversation_mode": "agente",
+            "conversation_mode": "bot",
             "asignado_asesor": None,
             "hubspot_contact_id": None
         }
@@ -721,6 +802,17 @@ class IntelligentLeadQualificationChatbot:
             self.state_store.delete_conversation_state(self.current_user_id)
         self.state = self._create_empty_state()
     
+    def _get_final_response_message(self) -> str:
+        """
+        Determina el mensaje final basado en el tipo_ayuda del estado actual.
+        Retorna un mensaje diferente si el usuario necesita algo diferente a maquinaria.
+        """
+        tipo_ayuda = self.state.get("tipo_ayuda")
+        if tipo_ayuda == "otro":
+            return "Claro, en un momento te comparto la información."
+        else:
+            return "Gracias por la información. Pronto te contactará nuestro asesor especializado."
+    
     def send_message(self, user_message: str, whatsapp_message_id: str = None, hubspot_manager: HubSpotManager = None) -> str:
         """
         Procesa un mensaje del usuario con slot-filling inteligente.
@@ -749,7 +841,7 @@ class IntelligentLeadQualificationChatbot:
 
             # Extraer TODA la información disponible del mensaje (SIEMPRE)
             # Obtener la última pregunta del bot para contexto
-            last_bot_question, last_bot_question_type = self._get_last_bot_question()
+            last_bot_question, _ = self._get_last_bot_question()
             extracted_info = self.slot_filler.extract_all_information(user_message, self.state, last_bot_question)
             debug_print(f"DEBUG: Información extraída: {extracted_info}") 
             
@@ -783,8 +875,7 @@ class IntelligentLeadQualificationChatbot:
             if self.slot_filler.is_conversation_complete(self.state):
                 debug_print(f"DEBUG: Conversación completa!")
                 self.state["completed"] = True
-                # final_response = self.response_generator.generate_final_response(self.state)
-                final_response = "Gracias por la información. Pronto te contactará nuestro asesor especializado."
+                final_response = self._get_final_response_message()
                 return self._add_message_and_return_response(final_response, "")
             
             # Obtener la siguiente pregunta necesaria
@@ -793,11 +884,10 @@ class IntelligentLeadQualificationChatbot:
             if next_question is None:
                 debug_print(f"DEBUG: Estado completo: {self.state}")
                 self.state["completed"] = True
-                final_message = "Gracias por la información. Pronto te contactará nuestro asesor especializado."
+                final_message = self._get_final_response_message()
                 return self._add_message_and_return_response(final_message, "")
 
             next_question_str = next_question["question"]
-            next_question_reason = next_question["reason"]
 
             debug_print(f"DEBUG: Siguiente pregunta: {next_question_str}")
 
@@ -817,9 +907,7 @@ class IntelligentLeadQualificationChatbot:
                 extracted_info, 
                 self.state, 
                 next_question_str, 
-                next_question_reason, 
-                is_inventory_question,
-                last_bot_question_type == next_question_type
+                is_inventory_question
             )
             contextual_response += generated_response
 
@@ -972,9 +1060,6 @@ class IntelligentLeadQualificationChatbot:
             
             # Verificar si es una pregunta sobre inventario
             is_inventory_question = self.inventory_responder.is_inventory_question(message_content)
-            
-            # Obtener la última pregunta del bot para contexto
-            _, last_bot_question_type = self._get_last_bot_question()
 
             # Obtener la siguiente pregunta necesaria
             next_question = self.slot_filler.get_next_question(self.state)
@@ -983,11 +1068,10 @@ class IntelligentLeadQualificationChatbot:
             if self.slot_filler.is_conversation_complete(self.state) or next_question is None:
                 debug_print(f"DEBUG: Conversación completa para {wa_id}")
                 self.state["completed"] = True
-                final_response = "Gracias por la información. Pronto te contactará nuestro asesor especializado."
+                final_response = self._get_final_response_message()
                 return self._add_message_and_return_response(final_response, "")
             
             next_question_str = next_question["question"]
-            next_question_reason = next_question["reason"]
             next_question_type = next_question['question_type']
             
             debug_print(f"DEBUG: Siguiente pregunta: {next_question_str}")
@@ -1005,9 +1089,7 @@ class IntelligentLeadQualificationChatbot:
                 {}, 
                 self.state, 
                 next_question_str, 
-                next_question_reason, 
-                is_inventory_question,
-                last_bot_question_type == next_question_type
+                is_inventory_question
             )
             
             return self._add_message_and_return_response(generated_response, next_question_type)

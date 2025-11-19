@@ -205,8 +205,12 @@ class HubSpotManager:
 
                 elif key == "sitio_web":
                     properties["pgina_web_de_tu_negocio"] = value
-
-            return self._update_contact(properties)
+            
+            if properties:
+                return self._update_contact(properties)
+            else:
+                logging.info(f"No hay propiedades para actualizar en el contacto {self.contact_id}")
+                return self.contact_id
         except Exception as e:
             logging.error(f"Error actualizando contacto en HubSpot: {e}")
             return None

@@ -34,7 +34,9 @@ def clasificar_mensaje(message: str) -> str:
             
             "1. VALIDO - Incluye CUALQUIER consulta con las siguientes características:\n"
             "   - Preguntas sobre tipos de maquinaria:" + ", ".join(maquinaria_types) + "\n"
+            "   - Preguntas sobre refacciones de maquinaria\n"
             "   - Consultas sobre PRECIOS de maquinaria específica\n"
+            "   - Consultas sobre créditos de maquinaria o financiamiento\n"
             "   - Preguntas sobre disponibilidad de inventario\n"
             "   - Preguntas sobre características y especificaciones\n"
             "   - Consultas sobre marcas de maquinaria\n"

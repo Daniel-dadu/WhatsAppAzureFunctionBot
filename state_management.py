@@ -19,6 +19,7 @@ class MaquinariaType(str, Enum):
 class ConversationState(TypedDict):
     nombre: Optional[str]
     apellido: Optional[str]
+    tipo_ayuda: Optional[str]  # "maquinaria" | "otro" (refacciones, créditos, etc.)
     tipo_maquinaria: Optional[MaquinariaType]
     detalles_maquinaria: Dict[str, Any]
     nombre_empresa: Optional[str]
@@ -51,11 +52,17 @@ FIELDS_CONFIG_PRIORITY = {
         "reason": "Para completar tu información personal",
         "required": True
     },
+    "tipo_ayuda": {
+        "description": "Tipo de ayuda que necesita el usuario",
+        "question": "¿En qué te puedo ayudar?", 
+        "reason": "Para entender mejor cómo puedo asistirte",
+        "required": True
+    },
     "tipo_maquinaria": {
         "description": "Tipo de maquinaria que necesita",
         "question": "¿Qué tipo de maquinaria requiere?", 
         "reason": "Para revisar nuestro inventario disponible",
-        "required": True
+        "required": False  # Solo requerido si tipo_ayuda es "maquinaria"
     },
     "detalles_maquinaria": {
         "description": "Detalles específicos de la máquina",
@@ -345,6 +352,7 @@ class CosmosDBStateStore(ConversationStateStore):
             "messages": messages,
             "nombre": state.get("nombre"),
             "apellido": state.get("apellido"),
+            "tipo_ayuda": state.get("tipo_ayuda"),
             "tipo_maquinaria": state.get("tipo_maquinaria"),
             "detalles_maquinaria": state.get("detalles_maquinaria", {}),
             "sitio_web": state.get("sitio_web"),
@@ -384,7 +392,7 @@ class CosmosDBStateStore(ConversationStateStore):
         
         # Campos a monitorear para cambios
         fields_to_check = [
-            "nombre", "apellido", "tipo_maquinaria", "detalles_maquinaria", "sitio_web",
+            "nombre", "apellido", "tipo_ayuda", "tipo_maquinaria", "detalles_maquinaria", "sitio_web",
             "uso_empresa_o_venta", "nombre_empresa", 
             "giro_empresa", "correo", "telefono", "completed", 
             "lugar_requerimiento", "asignado_asesor"
