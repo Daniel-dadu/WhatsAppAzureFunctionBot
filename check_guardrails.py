@@ -241,7 +241,6 @@ if __name__ == "__main__":
         # Información de contacto
         "Mi correo es juan@empresa.com",
         "Mi teléfono es 555-1234",
-        "No tenemos página web",
         "Solo tenemos Facebook",
         # Preguntas técnicas específicas
         "¿Qué tipo de electrodo usa esa soldadora?",
@@ -254,7 +253,6 @@ if __name__ == "__main__":
         "Exacto, es para construcción",
         "Sí, es para uso interno",
         # Respuestas negativas válidas
-        "No tengo página web",
         "No estoy seguro del amperaje",
         "Aún no he decidido el modelo",
         "No tengo empresa, soy particular",

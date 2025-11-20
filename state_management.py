@@ -26,7 +26,6 @@ class ConversationState(TypedDict):
     giro_empresa: Optional[str]
     lugar_requerimiento: Optional[str]
     uso_empresa_o_venta: Optional[str]
-    sitio_web: Optional[str]
     correo: Optional[str]
     telefono: Optional[str]
     # Campos que no se preguntan al usuario
@@ -36,6 +35,8 @@ class ConversationState(TypedDict):
     completed: bool
     # ID del contacto en HubSpot
     hubspot_contact_id: Optional[str]
+    # Control del flujo de cotización
+    quiere_cotizacion: Optional[str]  # "sí" | "no" | None (None = aún no se ha mostrado el mensaje o no ha respondido)
 
 # Configuración de prioridad de campos para la generación de preguntas
 # IMPORTANTE: El orden de los campos de esta variable es el orden en el que se hacen las preguntas
@@ -70,6 +71,12 @@ FIELDS_CONFIG_PRIORITY = {
         "reason": None,
         "required": False # Se maneja por separado en la función is_conversation_complete
     },
+    "quiere_cotizacion": {
+        "description": "Si quiere cotización",
+        "question": "¿Quieres que te cotice alguna de las maquinarias disponibles?",
+        "reason": "Para ofrecer opciones de maquinaria disponibles",
+        "required": False
+    },
     "nombre_empresa": {
         "description": "Nombre de la empresa",
         "question": "¿Cuál es el nombre de su empresa?", 
@@ -93,12 +100,6 @@ FIELDS_CONFIG_PRIORITY = {
         "question": "¿El equipo es para uso de la empresa o para venta?", 
         "reason": "Para ofrecerle los mejores precios",
         "required": True
-    },
-    "sitio_web": {
-        "description": "Sitio web de la empresa",
-        "question": "¿Cuál es el sitio web de su empresa?", 
-        "reason": "Para conocer mejor su empresa y generar una cotización más precisa",
-        "required": False
     },
     "correo": {
         "description": "Correo electrónico del usuario",
@@ -355,7 +356,6 @@ class CosmosDBStateStore(ConversationStateStore):
             "tipo_ayuda": state.get("tipo_ayuda"),
             "tipo_maquinaria": state.get("tipo_maquinaria"),
             "detalles_maquinaria": state.get("detalles_maquinaria", {}),
-            "sitio_web": state.get("sitio_web"),
             "uso_empresa_o_venta": state.get("uso_empresa_o_venta"),
             "nombre_empresa": state.get("nombre_empresa"),
             "giro_empresa": state.get("giro_empresa"),
@@ -365,7 +365,8 @@ class CosmosDBStateStore(ConversationStateStore):
             "lugar_requerimiento": state.get("lugar_requerimiento"),
             "conversation_mode": cosmos_doc.get("conversation_mode", "bot"),
             "asignado_asesor": cosmos_doc.get("asignado_asesor"),
-            "hubspot_contact_id": cosmos_doc.get("hubspot_contact_id")
+            "hubspot_contact_id": cosmos_doc.get("hubspot_contact_id"),
+            "quiere_cotizacion": state.get("quiere_cotizacion")
         }
         
         return conversation_state
@@ -392,10 +393,10 @@ class CosmosDBStateStore(ConversationStateStore):
         
         # Campos a monitorear para cambios
         fields_to_check = [
-            "nombre", "apellido", "tipo_ayuda", "tipo_maquinaria", "detalles_maquinaria", "sitio_web",
+            "nombre", "apellido", "tipo_ayuda", "tipo_maquinaria", "detalles_maquinaria",
             "uso_empresa_o_venta", "nombre_empresa", 
             "giro_empresa", "correo", "telefono", "completed", 
-            "lugar_requerimiento", "asignado_asesor"
+            "lugar_requerimiento", "asignado_asesor", "quiere_cotizacion"
         ]
         
         for field in fields_to_check:

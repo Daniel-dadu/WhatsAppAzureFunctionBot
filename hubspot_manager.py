@@ -202,9 +202,6 @@ class HubSpotManager:
 
                 elif key == "correo":
                     properties["email"] = value
-
-                elif key == "sitio_web":
-                    properties["pgina_web_de_tu_negocio"] = value
             
             if properties:
                 return self._update_contact(properties)

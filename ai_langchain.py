@@ -159,7 +159,6 @@ class IntelligentSlotFiller:
             
             RESPUESTAS NEGATIVAS (response_type: "No tiene"):
             - "no", "no tenemos", "no hay", "no tengo", "no cuenta con"
-            - "no tenemos página", "no tengo pagina web", "no tenemos sitio web"
             - "no tengo correo", "no tengo teléfono", "no tengo empresa"
             - "solo facebook", "solo instagram", "solo redes sociales"
             - Cualquier variación de "no" + el objeto de la pregunta
@@ -307,7 +306,6 @@ class IntelligentSlotFiller:
             - Mensaje: "venta de maquinaria" → {{"giro_empresa": "venta de maquinaria"}}
             - Mensaje: "construcción y mantenimiento" → {{"giro_empresa": "construcción y mantenimiento"}}
             - Mensaje: "para venta" → {{"uso_empresa_o_venta": "venta"}}
-            - Mensaje: "www.empresa.com" → {{"sitio_web": "www.empresa.com"}}
             - Mensaje: "en la Ciudad de México" → {{"lugar_requerimiento": "Ciudad de México"}}
             - Mensaje: "daniel@empresa.com" → {{"correo": "daniel@empresa.com"}}
             - Mensaje: "555-1234" → {{"telefono": "555-1234"}}
@@ -317,7 +315,6 @@ class IntelligentSlotFiller:
             - Última pregunta: "¿Cuál es el giro de su empresa?" + Mensaje: "Construcción" → {{"giro_empresa": "Construcción"}}
             - Última pregunta: "¿Cuál es su correo electrónico?" + Mensaje: "daniel@empresa.com" → {{"correo": "daniel@empresa.com"}}
             - Última pregunta: "¿Es para uso de la empresa o para venta?" + Mensaje: "Para venta" → {{"uso_empresa_o_venta": "venta"}}
-            - Última pregunta: "¿Cuál es el sitio web de su empresa?" + Mensaje: "www.empresa.com" → {{"sitio_web": "www.empresa.com"}}
             - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Necesito una soldadora" → {{"tipo_ayuda": "maquinaria"}}
             - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Quiero información sobre créditos" → {{"tipo_ayuda": "otro"}}
             - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Refacciones" → {{"tipo_ayuda": "otro"}}
@@ -331,6 +328,16 @@ class IntelligentSlotFiller:
             - Ejemplos: "¿manejan soldadoras?" → {{"tipo_maquinaria": "soldadora"}}
             - Ejemplos: "necesito un compresor" → {{"tipo_maquinaria": "compresor"}}
             IMPORTANTE: Incluso en preguntas sobre inventario, SIEMPRE extraer tipo_maquinaria si se menciona
+            
+            REGLAS ESPECIALES PARA QUIERE_COTIZACION:
+            - Si la última pregunta del bot contiene "¿Quieres que te cotice" o similar sobre cotización:
+              * Si el usuario dice "sí", "si", "claro", "por favor", "ok", "dale", "adelante", "quiero", "me interesa" → quiere_cotizacion: "sí"
+              * Si el usuario dice "no", "no gracias", "no quiero", "no me interesa", "no por ahora", "después", "más tarde" → quiere_cotizacion: "no"
+            - Ejemplos: "sí" → {{"quiere_cotizacion": "sí"}}
+            - Ejemplos: "no" → {{"quiere_cotizacion": "no"}}
+            - Ejemplos: "claro, quiero cotización" → {{"quiere_cotizacion": "sí"}}
+            - Ejemplos: "no gracias" → {{"quiere_cotizacion": "no"}}
+            - IMPORTANTE: Solo extraer quiere_cotizacion si la última pregunta del bot es sobre cotización
             
             IMPORTANTE: Analiza cuidadosamente el mensaje y extrae TODA la información disponible que corresponda a campos vacíos.
             
@@ -398,6 +405,10 @@ class IntelligentSlotFiller:
                 if tipo_ayuda == "otro" and slot_name in ["tipo_maquinaria", "detalles_maquinaria"]:
                     continue
                 
+                # Si el usuario dijo "no" a la cotización, no continuar con más preguntas
+                if tipo_ayuda == "maquinaria" and "no" in current_state.get("quiere_cotizacion").lower():
+                    continue
+                
                 if slot_name == "detalles_maquinaria":
                     # Solo preguntar detalles si tipo_ayuda es "maquinaria"
                     if tipo_ayuda != "maquinaria":
@@ -409,6 +420,20 @@ class IntelligentSlotFiller:
                 elif slot_name == "tipo_maquinaria":
                     # Solo preguntar tipo_maquinaria si tipo_ayuda es "maquinaria"
                     if tipo_ayuda != "maquinaria":
+                        continue
+                    value = current_state.get(slot_name)
+                    if not value:
+                        return {
+                            "question": question, 
+                            "reason": reason, 
+                            "question_type": slot_name
+                        }
+                elif slot_name == "quiere_cotizacion":
+                    # Solo preguntar si tipo_ayuda es "maquinaria" y los detalles están completos
+                    if tipo_ayuda != "maquinaria":
+                        continue
+                    tipo_maquinaria = current_state.get("tipo_maquinaria")
+                    if not tipo_maquinaria or not self._are_maquinaria_details_complete(current_state):
                         continue
                     value = current_state.get(slot_name)
                     if not value:
@@ -446,6 +471,23 @@ class IntelligentSlotFiller:
         for field in fields_available:
             fields_available_str += f"- {field}: " + FIELDS_CONFIG_PRIORITY[field]['description'] + "\n"
         return fields_available_str
+    
+    def _are_maquinaria_details_complete(self, current_state: ConversationState) -> bool:
+        """Verifica si todos los detalles de maquinaria están completos"""
+        tipo = current_state.get("tipo_maquinaria")
+        
+        if not tipo or tipo not in MAQUINARIA_CONFIG:
+            return False
+        
+        detalles = current_state.get("detalles_maquinaria", {})
+        required_fields = get_required_fields_for_tipo(tipo)
+        
+        return all(
+            field in detalles and 
+            detalles[field] is not None and 
+            detalles[field] != ""
+            for field in required_fields
+        )
     
     def _get_maquinaria_detail_question_with_reason(self, current_state: ConversationState) -> Optional[dict]:
         """Obtiene la siguiente pregunta específica sobre detalles de maquinaria de manera conversacional con el motivo"""
@@ -542,7 +584,8 @@ class IntelligentResponseGenerator:
         extracted_info: Dict[str, Any], 
         current_state: ConversationState, 
         next_question: str = None, 
-        is_inventory_question: bool = False
+        is_inventory_question: bool = False,
+        question_type: str = None
     ) -> str:
         """Genera una respuesta contextual apropiada usando un enfoque conversacional"""
         
@@ -571,10 +614,11 @@ class IntelligentResponseGenerator:
                 {presentation_instruction}
                 
                 INSTRUCCIONES:
-                1. No repitas información que ya confirmaste anteriormente ni menciones el nombre del usuario.
+                1. No repitas información que ya confirmaste anteriormente 
+                2. {extracted_name_instruction}
                 2. Si hay una siguiente pregunta, hazla de manera natural
                 3. NO inventes preguntas adicionales
-                4. Si no hay siguiente pregunta, simplemente confirma la información recibida y termina la conversación.
+                4. Si no hay siguiente pregunta, simplemente confirma la información recibida y termina la conversación
                 
                 Genera una respuesta natural y apropiada:
             """
@@ -594,6 +638,9 @@ class IntelligentResponseGenerator:
                 Si en el primer mensaje del usuario este menciona que requiere algún producto o servicio, o solo quiere más información, dile "Hola, sí claro, puedo ayudarte con eso." y luego preséntate y haz la pregunta correspondiente. Si solo es un saludo, dile "Hola, soy Alejandro Gómez, asesor comercial de Alpha C." y luego haz la pregunta correspondiente.
                 """
 
+            # Instrucción para manejar el nombre y apellido del usuario
+            extracted_name_instruction = ""
+
             # Preparar información extraída como string de manera más segura
             if not extracted_info:
                 extracted_info_str = "Ninguna información nueva"
@@ -607,6 +654,13 @@ class IntelligentResponseGenerator:
                         safe_info[key] = value
                 extracted_info_str = json.dumps(safe_info, ensure_ascii=False, indent=2)
 
+                if extracted_info.get("nombre"):
+                    extracted_name_instruction = "El usuario acaba de decir su nombre, así que responde con un 'Gracias, {nombre}.' Y haz la siguiente pregunta."
+                elif extracted_info.get("apellido"):
+                    extracted_name_instruction = "El usuario acaba de decir su apellido, así que responde con un 'Va.' Y haz la siguiente pregunta, no repitas el nombre ni apellido."
+                else:
+                    extracted_name_instruction = "No menciones el nombre ni apellido del usuario."
+
             if is_inventory_question:
                 # Nombres de tipos de maquinaria
                 maquinaria_names = ", ".join([f"\"{name.value}\"" for name in MaquinariaType])
@@ -618,6 +672,14 @@ class IntelligentResponseGenerator:
             else:
                 inventory_instruction = "Sigue las instrucciones dadas."
 
+            # Instrucción especial para cuando se pregunta sobre cotización de maquinarias
+            if question_type == "quiere_cotizacion":
+                return """Muy bien, contamos con las siguientes maquinarias que pueden satisfacer tus necesidades:
+- Maquina 1
+- Maquina 2
+- Maquina 3...
+¿Quieres que te cotice alguna de estas?"""
+
             current_state_str = get_current_state_str(current_state)
             formatedPrompt = prompt.format_prompt(
                 user_message=message,
@@ -626,7 +688,8 @@ class IntelligentResponseGenerator:
                 extracted_info_str=extracted_info_str,
                 next_question=next_question or "No hay siguiente pregunta",
                 inventory_instruction=inventory_instruction,
-                presentation_instruction=presentation_instruction
+                presentation_instruction=presentation_instruction,
+                extracted_name_instruction=extracted_name_instruction
             )
 
             debug_print(f"DEBUG: Prompt conversacional: {formatedPrompt}")
@@ -705,7 +768,6 @@ class InventoryResponder:
                 EJEMPLOS DE NO INVENTARIO:
                 - "me llamo Juan"
                 - "quiero un compresor"
-                - "no tengo página web"
                 - "es para venta"
                 - "mi empresa se llama ABC"
                 
@@ -763,7 +825,8 @@ class IntelligentLeadQualificationChatbot:
             "messages": [],
             "conversation_mode": "bot",
             "asignado_asesor": None,
-            "hubspot_contact_id": None
+            "hubspot_contact_id": None,
+            "quiere_cotizacion": None
         }
         
         # Agregamos los campos que se preguntan al usuario desde el FIELDS_CONFIG_PRIORITY
@@ -883,15 +946,21 @@ class IntelligentLeadQualificationChatbot:
 
             if next_question is None:
                 debug_print(f"DEBUG: Estado completo: {self.state}")
+                
+                # Si el usuario dijo "no" a la cotización, responder con mensaje específico
+                if "no" in self.state.get("quiere_cotizacion").lower():
+                    self.state["completed"] = True
+                    final_message = "Okay, ¿hay algo más en lo que te pueda ayudar?"
+                    return self._add_message_and_return_response(final_message, "")
+                
                 self.state["completed"] = True
                 final_message = self._get_final_response_message()
                 return self._add_message_and_return_response(final_message, "")
 
             next_question_str = next_question["question"]
+            next_question_type = next_question['question_type']
 
             debug_print(f"DEBUG: Siguiente pregunta: {next_question_str}")
-
-            next_question_type = next_question['question_type']
             debug_print(f"DEBUG: Tipo de siguiente pregunta: {next_question_type}")
 
             # Extract only the role and content of the history messages
@@ -907,7 +976,8 @@ class IntelligentLeadQualificationChatbot:
                 extracted_info, 
                 self.state, 
                 next_question_str, 
-                is_inventory_question
+                is_inventory_question,
+                question_type=next_question_type
             )
             contextual_response += generated_response
 
@@ -958,12 +1028,13 @@ class IntelligentLeadQualificationChatbot:
             if value is None or value == "":
                 continue
 
-            # 2. No sobrescribir campos que ya tienen un valor válido a excepción de detalles_maquinaria.
+            # 2. No sobrescribir campos que ya tienen un valor válido a excepción de detalles_maquinaria y quiere_cotizacion.
             # detalles_maquinaria se actualiza múltiples veces porque tiene varios subcampos.
+            # quiere_cotizacion puede cambiar si el usuario corrige su respuesta.
             # Esto es clave para evitar que una respuesta ambigua posterior
             # borre un dato que ya se había confirmado.
             current_value = self.state.get(key)
-            if key != "detalles_maquinaria" and current_value:
+            if key not in ["detalles_maquinaria", "quiere_cotizacion"] and current_value:
                 debug_print(f"DEBUG: Campo '{key}' ya tiene valor válido '{current_value}', no se sobrescribe.")
                 continue
 
@@ -1089,7 +1160,8 @@ class IntelligentLeadQualificationChatbot:
                 {}, 
                 self.state, 
                 next_question_str, 
-                is_inventory_question
+                is_inventory_question,
+                question_type=next_question_type
             )
             
             return self._add_message_and_return_response(generated_response, next_question_type)

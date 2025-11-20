@@ -265,6 +265,8 @@ class WhatsAppBot:
                 authorized_ids.append(os.environ['RECIPIENT_WAID_3'])
             if "RECIPIENT_WAID_4" in os.environ:
                 authorized_ids.append(os.environ['RECIPIENT_WAID_4'])
+            if "RECIPIENT_WAID_5" in os.environ:
+                authorized_ids.append(os.environ['RECIPIENT_WAID_5'])
                 
             return wa_id in authorized_ids
         except Exception as e:
@@ -318,7 +320,6 @@ class WhatsAppBot:
         🔍 Detalles maquinaria: {state.get('detalles_maquinaria', 'No especificado')}
         💼 Nombre empresa: {state.get('nombre_empresa', 'No especificado')}
         💼 Giro empresa: {state.get('giro_empresa', 'No especificado')}
-        🌐 Sitio web: {state.get('sitio_web', 'No especificado')}
         💼 Tipo de uso: {state.get('uso_empresa_o_venta', 'No especificado')}
         📧 Correo: {state.get('correo', 'No especificado')}
         📱 Teléfono: {state.get('telefono', 'No especificado')}

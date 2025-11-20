@@ -71,7 +71,6 @@ El bot recopila sistemáticamente la siguiente información:
 2. **Información Empresarial**
    - Nombre de la empresa
    - Giro o actividad de la empresa
-   - Sitio web (opcional)
    - Tipo de uso (empresa o venta)
 
 3. **Requerimientos Técnicos**

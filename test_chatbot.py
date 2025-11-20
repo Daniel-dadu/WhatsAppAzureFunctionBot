@@ -182,7 +182,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "La empresa se llama 'Construcciones del Sol' y nos dedicamos a la construcción de carreteras.",
         "La necesitamos en Chiapas.",
         "Es para uso en nuestra empresa.",
-        "La página web es constresol.com",
         "mi correo es ana.gomez@constresol.com",
         "mi teléfono es 55 1234 5678"
     ]
@@ -192,7 +191,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "apellido": "Gómez",
         "tipo_maquinaria": MaquinariaType.TORRE_ILUMINACION,
         "detalles_maquinaria": {"es_led": True},
-        "sitio_web": "constresol.com",
         "uso_empresa_o_venta": "uso empresa",
         "nombre_empresa": "Construcciones del Sol",
         "giro_empresa": "construcción de carreteras",
@@ -215,7 +213,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "nos dedicamos a la renta de maquinaria",
         "En Jalisco.",
         "Es para venderlo a un cliente.",
-        "nuestro sitio web es maquinariapesada.mx y mi correo es roberto@maqpesada.mx",
+        "mi correo es roberto@maqpesada.mx",
         "mi tel es 81 8765 4321"
     ]
     
@@ -229,7 +227,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
             "ubicacion": "exterior"
         },
         "lugar_requerimiento": "Jalisco",
-        "sitio_web": "maquinariapesada.mx",
         "uso_empresa_o_venta": "venta",
         "nombre_empresa": "Maquinaria Pesada S.A.",
         "giro_empresa": "renta de maquinaria",
@@ -252,7 +249,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "En qué estados pueden hacer entrega?",
         "Okay, en Aguascalientes.",
         "Para venta.",
-        "Entiendo. La web es hh.com",
         "Mi correo es lucia.h@hh.com y mi teléfono es 33 9876 5432"
     ]
     
@@ -264,7 +260,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
             "capacidad": "50 kva"
         },
         "nombre_empresa": "Mineria H&H",
-        "sitio_web": "hh.com",
         "giro_empresa": "Mineria",
         "uso_empresa_o_venta": "venta",
         "lugar_requerimiento": "Aguascalientes",
@@ -284,7 +279,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "No conozco el giro de la empresa.",
         "No estoy seguro.",
         "Es para venderlo a un cliente.",
-        "No tenemos pagina web.",
         "mi correo es daniel.marquez@machinescorp.com y mi teléfono es 33 9876 5432"
     ]
 
@@ -293,7 +287,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "apellido": "Marquez",
         "tipo_maquinaria": MaquinariaType.TORRE_ILUMINACION,
         "detalles_maquinaria": {"es_led": True},
-        "sitio_web": "No tiene",
         "uso_empresa_o_venta": "venta",
         "nombre_empresa": "MachinesCorp",
         "giro_empresa": "No especificado",
