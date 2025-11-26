@@ -1,6 +1,5 @@
 import json
 import os
-import random
 from typing import Dict, Any, List, Optional, Tuple
 from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -129,6 +128,33 @@ class AzureOpenAIConfig:
             top_p=0.9,       # Top-p moderado
             max_tokens=1000
         )
+
+# ============================================================================
+# FUNCIONES HELPER
+# ============================================================================
+
+def get_pending_empresa_fields(current_state: ConversationState) -> List[str]:
+    """
+    Extrae los campos pendientes de la empresa.
+    Retorna una lista con los labels de los campos que aún no han sido respondidos.
+    """
+    # Campos de empresa que se agrupan en un solo mensaje
+    empresa_fields = {
+        "nombre_empresa": "Nombre de la empresa",
+        "giro_empresa": "Giro de la empresa",
+        "lugar_requerimiento": "Ubicación (estado de la República Mexicana)",
+        "uso_empresa_o_venta": "¿Es para uso de la empresa o para venta?",
+        "correo": "Correo electrónico"
+    }
+    
+    # Obtener campos pendientes
+    pending_fields = []
+    for field_key, field_label in empresa_fields.items():
+        value = current_state.get(field_key)
+        if not value or value == "":
+            pending_fields.append(field_label)
+    
+    return pending_fields
 
 # ============================================================================
 # SISTEMA DE SLOT-FILLING INTELIGENTE
@@ -406,7 +432,8 @@ class IntelligentSlotFiller:
                     continue
                 
                 # Si el usuario dijo "no" a la cotización, no continuar con más preguntas
-                if tipo_ayuda == "maquinaria" and "no" in current_state.get("quiere_cotizacion").lower():
+                quiere_cotizacion_val = current_state.get("quiere_cotizacion")
+                if tipo_ayuda == "maquinaria" and quiere_cotizacion_val and "no" in quiere_cotizacion_val.lower():
                     continue
                 
                 if slot_name == "detalles_maquinaria":
@@ -443,14 +470,32 @@ class IntelligentSlotFiller:
                             "question_type": slot_name
                         }
                 else:
+                    # Campos de empresa que se agrupan en un solo mensaje
+                    empresa_fields = ["nombre_empresa", "giro_empresa", "lugar_requerimiento", "uso_empresa_o_venta", "correo"]
+                    
+                    # Si es un campo de empresa, verificar si se debe mostrar el mensaje agrupado
+                    if slot_name in empresa_fields:
+                        # Solo mostrar el mensaje agrupado si quiere_cotizacion es "sí"
+                        quiere_cotizacion = current_state.get("quiere_cotizacion", "")
+                        if quiere_cotizacion and "sí" in quiere_cotizacion.lower():
+                            # Verificar si hay algún campo de empresa pendiente
+                            pending_fields = get_pending_empresa_fields(current_state)
+                            if len(pending_fields) > 0:
+                                # Retornar un question_type especial para que generate_response genere el mensaje
+                                return {
+                                    "question": "",  # El mensaje se generará en generate_response
+                                    "reason": "Para generar la cotización",
+                                    "question_type": "datos_empresa"
+                                }
+                            # Si todos los campos de empresa están completos, continuar con el siguiente campo
+                            continue
+                        else:
+                            # Si no quiere cotización, no preguntar campos de empresa
+                            continue
+                    
                     # Verificar si el slot está vacío o tiene respuestas negativas
                     value = current_state.get(slot_name)
                     if not value:
-                        # Si se debe preguntar por el nombre de la empresa y no se tiene el giro,
-                        # preguntar por el giro de la empresa también.
-                        if slot_name == "nombre_empresa" and not current_state.get("giro_empresa"):
-                            question = "¿Cuál es el nombre y giro de su empresa?"
-                        
                         return {
                             "question": question, 
                             "reason": reason, 
@@ -612,13 +657,14 @@ class IntelligentResponseGenerator:
                 IMPORTANTE:
                 {inventory_instruction}
                 {presentation_instruction}
+                {datos_empresa_instruction}
                 
                 INSTRUCCIONES:
                 1. No repitas información que ya confirmaste anteriormente 
                 2. {extracted_name_instruction}
-                2. Si hay una siguiente pregunta, hazla de manera natural
-                3. NO inventes preguntas adicionales
-                4. Si no hay siguiente pregunta, simplemente confirma la información recibida y termina la conversación
+                3. Si hay una siguiente pregunta, hazla de manera natural
+                4. NO inventes preguntas adicionales
+                5. Si no hay siguiente pregunta, simplemente confirma la información recibida y termina la conversación
                 
                 Genera una respuesta natural y apropiada:
             """
@@ -679,6 +725,31 @@ class IntelligentResponseGenerator:
 - Maquina 2
 - Maquina 3...
 ¿Quieres que te cotice alguna de estas?"""
+            
+            # Instrucción especial para datos_empresa
+            datos_empresa_instruction = ""
+            pending_fields = []
+            if question_type == "datos_empresa":
+                pending_fields = get_pending_empresa_fields(current_state)
+                if not pending_fields:
+                    return ""
+                
+                # Agregar instrucción específica para datos_empresa
+                datos_empresa_instruction = """
+                
+                INSTRUCCIÓN ESPECIAL PARA DATOS DE EMPRESA:
+                - Responde inteligentemente pero de forma BREVE al mensaje del usuario
+                - Si el usuario pregunta algo sobre los campos, responde de manera natural y útil
+                - Usa un mensaje como: """
+                if len(pending_fields) == 5:
+                    datos_empresa_instruction += "Para poder generar la cotización, necesito que me compartas los siguientes datos:"
+                else:
+                    datos_empresa_instruction += "También necesito estos otros campos:"
+                
+                datos_empresa_instruction += """
+                - NUNCA menciones los campos pendientes en tu respuesta, solo responde con la introducción
+                - NUNCA menciones información que se extrajo previamente, ni confirmes la información recién extraída, a menos de que el usuario lo pregunte
+                """
 
             current_state_str = get_current_state_str(current_state)
             formatedPrompt = prompt.format_prompt(
@@ -689,7 +760,8 @@ class IntelligentResponseGenerator:
                 next_question=next_question or "No hay siguiente pregunta",
                 inventory_instruction=inventory_instruction,
                 presentation_instruction=presentation_instruction,
-                extracted_name_instruction=extracted_name_instruction
+                extracted_name_instruction=extracted_name_instruction,
+                datos_empresa_instruction=datos_empresa_instruction
             )
 
             debug_print(f"DEBUG: Prompt conversacional: {formatedPrompt}")
@@ -698,6 +770,16 @@ class IntelligentResponseGenerator:
             
             result = response.content.strip()
             debug_print(f"DEBUG: Respuesta conversacional generada: '{result}'")
+            
+            # Si es datos_empresa, agregar la lista de campos pendientes hardcoded
+            if question_type == "datos_empresa" and pending_fields:
+                fields_list = "\n".join([f"- {field_label}" for field_label in pending_fields])
+                # Asegurar que haya un salto de línea entre la respuesta de IA y la lista
+                if not result.endswith("\n"):
+                    result = f"{result}\n{fields_list}"
+                else:
+                    result = f"{result}{fields_list}"
+            
             return result
             
         except Exception as e:

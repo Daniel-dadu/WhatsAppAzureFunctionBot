@@ -65,12 +65,12 @@ MAQUINARIA_CONFIG = {
                 "question": "¿cuál es el amperaje que necesitas?",
                 "required": True
             },
-            {
-                "name": "electrodo", 
-                "reason": "Para asegurar compatibilidad con tus materiales",
-                "question": "¿qué tipo de electrodo quemas?",
-                "required": True
-            }
+            # {
+            #     "name": "electrodo", 
+            #     "reason": "Para asegurar compatibilidad con tus materiales",
+            #     "question": "¿qué tipo de electrodo quemas?",
+            #     "required": True
+            # }
         ]
     },
     MaquinariaType.COMPRESOR: {
@@ -82,12 +82,12 @@ MAQUINARIA_CONFIG = {
                 "question": "¿cuál es la capacidad de volumen de aire necesitas?",
                 "required": True
             },
-            {
-                "name": "herramientas_conectar", 
-                "reason": "Para verificar compatibilidad con tus equipos",
-                "question": "¿qué herramientas le vas a conectar?",
-                "required": True
-            }
+            # {
+            #     "name": "herramientas_conectar", 
+            #     "reason": "Para verificar compatibilidad con tus equipos",
+            #     "question": "¿qué herramientas le vas a conectar?",
+            #     "required": True
+            # }
         ]
     },
     MaquinariaType.TORRE_ILUMINACION: {
@@ -110,18 +110,18 @@ MAQUINARIA_CONFIG = {
                 "question": "¿cuál es la altura de trabajo que necesitas?",
                 "required": True
             },
-            {
-                "name": "actividad", 
-                "reason": "Para entender el contexto de uso",
-                "question": "¿qué actividad vas a realizar?",
-                "required": True
-            },
-            {
-                "name": "ubicacion", 
-                "reason": "Para determinar el modelo más conveniente",
-                "question": "¿es para interior o exterior?",
-                "required": True
-            }
+            # {
+            #     "name": "actividad", 
+            #     "reason": "Para entender el contexto de uso",
+            #     "question": "¿qué actividad vas a realizar?",
+            #     "required": True
+            # },
+            # {
+            #     "name": "ubicacion", 
+            #     "reason": "Para determinar el modelo más conveniente",
+            #     "question": "¿es para interior o exterior?",
+            #     "required": True
+            # }
         ]
     },
     MaquinariaType.GENERADORES: {
@@ -133,12 +133,12 @@ MAQUINARIA_CONFIG = {
                 "question": "¿para qué actividad lo requiere?",
                 "required": True
             },
-            {
-                "name": "capacidad", 
-                "reason": "Para determinar la potencia necesaria",
-                "question": "¿qué capacidad en kvas o kw necesitas?",
-                "required": True
-            }
+            # {
+            #     "name": "capacidad", 
+            #     "reason": "Para determinar la potencia necesaria",
+            #     "question": "¿qué capacidad en kvas o kw necesitas?",
+            #     "required": True
+            # }
         ]
     },
     MaquinariaType.ROMPEDORES: {
@@ -150,12 +150,12 @@ MAQUINARIA_CONFIG = {
                 "question": "¿para qué lo va a utilizar?",
                 "required": True
             },
-            {
-                "name": "tipo", 
-                "reason": "Para determinar el tipo de energía necesaria",
-                "question": "¿lo requiere eléctrico o neumático?",
-                "required": True
-            }
+            # {
+            #     "name": "tipo", 
+            #     "reason": "Para determinar el tipo de energía necesaria",
+            #     "question": "¿lo requiere eléctrico o neumático?",
+            #     "required": True
+            # }
         ]
     },
     MaquinariaType.APISONADOR: {
@@ -167,18 +167,18 @@ MAQUINARIA_CONFIG = {
                 "question": "¿para qué lo va a utilizar?",
                 "required": True
             },
-            {
-                "name": "motor", 
-                "reason": "Para determinar las características del equipo",
-                "question": "¿qué tipo de motor debe tener?",
-                "required": True
-            },
-            {
-                "name": "es_diafragma", 
-                "reason": "Para determinar si lo requiere",
-                "question": "¿el equipo debe ser de diafragma?",
-                "required": True
-            }
+            # {
+            #     "name": "motor", 
+            #     "reason": "Para determinar las características del equipo",
+            #     "question": "¿qué tipo de motor debe tener?",
+            #     "required": True
+            # },
+            # {
+            #     "name": "es_diafragma", 
+            #     "reason": "Para determinar si lo requiere",
+            #     "question": "¿el equipo debe ser de diafragma?",
+            #     "required": True
+            # }
         ]
     },
     MaquinariaType.MONTACARGAS: {
@@ -190,24 +190,24 @@ MAQUINARIA_CONFIG = {
                 "question": "¿qué peso requiere levantar?",
                 "required": True
             },
-            {
-                "name": "tipo_energia", 
-                "reason": "Para determinar el tipo de energía adecuado",
-                "question": "¿lo requiere eléctrico, a combustión a gasolina o gas lp?",
-                "required": True
-            },
-            {
-                "name": "posicion_operador", 
-                "reason": "Para determinar la posición del operador",
-                "question": "¿lo requiere para hombre parado o sentado?",
-                "required": True
-            },
-            {
-                "name": "altura", 
-                "reason": "Para determinar la altura necesaria",
-                "question": "¿qué altura requiere?",
-                "required": True
-            }
+            # {
+            #     "name": "tipo_energia", 
+            #     "reason": "Para determinar el tipo de energía adecuado",
+            #     "question": "¿lo requiere eléctrico, a combustión a gasolina o gas lp?",
+            #     "required": True
+            # },
+            # {
+            #     "name": "posicion_operador", 
+            #     "reason": "Para determinar la posición del operador",
+            #     "question": "¿lo requiere para hombre parado o sentado?",
+            #     "required": True
+            # },
+            # {
+            #     "name": "altura", 
+            #     "reason": "Para determinar la altura necesaria",
+            #     "question": "¿qué altura requiere?",
+            #     "required": True
+            # }
         ]
     },
     MaquinariaType.MANIPULADOR: {
@@ -219,24 +219,24 @@ MAQUINARIA_CONFIG = {
                 "question": "¿qué peso requiere mover?",
                 "required": True
             },
-            {
-                "name": "altura", 
-                "reason": "Para determinar la altura necesaria",
-                "question": "¿qué altura necesita?",
-                "required": True
-            },
-            {
-                "name": "actividad", 
-                "reason": "Para entender el contexto de uso",
-                "question": "¿qué actividad va a realizar?",
-                "required": True
-            },
-            {
-                "name": "tipo_energia", 
-                "reason": "Para determinar el tipo de energía adecuado",
-                "question": "¿lo requiere eléctrico o a combustión?",
-                "required": True
-            }
+            # {
+            #     "name": "altura", 
+            #     "reason": "Para determinar la altura necesaria",
+            #     "question": "¿qué altura necesita?",
+            #     "required": True
+            # },
+            # {
+            #     "name": "actividad", 
+            #     "reason": "Para entender el contexto de uso",
+            #     "question": "¿qué actividad va a realizar?",
+            #     "required": True
+            # },
+            # {
+            #     "name": "tipo_energia", 
+            #     "reason": "Para determinar el tipo de energía adecuado",
+            #     "question": "¿lo requiere eléctrico o a combustión?",
+            #     "required": True
+            # }
         ]
     }
 }
