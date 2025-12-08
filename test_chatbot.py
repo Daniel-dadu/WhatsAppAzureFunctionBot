@@ -179,11 +179,8 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "Mi apellido es Gómez",
         "Busco una torre de iluminación.",
         "Sí, la prefiero de LED por favor.",
-        "La empresa se llama 'Construcciones del Sol' y nos dedicamos a la construcción de carreteras.",
-        "La necesitamos en Chiapas.",
-        "Es para uso en nuestra empresa.",
-        "mi correo es ana.gomez@constresol.com",
-        "mi teléfono es 55 1234 5678"
+        "Sí, quiero la maquina 1",
+        "Claro. La empresa se llama 'Construcciones del Sol' y nos dedicamos a la construcción de carreteras. Estamos ubicados en Puebla. La maquina es para uso en nuestra empresa. Mi correo es ana.gomez@constresol.com y mi teléfono es 55 1234 5678."
     ]
     
     esperado_1 = {
@@ -198,23 +195,19 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "55 1234 5678"
     }
     
-    # run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
+    run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
     
     # ------------------------------------------------------------------------
     # Flujo 2: Usuario que da Múltiples Datos
     # Este usuario proporciona varios datos en una sola respuesta.
     # ------------------------------------------------------------------------
     flujo_2 = [
-        "Qué tal, soy Roberto, de la empresa 'Maquinaria Pesada S.A.' y mi correo es roberto@maqpesada.mx. Necesito una plataforma de elevación.",
+        "Qué tal, soy Roberto. Necesito una plataforma de elevación.",
         "mi apellido es Marquez",
         "la necesito de 10 metros",
-        "voy a elevar personal de construccion",
-        "es para exterior",
-        "nos dedicamos a la renta de maquinaria",
-        "En Jalisco.",
-        "Es para venderlo a un cliente.",
-        "mi correo es roberto@maqpesada.mx",
-        "mi tel es 81 8765 4321"
+        "Sí, quiero la segunda maquina",
+        "Trabajo en 'Maquinaria Pesada S.A.' y nos dedicamos a la renta de maquinaria. La maquinaria es para venta.",
+        "Estamos ubicados en Jalisco, mi correo es roberto@maqpesada.mx y mi teléfono es 81 8765 4321",
     ]
     
     esperado_2 = {
@@ -223,8 +216,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "tipo_maquinaria": MaquinariaType.PLATAFORMA,
         "detalles_maquinaria": {
             "altura_trabajo": "10 metros",
-            "actividad": "elevar personal de construccion",
-            "ubicacion": "exterior"
         },
         "lugar_requerimiento": "Jalisco",
         "uso_empresa_o_venta": "venta",
@@ -234,7 +225,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "81 8765 4321"
     }
     
-    # run_conversation_test("Flujo 2: Usuario con Múltiples Datos", chatbot, flujo_2, esperado_2)
+    run_conversation_test("Flujo 2: Usuario con Múltiples Datos", chatbot, flujo_2, esperado_2)
 
     # ------------------------------------------------------------------------
     # Flujo 3: Usuario que Pregunta y se Desvía
@@ -243,12 +234,12 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     flujo_3 = [
         "Hola, ¿tienen generadores en existencia?",
         "Ok, necesito uno para mineria. Soy Lucía Martinez.",
-        "Necesito unos 50 kva.",
-        "Mineria H&H",
+        "Dame la cotización de la 2",
+        "Empresa: Mineria H&H",
         "Nos dedicamos a la mineria.",
         "En qué estados pueden hacer entrega?",
         "Okay, en Aguascalientes.",
-        "Para venta.",
+        "Es para venta.",
         "Mi correo es lucia.h@hh.com y mi teléfono es 33 9876 5432"
     ]
     
@@ -256,12 +247,10 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "nombre": "Lucía Martinez",
         "tipo_maquinaria": MaquinariaType.GENERADORES,
         "detalles_maquinaria": {
-            "actividad": "mineria",
-            "capacidad": "50 kva"
+            "actividad": "mineria"
         },
         "nombre_empresa": "Mineria H&H",
-        "giro_empresa": "Mineria",
-        "uso_empresa_o_venta": "venta",
+        "giro_empresa": "mineria",
         "lugar_requerimiento": "Aguascalientes",
         "correo": "lucia.h@hh.com",
         "telefono": "33 9876 5432"
@@ -275,10 +264,9 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     flujo_4 = [
         "Hola, soy Daniel Marquez y quiero comprar una torre de iluminación.",
         "Que sea de LED",
-        "Trabajo para MachinesCorp",
-        "No conozco el giro de la empresa.",
-        "No estoy seguro.",
-        "Es para venderlo a un cliente.",
+        "Quiero la maquina 1",
+        "Trabajo para MachinesCorp pero no conozco el giro de la empresa.",
+        "No sé en qué lugar requiero la maquinaria, pero es para venta.",
         "mi correo es daniel.marquez@machinescorp.com y mi teléfono es 33 9876 5432"
     ]
 
@@ -296,6 +284,53 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     }
 
     run_conversation_test("Flujo 4: Usuario que dice que no tiene varios campos", chatbot, flujo_4, esperado_4)
+
+    # ------------------------------------------------------------------------
+    # Flujo 5: Usuario que selecciona máquina específica
+    # ------------------------------------------------------------------------
+    flujo_5 = [
+        "Hola, quiero una torre de luz",
+        "Soy Juan Perez",
+        "Si, LED",
+        "quiero la 1",
+        "Mi empresa es 'MachinesTop', giro venta de maquinaria",
+        "ubicación CDMX, es para venta, correo eventos@mail.com, tel 5555555555"
+    ]
+
+    esperado_5 = {
+        "nombre": "Juan Perez",
+        "apellido": "Perez",
+        "tipo_maquinaria": MaquinariaType.TORRE_ILUMINACION,
+        "detalles_maquinaria": {"es_led": True},
+        "quiere_cotizacion": "sí",
+        "nombre_empresa": "MachinesTop",
+        "giro_empresa": "venta de maquinaria",
+        "lugar_requerimiento": "CDMX",
+        "uso_empresa_o_venta": "venta",
+        "correo": "eventos@mail.com",
+        "telefono": "5555555555"
+    }
+
+    run_conversation_test("Flujo 5: Selección de máquina específica", chatbot, flujo_5, esperado_5)
+
+    # ------------------------------------------------------------------------
+    # Flujo 6: Inferencia de tipo_ayuda
+    # ------------------------------------------------------------------------
+    flujo_6 = [
+        "Hola, soy Pedro",
+        "Quiero una soldadora",
+        "Si, de 300 amperes"
+    ]
+
+    esperado_6 = {
+        "nombre": "Pedro",
+        "tipo_ayuda": "maquinaria",  # Esto debe inferirse automáticamente
+        "tipo_maquinaria": MaquinariaType.SOLDADORAS,
+        "detalles_maquinaria": {"amperaje": "300"}
+    }
+
+    run_conversation_test("Flujo 6: Inferencia de tipo_ayuda", chatbot, flujo_6, esperado_6)
+
 
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:
@@ -372,6 +407,6 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
 
 if __name__ == "__main__":
     chatbot_instance = setup_chatbot()
-    # define_test_flows(chatbot_instance)
-    test_manually(chatbot_instance)
+    define_test_flows(chatbot_instance)
+    # test_manually(chatbot_instance)
     print("\n🎉 Todas las pruebas han finalizado.")

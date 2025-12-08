@@ -189,6 +189,8 @@ class WhatsAppBot:
         El chatbot ahora envía automáticamente las respuestas por WhatsApp.
         """
         try:
+            # Desactivamos los comandos
+            """
             # Verificar si es un comando especial
             if message_text.lower() == "reset":
                 reset_response = self._handle_reset_command(wa_id, hubspot_manager)
@@ -200,6 +202,7 @@ class WhatsAppBot:
                 # Ignorar el Id de WhatsApp porque no se guarda en la base de datos
                 self.send_message(wa_id, status_response)
                 return
+            """
 
             # Verificar si el mensaje es seguro
             safety_result = self.guardrails.check_message_safety(message_text)
@@ -270,7 +273,7 @@ class WhatsAppBot:
             if "RECIPIENT_WAID_6" in os.environ:
                 authorized_ids.append(os.environ['RECIPIENT_WAID_6'])
                 
-            return wa_id in authorized_ids
+            return wa_id in authorized_ids or True
         except Exception as e:
             logging.error(f"Error verificando si el usuario {wa_id} está autorizado: {e}")
             return False

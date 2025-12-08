@@ -5,6 +5,12 @@ from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 import langchain
+from ai_prompts import (
+    NEGATIVE_RESPONSE_PROMPT, 
+    EXTRACTION_PROMPT, 
+    RESPONSE_GENERATION_PROMPT, 
+    INVENTORY_DETECTION_PROMPT
+)
 from maquinaria_config import MAQUINARIA_CONFIG, get_required_fields_for_tipo
 from state_management import MaquinariaType, ConversationState, ConversationStateStore, InMemoryStateStore, FIELDS_CONFIG_PRIORITY
 from datetime import datetime, timezone
@@ -173,38 +179,7 @@ class IntelligentSlotFiller:
         Retorna un diccionario con el tipo de respuesta y el campo específico, o None si no es una respuesta negativa.
         Formato: {"response_type": "No tiene" o "No especificado", "field": "nombre_del_campo"}
         """
-        prompt = ChatPromptTemplate.from_template(
-            """
-            Eres un asistente experto en detectar respuestas negativas o de incertidumbre y determinar a qué campo específico pertenecen.
-            
-            ÚLTIMA PREGUNTA DEL BOT: {last_bot_question}
-            MENSAJE DEL USUARIO: {message}
-            
-            INSTRUCCIONES:
-            Analiza si el usuario está dando una respuesta negativa o de incertidumbre y determina a qué campo específico pertenece.
-            
-            RESPUESTAS NEGATIVAS (response_type: "No tiene"):
-            - "no", "no tenemos", "no hay", "no tengo", "no cuenta con"
-            - "no tengo correo", "no tengo teléfono", "no tengo empresa"
-            - "solo facebook", "solo instagram", "solo redes sociales"
-            - Cualquier variación de "no" + el objeto de la pregunta
-            
-            RESPUESTAS DE INCERTIDUMBRE (response_type: "No especificado"):
-            - "no sé", "no estoy seguro", "no lo sé", "no tengo idea"
-            - "no quiero dar esa información", "prefiero no decir", "es confidencial"
-            - "no estoy seguro", "tal vez", "posiblemente", "creo que no"
-            
-            CAMPOS DISPONIBLES:
-            {fields_available}
-            
-            Si NO es una respuesta negativa ni de incertidumbre, retorna "None".
-            
-            IMPORTANTE: Responde EXACTAMENTE en formato JSON:
-            - Si es respuesta negativa: {{"response_type": "No tiene", "field": "nombre_del_campo"}}
-            - Si es respuesta de incertidumbre: {{"response_type": "No especificado", "field": "nombre_del_campo"}}
-            - Si no es respuesta negativa: "None"
-            """
-        )
+        prompt = NEGATIVE_RESPONSE_PROMPT
         
         try:
             # Obtener campos disponibles desde el FIELDS_CONFIG_PRIORITY
@@ -247,129 +222,19 @@ class IntelligentSlotFiller:
         # PRIMERO: Detectar si es una respuesta negativa o de incertidumbre
         negative_response = self.detect_negative_response(message, last_bot_question)
         
+        extracted_data = {}
+
         if negative_response:
-            # Si es una respuesta negativa, usar directamente el campo y valor proporcionados por el LLM
+            # Si es una respuesta negativa, guardar el campo y valor
             field_name = negative_response.get("field")
             response_type = negative_response.get("response_type")
             
             if field_name and response_type:
-                return {field_name: response_type}
-            else:
-                return {}
+                extracted_data[field_name] = response_type
         
+        # SEGUNDO: Extraer el resto de la información usando el prompt general
         # Crear prompt que considere el estado actual y la última pregunta del bot
-        prompt = ChatPromptTemplate.from_template(
-            """
-            Eres un asistente experto en extraer información de mensajes de usuarios.
-            
-            Analiza el mensaje del usuario y extrae TODA la información disponible.
-            Solo extrae campos que NO estén ya completos en el estado actual.
-            
-            ESTADO ACTUAL:
-            {current_state_str}
-            
-            ÚLTIMA PREGUNTA DEL BOT: {last_bot_question}
-            
-            MENSAJE DEL USUARIO: {message}
-            
-            INSTRUCCIONES:
-            1. Solo extrae campos que estén VACÍOS en el estado actual
-            2. Para detalles_maquinaria, solo incluye campos específicos que no estén ya llenos
-            3. Responde SOLO en formato JSON válido
-            4. IMPORTANTE: Si el mensaje del usuario no contiene información nueva para campos vacíos, responde con {{}} (JSON vacío)
-            5. NO extraigas información de campos que ya están llenos, incluso si el usuario dice algo que podría interpretarse como información
-            6. CLASIFICACIÓN INTELIGENTE: Si la última pregunta es sobre un campo específico, clasifica la respuesta en ese campo
-            
-            CAMPOS A EXTRAER (solo si están vacíos):
-            {fields_available}
-
-            REGLAS ESPECIALES PARA NOMBRES:
-            - Si el usuario dice "soy [nombre]", "me llamo [nombre]", "hola, soy [nombre]" → extraer nombre y apellido
-            - Para nombres de 1 palabra: llenar solo "nombre"
-            - Para nombres de 2+ palabras: llenar "nombre" con la primera palabra y "apellido" con el resto
-            - Ejemplos: "soy Paco" → nombre: "Paco"
-            - Ejemplos: "soy Paco Perez" → nombre: "Paco", apellido: "Perez"
-            - Ejemplos: "soy Paco Perez Diaz" → nombre: "Paco", apellido: "Perez Diaz"
-
-            Los tipos de maquinaria disponibles para el campo tipo_maquinaria son:
-            {maquinaria_names}
-            
-            REGLAS ADICIONALES PARA DETALLES DE MAQUINARIA - USA ESTOS NOMBRES EXACTOS:
-            - Para TORRE_ILUMINACION: es_led (true/false para LED)
-            - Para SOLDADORAS: amperaje, electrodo
-            - Para COMPRESOR: capacidad_volumen, herramientas_conectar
-            - Para PLATAFORMA: altura_trabajo, actividad, ubicacion
-            - Para GENERADORES: actividad, capacidad
-            - Para ROMPEDORES: uso, tipo
-            - Para APISONADOR: uso, motor, es_diafragma
-            - Para MONTACARGAS: capacidad, tipo_energia, posicion_operador, altura
-            - Para MANIPULADOR: capacidad, altura, actividad, tipo_energia
-            - IMPORTANTE: Usa exactamente estos nombres de campos, NO inventes nombres alternativos
-            - NO extraer campos que no estén en esta lista exacta
-            - NO inventar campos adicionales como "proyecto", "aplicación", "capacidad_de_volumen", etc.
-            
-            REGLAS ESPECIALES PARA GIRO_EMPRESA:
-            - Si el usuario describe la actividad de su empresa → giro_empresa: [descripción de la actividad]
-            - Si el usuario dice "nos dedicamos a la [actividad]" → giro_empresa: [actividad]
-            - Ejemplos: "venta de maquinaria pesada", "construcción", "manufactura", "servicios de mantenimiento", "distribución", "logística", etc.
-            - Extrae la actividad principal, no solo palabras sueltas
-            
-            REGLAS ESPECIALES PARA USO_EMPRESA_O_VENTA:
-            - Si el usuario dice "para venta", "es para vender", "para comercializar" → uso_empresa_o_venta: "venta"
-            - Si el usuario dice "para uso", "para usar", "para trabajo interno" → uso_empresa_o_venta: "uso empresa"
-            
-            REGLAS ESPECIALES PARA TIPO_AYUDA:
-            - Si la última pregunta es "¿En qué te puedo ayudar?" o similar, analiza si el usuario menciona:
-              * MAQUINARIA: Si menciona cualquier tipo de maquinaria (soldadora, compresor, generador, montacargas, etc.), o cualquier cosa relacionada con equipos/máquinas → tipo_ayuda: "maquinaria"
-              * OTRO: Si menciona refacciones (sin contexto de maquinaria), créditos, financiamiento, información general, servicios, o cualquier otra cosa que NO sea maquinaria → tipo_ayuda: "otro"
-            - Ejemplos de MAQUINARIA: "necesito una soldadora", "quiero un compresor", "busco generadores", "equipos de construcción", "quiero una maquina pesada"
-            - Ejemplos de OTRO: "refacciones" (sin contexto), "créditos", "financiamiento", "servicios", "cotización de refacciones" (sin mencionar maquinaria específica)
-            - IMPORTANTE: Si el usuario menciona maquinaria específica o tipos de maquinaria, SIEMPRE es "maquinaria"
-            
-            EJEMPLOS DE EXTRACCIÓN:
-            - Mensaje: "soy Renato Fuentes" → {{"nombre": "Renato", "apellido": "Fuentes"}}
-            - Mensaje: "me llamo Mauricio Martinez Rodriguez" → {{"nombre": "Mauricio", "apellido": "Martinez Rodriguez"}}
-            - Mensaje: "venta de maquinaria" → {{"giro_empresa": "venta de maquinaria"}}
-            - Mensaje: "construcción y mantenimiento" → {{"giro_empresa": "construcción y mantenimiento"}}
-            - Mensaje: "para venta" → {{"uso_empresa_o_venta": "venta"}}
-            - Mensaje: "en la Ciudad de México" → {{"lugar_requerimiento": "Ciudad de México"}}
-            - Mensaje: "daniel@empresa.com" → {{"correo": "daniel@empresa.com"}}
-            - Mensaje: "555-1234" → {{"telefono": "555-1234"}}
-            
-            EJEMPLOS DE USO DEL CONTEXTO DE LA ÚLTIMA PREGUNTA:
-            - Última pregunta: "¿En qué compañía trabajas?" + Mensaje: "Facebook" → {{"nombre_empresa": "Facebook"}}
-            - Última pregunta: "¿Cuál es el giro de su empresa?" + Mensaje: "Construcción" → {{"giro_empresa": "Construcción"}}
-            - Última pregunta: "¿Cuál es su correo electrónico?" + Mensaje: "daniel@empresa.com" → {{"correo": "daniel@empresa.com"}}
-            - Última pregunta: "¿Es para uso de la empresa o para venta?" + Mensaje: "Para venta" → {{"uso_empresa_o_venta": "venta"}}
-            - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Necesito una soldadora" → {{"tipo_ayuda": "maquinaria"}}
-            - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Quiero información sobre créditos" → {{"tipo_ayuda": "otro"}}
-            - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Refacciones" → {{"tipo_ayuda": "otro"}}
-            - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Refacciones para mi compresor" → {{"tipo_ayuda": "maquinaria"}}
-
-            REGLAS ESPECIALES PARA PREGUNTAS SOBRE INVENTARIO:
-            - Si el usuario pregunta "¿tienen [tipo]?" → extraer [tipo] como tipo_maquinaria
-            - Si el usuario pregunta "¿manejan [tipo]?" → extraer [tipo] como tipo_maquinaria  
-            - Si el usuario pregunta "necesito [tipo]" → extraer [tipo] como tipo_maquinaria
-            - Ejemplos: "¿tienen generadores?" → {{"tipo_maquinaria": "generador"}}
-            - Ejemplos: "¿manejan soldadoras?" → {{"tipo_maquinaria": "soldadora"}}
-            - Ejemplos: "necesito un compresor" → {{"tipo_maquinaria": "compresor"}}
-            IMPORTANTE: Incluso en preguntas sobre inventario, SIEMPRE extraer tipo_maquinaria si se menciona
-            
-            REGLAS ESPECIALES PARA QUIERE_COTIZACION:
-            - Si la última pregunta del bot contiene "¿Quieres que te cotice" o similar sobre cotización:
-              * Si el usuario dice "sí", "si", "claro", "por favor", "ok", "dale", "adelante", "quiero", "me interesa" → quiere_cotizacion: "sí"
-              * Si el usuario dice "no", "no gracias", "no quiero", "no me interesa", "no por ahora", "después", "más tarde" → quiere_cotizacion: "no"
-            - Ejemplos: "sí" → {{"quiere_cotizacion": "sí"}}
-            - Ejemplos: "no" → {{"quiere_cotizacion": "no"}}
-            - Ejemplos: "claro, quiero cotización" → {{"quiere_cotizacion": "sí"}}
-            - Ejemplos: "no gracias" → {{"quiere_cotizacion": "no"}}
-            - IMPORTANTE: Solo extraer quiere_cotizacion si la última pregunta del bot es sobre cotización
-            
-            IMPORTANTE: Analiza cuidadosamente el mensaje y extrae TODA la información disponible que corresponda a campos vacíos.
-            
-            Respuesta (solo JSON):
-            """
-        )
+        prompt = EXTRACTION_PROMPT
         
         try:
             # Nombres de tipos de maquinaria
@@ -387,122 +252,98 @@ class IntelligentSlotFiller:
             ))
             
             # Parsear la respuesta JSON
-            result = self.parser.parse(response.content)
-            return result
+            general_extraction = self.parser.parse(response.content)
+            
+            # Fusionar resultados (la extracción general tiene prioridad si encuentra algo más específico,
+            # pero mantenemos la respuesta negativa si no hay conflicto o si es complementaria)
+            if isinstance(general_extraction, dict):
+                extracted_data.update(general_extraction)
+            
+            return extracted_data
             
         except Exception as e:
             logging.error(f"Error extrayendo información: {e}")
-            return {}
+            return extracted_data
     
     def get_next_question(self, current_state: ConversationState) -> Optional[str]:
         """
         Determina inteligentemente cuál es la siguiente pregunta necesaria
-        generándola de manera conversacional y natural
+        siguiendo el flujo definido en el diagrama PlantUML.
         """
-        
         try:
-            # Verificar primero si tipo_ayuda está vacío
+            # 1. NOMBRE Y APELLIDO
+            # Verificar si tenemos el nombre
+            nombre = current_state.get("nombre")
+            if not nombre:
+                return {
+                    "question": FIELDS_CONFIG_PRIORITY["nombre"]["question"],
+                    "reason": FIELDS_CONFIG_PRIORITY["nombre"]["reason"],
+                    "question_type": "nombre"
+                }
+            
+            # Verificar si tenemos el apellido (o si el nombre ya incluye apellido)
+            apellido = current_state.get("apellido")
+            if not apellido and len(nombre.split()) < 2:
+                return {
+                    "question": FIELDS_CONFIG_PRIORITY["apellido"]["question"],
+                    "reason": FIELDS_CONFIG_PRIORITY["apellido"]["reason"],
+                    "question_type": "apellido"
+                }
+
+            # 2. TIPO DE AYUDA
             tipo_ayuda = current_state.get("tipo_ayuda")
+            if not tipo_ayuda:
+                return {
+                    "question": FIELDS_CONFIG_PRIORITY["tipo_ayuda"]["question"],
+                    "reason": FIELDS_CONFIG_PRIORITY["tipo_ayuda"]["reason"],
+                    "question_type": "tipo_ayuda"
+                }
             
-            # Si tipo_ayuda es "otro", solo preguntar por nombre y apellido
+            # Si el tipo de ayuda es "otro", terminamos el flujo de preguntas
             if tipo_ayuda == "otro":
-                # Solo verificar nombre y apellido
-                nombre = current_state.get("nombre", "")
-                if not nombre or len(nombre.split()) < 2:
-                    # Buscar la pregunta de nombre o apellido
-                    for slot_name, data in FIELDS_CONFIG_PRIORITY.items():
-                        if slot_name in ["nombre", "apellido"]:
-                            value = current_state.get(slot_name)
-                            if not value:
-                                return {
-                                    "question": data["question"], 
-                                    "reason": data["reason"], 
-                                    "question_type": slot_name
-                                }
-                # Si nombre y apellido están completos, retornar None para terminar
                 return None
+
+            # 3. TIPO DE MAQUINARIA (Solo si tipo_ayuda es "maquinaria")
+            tipo_maquinaria = current_state.get("tipo_maquinaria")
+            if not tipo_maquinaria:
+                return {
+                    "question": FIELDS_CONFIG_PRIORITY["tipo_maquinaria"]["question"],
+                    "reason": FIELDS_CONFIG_PRIORITY["tipo_maquinaria"]["reason"],
+                    "question_type": "tipo_maquinaria"
+                }
+
+            # 4. DETALLES DE MAQUINARIA
+            # Verificar si faltan detalles específicos
+            if not self._are_maquinaria_details_complete(current_state):
+                question_details = self._get_maquinaria_detail_question_with_reason(current_state)
+                if question_details:
+                    return question_details
+
+            # 5. COTIZACIÓN
+            # Preguntar si quiere cotización
+            quiere_cotizacion = current_state.get("quiere_cotizacion")
+            if not quiere_cotizacion:
+                return {
+                    "question": FIELDS_CONFIG_PRIORITY["quiere_cotizacion"]["question"],
+                    "reason": FIELDS_CONFIG_PRIORITY["quiere_cotizacion"]["reason"],
+                    "question_type": "quiere_cotizacion"
+                }
             
-            # Verificar cada slot en orden de prioridad
-            for slot_name, data in FIELDS_CONFIG_PRIORITY.items():
-                question = data["question"]
-                reason = data["reason"]
-                
-                # Si tipo_ayuda es "otro", saltar tipo_maquinaria y detalles_maquinaria
-                if tipo_ayuda == "otro" and slot_name in ["tipo_maquinaria", "detalles_maquinaria"]:
-                    continue
-                
-                # Si el usuario dijo "no" a la cotización, no continuar con más preguntas
-                quiere_cotizacion_val = current_state.get("quiere_cotizacion")
-                if tipo_ayuda == "maquinaria" and quiere_cotizacion_val and "no" in quiere_cotizacion_val.lower():
-                    continue
-                
-                if slot_name == "detalles_maquinaria":
-                    # Solo preguntar detalles si tipo_ayuda es "maquinaria"
-                    if tipo_ayuda != "maquinaria":
-                        continue
-                    # Manejar detalles específicos de maquinaria
-                    question_details = self._get_maquinaria_detail_question_with_reason(current_state)
-                    if question_details:
-                        return question_details
-                elif slot_name == "tipo_maquinaria":
-                    # Solo preguntar tipo_maquinaria si tipo_ayuda es "maquinaria"
-                    if tipo_ayuda != "maquinaria":
-                        continue
-                    value = current_state.get(slot_name)
-                    if not value:
-                        return {
-                            "question": question, 
-                            "reason": reason, 
-                            "question_type": slot_name
-                        }
-                elif slot_name == "quiere_cotizacion":
-                    # Solo preguntar si tipo_ayuda es "maquinaria" y los detalles están completos
-                    if tipo_ayuda != "maquinaria":
-                        continue
-                    tipo_maquinaria = current_state.get("tipo_maquinaria")
-                    if not tipo_maquinaria or not self._are_maquinaria_details_complete(current_state):
-                        continue
-                    value = current_state.get(slot_name)
-                    if not value:
-                        return {
-                            "question": question, 
-                            "reason": reason, 
-                            "question_type": slot_name
-                        }
-                else:
-                    # Campos de empresa que se agrupan en un solo mensaje
-                    empresa_fields = ["nombre_empresa", "giro_empresa", "lugar_requerimiento", "uso_empresa_o_venta", "correo"]
-                    
-                    # Si es un campo de empresa, verificar si se debe mostrar el mensaje agrupado
-                    if slot_name in empresa_fields:
-                        # Solo mostrar el mensaje agrupado si quiere_cotizacion es "sí"
-                        quiere_cotizacion = current_state.get("quiere_cotizacion", "")
-                        if quiere_cotizacion and "sí" in quiere_cotizacion.lower():
-                            # Verificar si hay algún campo de empresa pendiente
-                            pending_fields = get_pending_empresa_fields(current_state)
-                            if len(pending_fields) > 0:
-                                # Retornar un question_type especial para que generate_response genere el mensaje
-                                return {
-                                    "question": "",  # El mensaje se generará en generate_response
-                                    "reason": "Para generar la cotización",
-                                    "question_type": "datos_empresa"
-                                }
-                            # Si todos los campos de empresa están completos, continuar con el siguiente campo
-                            continue
-                        else:
-                            # Si no quiere cotización, no preguntar campos de empresa
-                            continue
-                    
-                    # Verificar si el slot está vacío o tiene respuestas negativas
-                    value = current_state.get(slot_name)
-                    if not value:
-                        return {
-                            "question": question, 
-                            "reason": reason, 
-                            "question_type": slot_name
-                        }
-            
-            # Si todos los slots están llenos
+            # Si no quiere cotización, terminamos
+            if "no" in quiere_cotizacion.lower():
+                return None
+
+            # 6. DATOS DE EMPRESA
+            # Si quiere cotización, pedir datos de empresa si faltan
+            pending_fields = get_pending_empresa_fields(current_state)
+            if len(pending_fields) > 0:
+                return {
+                    "question": "Necesito los siguientes datos de su empresa para continuar con la cotización.",  # Mensaje explícito para evitar que el LLM piense que acabó
+                    "reason": "Para generar la cotización",
+                    "question_type": "datos_empresa"
+                }
+
+            # Si llegamos aquí, tenemos toda la información necesaria
             return None
             
         except Exception as e:
@@ -636,40 +477,8 @@ class IntelligentResponseGenerator:
         
         try:
             # Crear prompt conversacional basado en el estilo de llm.py
-            prompt_str = """
-                Eres Alejandro Gómez, un asesor comercial en Alpha C y un asistente de ventas profesional especializado en maquinaria de la empresa.
-                Estás continuando una conversación con un lead.
-                Tu trabajo recolectar información de manera natural y conversacional, con un tono casual y amigable.
-
-                HISTORIAL DE CONVERSACIÓN:
-                {history_messages}
-
-                INFORMACIÓN EXTRAÍDA DEL ÚLTIMO MENSAJE:
-                {extracted_info_str}
-                
-                ESTADO ACTUAL DE LA CONVERSACIÓN:
-                {current_state_str}
-                
-                SIGUIENTE PREGUNTA A HACER: {next_question}
-           
-                MENSAJE DEL USUARIO: {user_message}
-
-                IMPORTANTE:
-                {inventory_instruction}
-                {presentation_instruction}
-                {datos_empresa_instruction}
-                
-                INSTRUCCIONES:
-                1. No repitas información que ya confirmaste anteriormente 
-                2. {extracted_name_instruction}
-                3. Si hay una siguiente pregunta, hazla de manera natural
-                4. NO inventes preguntas adicionales
-                5. Si no hay siguiente pregunta, simplemente confirma la información recibida y termina la conversación
-                
-                Genera una respuesta natural y apropiada:
-            """
-            
-            prompt = ChatPromptTemplate.from_template(prompt_str)
+            # Crear prompt conversacional basado en el estilo de llm.py
+            prompt = RESPONSE_GENERATION_PROMPT
 
             # Verificar si es el inicio de la conversación (menos de 2 elementos en history_messages)
             is_initial_conversation = len(history_messages) < 2
@@ -681,7 +490,9 @@ class IntelligentResponseGenerator:
                 
                 PRESENTACIÓN:
                 Presentate como Alejandro Gómez, asesor comercial de Alpha C.
-                Si en el primer mensaje del usuario este menciona que requiere algún producto o servicio, o solo quiere más información, dile "Hola, sí claro, puedo ayudarte con eso." y luego preséntate y haz la pregunta correspondiente. Si solo es un saludo, dile "Hola, soy Alejandro Gómez, asesor comercial de Alpha C." y luego haz la pregunta correspondiente.
+                Si en el primer mensaje del usuario este menciona que requiere algún producto o servicio, o solo quiere más información, dile "Hola, sí claro, puedo ayudarte con eso. Soy Alejandro Gómez, asesor comercial de Alpha C." y luego haz la pregunta correspondiente.
+                Si el usuario NO menciona ninguna necesidad (solo saluda o se presenta), dile "Hola, soy Alejandro Gómez, asesor comercial de Alpha C." y luego haz la pregunta correspondiente.
+                IMPORTANTE: SIEMPRE debes incluir tu nombre y cargo en el PRIMER mensaje.
                 """
 
             # Instrucción para manejar el nombre y apellido del usuario
@@ -701,9 +512,16 @@ class IntelligentResponseGenerator:
                 extracted_info_str = json.dumps(safe_info, ensure_ascii=False, indent=2)
 
                 if extracted_info.get("nombre"):
-                    extracted_name_instruction = "El usuario acaba de decir su nombre, así que responde con un 'Gracias, {nombre}.' Y haz la siguiente pregunta."
+                    nombre = extracted_info.get("nombre")
+                    if is_initial_conversation:
+                        extracted_name_instruction = f"El usuario ya proporcionó su nombre ({nombre}). Úsalo amablemente en tu saludo, PERO NO dejes de presentarte tú primero."
+                    else:
+                        extracted_name_instruction = f"El usuario acaba de decir su nombre, así que responde con un 'Gracias, {nombre}.' Y haz la siguiente pregunta."
                 elif extracted_info.get("apellido"):
-                    extracted_name_instruction = "El usuario acaba de decir su apellido, así que responde con un 'Va.' Y haz la siguiente pregunta, no repitas el nombre ni apellido."
+                    if is_initial_conversation:
+                        extracted_name_instruction = "El usuario proporcionó su apellido. Tómalo en cuenta."
+                    else:
+                        extracted_name_instruction = "El usuario acaba de decir su apellido, así que responde con un 'Va.' Y haz la siguiente pregunta, no repitas el nombre ni apellido."
                 else:
                     extracted_name_instruction = "No menciones el nombre ni apellido del usuario."
 
@@ -749,6 +567,8 @@ class IntelligentResponseGenerator:
                 datos_empresa_instruction += """
                 - NUNCA menciones los campos pendientes en tu respuesta, solo responde con la introducción
                 - NUNCA menciones información que se extrajo previamente, ni confirmes la información recién extraída, a menos de que el usuario lo pregunte
+                - IMPORTANTE: NO te despidas, NO digas 'Perfecto, con esto terminamos', NO digas 'Gracias por la información' como cierre.
+                - Debes dejar claro que FALTAN datos y que la conversación continúa.
                 """
 
             current_state_str = get_current_state_str(current_state)
@@ -818,46 +638,7 @@ class InventoryResponder:
     def is_inventory_question(self, message: str) -> bool:
         """Determina si el mensaje del usuario es una pregunta sobre el inventario"""
         try:
-            prompt = ChatPromptTemplate.from_template(
-                """
-                Eres un asistente especializado en identificar si un mensaje del usuario es una pregunta sobre inventario de maquinaria.
-                
-                TU TAREA:
-                Determinar si el mensaje del usuario es una pregunta sobre:
-                1. Disponibilidad de maquinaria
-                2. Tipos de maquinaria que vendemos
-                3. Modelos disponibles
-                4. Ubicaciones de entrega
-                5. Precios o cotizaciones
-                6. Características de la maquinaria
-                7. Cualquier consulta relacionada con el inventario
-                
-                REGLAS:
-                - Si es pregunta sobre inventario → true
-                - Si es respuesta a una pregunta del bot → false
-                - Si es información personal del usuario → false
-                - Si es pregunta general no relacionada → false
-                
-                EJEMPLOS DE PREGUNTAS SOBRE INVENTARIO:
-                - "¿Qué tipos de maquinaria tienen?"
-                - "¿Tienen soldadoras?"
-                - "¿Cuánto cuesta un compresor?"
-                - "¿En qué ubicaciones entregan?"
-                - "¿Qué modelos de generadores manejan?"
-                - "¿Tienen inventario disponible?"
-                - "¿Pueden cotizar una torre de iluminación?"
-                
-                EJEMPLOS DE NO INVENTARIO:
-                - "me llamo Juan"
-                - "quiero un compresor"
-                - "es para venta"
-                - "mi empresa se llama ABC"
-                
-                Mensaje del usuario: {message}
-                
-                Responde SOLO con "true" si es pregunta sobre inventario, o "false" si no lo es.
-                """
-            )
+            prompt = INVENTORY_DETECTION_PROMPT
             
             response = self.llm.invoke(prompt.format_prompt(
                 message=message
@@ -905,7 +686,7 @@ class IntelligentLeadQualificationChatbot:
             # Campos que no se preguntan al usuario
             "completed": False,
             "messages": [],
-            "conversation_mode": "bot",
+            "conversation_mode": "bot", # agente o bot
             "asignado_asesor": None,
             "hubspot_contact_id": None,
             "quiere_cotizacion": None
@@ -1151,6 +932,12 @@ class IntelligentLeadQualificationChatbot:
             else:
                 self.state[key] = value
                 debug_print(f"DEBUG: Campo '{key}' actualizado con valor: '{value}'")
+        
+        # Lógica de inferencia post-extracción
+        # Si tenemos tipo_maquinaria pero no tipo_ayuda, inferimos que es "maquinaria"
+        if self.state.get("tipo_maquinaria") and not self.state.get("tipo_ayuda"):
+            self.state["tipo_ayuda"] = "maquinaria"
+            debug_print("DEBUG: Inferido tipo_ayuda='maquinaria' basado en presencia de tipo_maquinaria")
         
     def _get_last_bot_question(self) -> Tuple[Optional[str], Optional[str]]:
         """Obtiene la última pregunta que hizo el bot para proporcionar contexto"""
