@@ -787,68 +787,76 @@ class IntelligentLeadQualificationChatbot:
                 self.save_conversation()
                 return None  # No response en modo agente
             
-            is_inventory_question = False
-
-            # Verificar si es una pregunta sobre inventario
-            if self.inventory_responder.is_inventory_question(user_message):
-                debug_print(f"DEBUG: Pregunta sobre inventario detectada")
-                is_inventory_question = True
-            
-            # Si no es pregunta de inventario ni de requerimientos, continuar con el flujo normal
-            debug_print(f"DEBUG: Flujo normal de calificación de leads...")
-
-            # Verificar si la conversación está completa (solo en modo bot)
-            if self.slot_filler.is_conversation_complete(self.state):
-                debug_print(f"DEBUG: Conversación completa!")
-                self.state["completed"] = True
-                final_response = self._get_final_response_message()
-                return self._add_message_and_return_response(final_response, "")
-            
-            # Obtener la siguiente pregunta necesaria
-            next_question = self.slot_filler.get_next_question(self.state)
-
-            if next_question is None:
-                debug_print(f"DEBUG: Estado completo: {self.state}")
-                
-                # Si el usuario dijo "no" a la cotización, responder con mensaje específico
-                if "no" in self.state.get("quiere_cotizacion").lower():
-                    self.state["completed"] = True
-                    final_message = "Okay, ¿hay algo más en lo que te pueda ayudar?"
-                    return self._add_message_and_return_response(final_message, "")
-                
-                self.state["completed"] = True
-                final_message = self._get_final_response_message()
-                return self._add_message_and_return_response(final_message, "")
-
-            next_question_str = next_question["question"]
-            next_question_type = next_question['question_type']
-
-            debug_print(f"DEBUG: Siguiente pregunta: {next_question_str}")
-            debug_print(f"DEBUG: Tipo de siguiente pregunta: {next_question_type}")
-
-            # Extract only the role and content of the history messages
-            history_messages = [{
-                "role": msg["role"],
-                "content": msg["content"]
-            } for msg in self.state["messages"]]
-
-            # Generar respuesta con LLM
-            generated_response = self.response_generator.generate_response(
-                user_message, 
-                history_messages,
-                extracted_info, 
-                self.state, 
-                next_question_str, 
-                is_inventory_question,
-                question_type=next_question_type
-            )
-            contextual_response += generated_response
-
-            return self._add_message_and_return_response(contextual_response, next_question_type)
+            return self._process_and_respond(user_message, extracted_info)
         
         except Exception as e:
             logging.error(f"Error procesando mensaje: {e}")
             return "Disculpe, hubo un error técnico. ¿Podría intentar de nuevo?"
+
+    def _process_and_respond(self, user_message: str, extracted_info: Dict[str, Any]) -> str:
+        """
+        Lógica común para procesar un mensaje y generar una respuesta.
+        Detecta preguntas de inventario, verifica si la conversación está completa,
+        obtiene la siguiente pregunta y genera la respuesta con LLM.
+        """
+        is_inventory_question = False
+
+        # Verificar si es una pregunta sobre inventario
+        if self.inventory_responder.is_inventory_question(user_message):
+            debug_print(f"DEBUG: Pregunta sobre inventario detectada")
+            is_inventory_question = True
+        
+        # Si no es pregunta de inventario ni de requerimientos, continuar con el flujo normal
+        debug_print(f"DEBUG: Flujo normal de calificación de leads...")
+
+        # Verificar si la conversación está completa (solo en modo bot)
+        if self.slot_filler.is_conversation_complete(self.state):
+            debug_print(f"DEBUG: Conversación completa!")
+            self.state["completed"] = True
+            final_response = self._get_final_response_message()
+            return self._add_message_and_return_response(final_response, "")
+        
+        # Obtener la siguiente pregunta necesaria
+        next_question = self.slot_filler.get_next_question(self.state)
+
+        if next_question is None:
+            debug_print(f"DEBUG: Estado completo: {self.state}")
+            
+            # Si el usuario dijo "no" a la cotización, responder con mensaje específico
+            quiere_cot = self.state.get("quiere_cotizacion")
+            if quiere_cot and "no" in quiere_cot.lower():
+                self.state["completed"] = True
+                final_message = "Okay, ¿hay algo más en lo que te pueda ayudar?"
+                return self._add_message_and_return_response(final_message, "")
+            
+            self.state["completed"] = True
+            final_message = self._get_final_response_message()
+            return self._add_message_and_return_response(final_message, "")
+
+        next_question_str = next_question["question"]
+        next_question_type = next_question['question_type']
+
+        debug_print(f"DEBUG: Siguiente pregunta: {next_question_str}")
+        debug_print(f"DEBUG: Tipo de siguiente pregunta: {next_question_type}")
+
+        # Extract only the role and content of the history messages
+        history_messages = [{
+            "role": msg["role"],
+            "content": msg["content"]
+        } for msg in self.state["messages"]]
+
+        # Generar respuesta con LLM
+        generated_response = self.response_generator.generate_response(
+            user_message, 
+            history_messages,
+            extracted_info, 
+            self.state, 
+            next_question_str, 
+            is_inventory_question,
+            question_type=next_question_type
+        )
+        
+        return self._add_message_and_return_response(generated_response, next_question_type)
         
     def _add_message_and_return_response(self, response: str, question_type: str) -> str:
         """
@@ -998,42 +1006,7 @@ class IntelligentLeadQualificationChatbot:
             
             debug_print(f"DEBUG: Procesando mensaje del lead: '{message_content}'")
             
-            # Verificar si es una pregunta sobre inventario
-            is_inventory_question = self.inventory_responder.is_inventory_question(message_content)
-
-            # Obtener la siguiente pregunta necesaria
-            next_question = self.slot_filler.get_next_question(self.state)
-            
-            # Verificar si la conversación está completa
-            if self.slot_filler.is_conversation_complete(self.state) or next_question is None:
-                debug_print(f"DEBUG: Conversación completa para {wa_id}")
-                self.state["completed"] = True
-                final_response = self._get_final_response_message()
-                return self._add_message_and_return_response(final_response, "")
-            
-            next_question_str = next_question["question"]
-            next_question_type = next_question['question_type']
-            
-            debug_print(f"DEBUG: Siguiente pregunta: {next_question_str}")
-            
-            # Preparar historial de mensajes para el contexto
-            history_messages = [{
-                "role": msg["role"],
-                "content": msg["content"]
-            } for msg in self.state["messages"]]
-            
-            # Generar respuesta contextual
-            generated_response = self.response_generator.generate_response(
-                message_content, 
-                history_messages,
-                {}, 
-                self.state, 
-                next_question_str, 
-                is_inventory_question,
-                question_type=next_question_type
-            )
-            
-            return self._add_message_and_return_response(generated_response, next_question_type)
+            return self._process_and_respond(message_content, {})
             
         except Exception as e:
             logging.error(f"Error procesando último mensaje del lead: {e}")
