@@ -81,19 +81,12 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     Los tipos de maquinaria disponibles para el campo tipo_maquinaria son:
     {maquinaria_names}
     
-    REGLAS ADICIONALES PARA DETALLES DE MAQUINARIA - USA ESTOS NOMBRES EXACTOS:
-    - Para TORRE_ILUMINACION: es_led (true/false para LED)
-    - Para SOLDADORAS: amperaje, electrodo
-    - Para COMPRESOR: capacidad_volumen, herramientas_conectar
-    - Para PLATAFORMA: altura_trabajo, actividad, ubicacion
-    - Para GENERADORES: actividad (ej. mineria, construccion), capacidad
-    - Para ROMPEDORES: uso, tipo
-    - Para APISONADOR: uso, motor, es_diafragma
-    - Para MONTACARGAS: capacidad, tipo_energia, posicion_operador, altura
-    - Para MANIPULADOR: capacidad, altura, actividad, tipo_energia
-    - IMPORTANTE: Usa exactamente estos nombres de campos, NO inventes nombres alternativos
-    - NO extraer campos que no estén en esta lista exacta
-    - NO inventar campos adicionales como "proyecto", "aplicación", "capacidad_de_volumen", etc.
+    REGLAS ADICIONALES PARA DETALLES DE MAQUINARIA (PRIORIDAD MÁXIMA - STRICT MODE):
+    {machine_specific_fields}
+    - IMPORTANTE: Usa EXACTAMENTE los nombres de campos listados arriba (keys del JSON).
+    - NO uses sinónimos ni inventes nombres. Si el usuario dice "volumen", usa el campo correspondiente (ej. "cfm_requerido").
+    - NO extraigas campos que no estén en esta lista.
+    - PROHIBIDO inventar campos como: "proyecto", "aplicación", "capacidad_volumen", "capacidad_de_volumen", "volumen", etc.
     - IMPORTANTE: Si el usuario dice "para venta", extráelo como "uso_empresa_o_venta": "venta", y NO como actividad en detalles_maquinaria.
     
     REGLAS ESPECIALES PARA GIRO_EMPRESA:

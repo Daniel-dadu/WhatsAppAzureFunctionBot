@@ -5,22 +5,11 @@ from enum import Enum
 from datetime import datetime, timezone
 import logging
 
-class MaquinariaType(str, Enum):
-    SOLDADORAS = "soldadora"
-    COMPRESOR = "compresor"
-    TORRE_ILUMINACION = "torre_iluminacion"
-    PLATAFORMA = "plataforma"
-    GENERADORES = "generador"
-    ROMPEDORES = "rompedor"
-    APISONADOR = "apisonador"
-    MONTACARGAS = "montacargas"
-    MANIPULADOR = "manipulador"
-
 class ConversationState(TypedDict):
     nombre: Optional[str]
     apellido: Optional[str]
     tipo_ayuda: Optional[str]  # "maquinaria" | "otro" (refacciones, créditos, etc.)
-    tipo_maquinaria: Optional[MaquinariaType]
+    tipo_maquinaria: Optional[str] # Ahora es string dinámico
     detalles_maquinaria: Dict[str, Any]
     nombre_empresa: Optional[str]
     giro_empresa: Optional[str]
@@ -306,9 +295,8 @@ class CosmosDBStateStore(ConversationStateStore):
         state_copy.pop("asignado_asesor", None)
         state_copy.pop("hubspot_contact_id", None)
         
-        # Convertir MaquinariaType a string para JSON
-        if state_copy.get("tipo_maquinaria"):
-            state_copy["tipo_maquinaria"] = state_copy["tipo_maquinaria"].value
+        # Tipo de maquinaria ya es string, no requiere conversión
+        pass
         
         cosmos_doc = {
             "id": f"conv_{user_id}",
@@ -341,12 +329,8 @@ class CosmosDBStateStore(ConversationStateStore):
             }
             messages.append(msg_converted)
         
-        # Convertir string a MaquinariaType si existe
-        if state.get("tipo_maquinaria"):
-            try:
-                state["tipo_maquinaria"] = MaquinariaType(state["tipo_maquinaria"])
-            except ValueError:
-                state["tipo_maquinaria"] = None
+        # Tipo de maquinaria ya es string
+        pass
         
         # Crear ConversationState con todos los campos
         conversation_state: ConversationState = {
@@ -403,10 +387,8 @@ class CosmosDBStateStore(ConversationStateStore):
             old_value = old_state.get(field)
             new_value = new_state.get(field)
             
-            # Convertir MaquinariaType a string para comparación
-            if field == "tipo_maquinaria":
-                old_value = old_value.value if old_value else None
-                new_value = new_value.value if new_value else None
+            # Comparacion directa de strings para tipo_maquinaria
+            pass
             
             if old_value != new_value:
                 changes[field] = new_value
@@ -469,9 +451,8 @@ class CosmosDBStateStore(ConversationStateStore):
             patch_ops = []
             
             for field_name, new_value in field_changes.items():
-                # Convertir MaquinariaType a string para JSON
-                if field_name == "tipo_maquinaria" and new_value:
-                    new_value = new_value.value if hasattr(new_value, 'value') else new_value
+                # No es necesaria la conversion de MaquinariaType
+                pass
                 
                 patch_ops.append({
                     "op": "replace",

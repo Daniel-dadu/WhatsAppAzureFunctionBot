@@ -18,7 +18,7 @@ from check_guardrails import ContentSafetyGuardrails
 # ============================================================================
 
 class WhatsAppBot:
-    def __init__(self, state_store: Optional[ConversationStateStore] = None):
+    def __init__(self, state_store: Optional[ConversationStateStore] = None, cosmos_client: Any = None, db_name: str = None):
         self.access_token = os.environ['WHATSAPP_ACCESS_TOKEN']
         self.phone_number_id = os.environ['PHONE_NUMBER_ID']
         self.version = os.environ['WHATSAPP_API_VERSION']
@@ -29,13 +29,20 @@ class WhatsAppBot:
         
         # Usar el state_store proporcionado
         self.state_store = state_store
+        
+        # Cliente Cosmos para servicios que lo requieran
+        self.cosmos_client = cosmos_client
+        self.db_name = db_name
 
         # Una sola instancia del chatbot que manejará todos los usuarios
         # Pasar callback de envío de mensajes para que el chatbot pueda enviar directamente
+        # Pasar cliente cosmos para servicios internos
         self.chatbot = IntelligentLeadQualificationChatbot(
             self.langchain_config, 
             self.state_store,
-            send_message_callback=self.send_message
+            send_message_callback=self.send_message,
+            cosmos_client=self.cosmos_client,
+            db_name=self.db_name
         )
 
         # Una sola instancia del guardrails
@@ -189,8 +196,6 @@ class WhatsAppBot:
         El chatbot ahora envía automáticamente las respuestas por WhatsApp.
         """
         try:
-            # Desactivamos los comandos
-            """
             # Verificar si es un comando especial
             if message_text.lower() == "reset":
                 reset_response = self._handle_reset_command(wa_id, hubspot_manager)
@@ -202,7 +207,6 @@ class WhatsAppBot:
                 # Ignorar el Id de WhatsApp porque no se guarda en la base de datos
                 self.send_message(wa_id, status_response)
                 return
-            """
 
             # Verificar si el mensaje es seguro
             safety_result = self.guardrails.check_message_safety(message_text)

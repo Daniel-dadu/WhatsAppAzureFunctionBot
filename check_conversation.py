@@ -3,7 +3,7 @@ import json
 from azure.ai.inference import ChatCompletionsClient
 from azure.ai.inference.models import SystemMessage, UserMessage
 from azure.core.credentials import AzureKeyCredential
-from state_management import MaquinariaType
+from maquinaria_config import machinery_config_service
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
 
@@ -26,7 +26,8 @@ def clasificar_mensaje(message: str) -> str:
             api_version="2024-05-01-preview"
         )   
 
-        maquinaria_types = [maquinaria_type.value for maquinaria_type in MaquinariaType]
+        # Obtener tipos de maquinaria dinámicamente
+        maquinaria_types = [m.type_id for m in machinery_config_service.get_all_types()]
 
         system_prompt = (
             "Eres un clasificador de intenciones para un chatbot de ventas de maquinaria.\n\n"

@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Importa las clases necesarias de tu archivo de chatbot
-from ai_langchain import IntelligentLeadQualificationChatbot, AzureOpenAIConfig, MaquinariaType
+from ai_langchain import IntelligentLeadQualificationChatbot, AzureOpenAIConfig
 
 # Importar la clase de los guardrails
 from check_guardrails import ContentSafetyGuardrails
@@ -87,6 +87,7 @@ def run_conversation_test(
     
     # Simula la conversación
     for i, user_message in enumerate(conversation_flow):
+        time.sleep(2) # Evitar rate limits
         timestamp = _get_timestamp()
         output_lines.append(f"[{timestamp}] 👤 Usuario: {user_message}")
 
@@ -112,13 +113,7 @@ def run_conversation_test(
         extracted_value = final_state.get(key)
         
         # Manejo especial para comparar enums y diccionarios
-        if isinstance(expected_value, MaquinariaType):
-            if extracted_value != expected_value:
-                has_errors = True
-                output_lines.append(f"❌ ERROR en '{key}':")
-                output_lines.append(f"   -> Esperado: {expected_value}")
-                output_lines.append(f"   -> Extraído: {extracted_value}")
-        elif isinstance(expected_value, dict):
+        if isinstance(expected_value, dict):
             try:
                 ev = json.dumps(expected_value, sort_keys=True)
                 xv = json.dumps(extracted_value, sort_keys=True)
@@ -186,7 +181,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     esperado_1 = {
         "nombre": "Ana Gómez",
         "apellido": "Gómez",
-        "tipo_maquinaria": MaquinariaType.TORRE_ILUMINACION,
+        "tipo_maquinaria": "torre_iluminacion",
         "detalles_maquinaria": {"es_led": True},
         "uso_empresa_o_venta": "uso empresa",
         "nombre_empresa": "Construcciones del Sol",
@@ -205,7 +200,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "Qué tal, soy Roberto. Necesito una plataforma de elevación.",
         "mi apellido es Marquez",
         "la necesito de 10 metros",
-        "Sí, quiero la segunda maquina",
+        "La prefiero de tijera",
         "Trabajo en 'Maquinaria Pesada S.A.' y nos dedicamos a la renta de maquinaria. La maquinaria es para venta.",
         "Estamos ubicados en Jalisco, mi correo es roberto@maqpesada.mx y mi teléfono es 81 8765 4321",
     ]
@@ -213,9 +208,10 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     esperado_2 = {
         "nombre": "Roberto Marquez",
         "apellido": "Marquez",
-        "tipo_maquinaria": MaquinariaType.PLATAFORMA,
+        "tipo_maquinaria": "plataforma",
         "detalles_maquinaria": {
             "altura_trabajo": "10 metros",
+            "tipo_plataforma": "tijera"
         },
         "lugar_requerimiento": "Jalisco",
         "uso_empresa_o_venta": "venta",
@@ -234,9 +230,9 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     flujo_3 = [
         "Hola, ¿tienen generadores en existencia?",
         "Ok, necesito uno para mineria. Soy Lucía Martinez.",
-        "Dame la cotización de la 2",
+        "El tipo de generador debe ser portátil",
         "Empresa: Mineria H&H",
-        "Nos dedicamos a la mineria.",
+        "La potencia debe ser de 20 kW",
         "En qué estados pueden hacer entrega?",
         "Okay, en Aguascalientes.",
         "Es para venta.",
@@ -245,12 +241,14 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     
     esperado_3 = {
         "nombre": "Lucía Martinez",
-        "tipo_maquinaria": MaquinariaType.GENERADORES,
+        "tipo_maquinaria": "generador",
         "detalles_maquinaria": {
-            "actividad": "mineria"
+            "actividad": "mineria",
+            "tipo_generador": "portátil",
+            "potencia": "20 kW"
         },
         "nombre_empresa": "Mineria H&H",
-        "giro_empresa": "mineria",
+        "giro_empresa": "mineria", # Inferido de "para mineria" en el contexto inicial o actividad
         "lugar_requerimiento": "Aguascalientes",
         "correo": "lucia.h@hh.com",
         "telefono": "33 9876 5432"
@@ -273,7 +271,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     esperado_4 = {
         "nombre": "Daniel Marquez",
         "apellido": "Marquez",
-        "tipo_maquinaria": MaquinariaType.TORRE_ILUMINACION,
+        "tipo_maquinaria": "torre_iluminacion",
         "detalles_maquinaria": {"es_led": True},
         "uso_empresa_o_venta": "venta",
         "nombre_empresa": "MachinesCorp",
@@ -300,7 +298,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     esperado_5 = {
         "nombre": "Juan Perez",
         "apellido": "Perez",
-        "tipo_maquinaria": MaquinariaType.TORRE_ILUMINACION,
+        "tipo_maquinaria": "torre_iluminacion",
         "detalles_maquinaria": {"es_led": True},
         "quiere_cotizacion": "sí",
         "nombre_empresa": "MachinesTop",
@@ -325,7 +323,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     esperado_6 = {
         "nombre": "Pedro",
         "tipo_ayuda": "maquinaria",  # Esto debe inferirse automáticamente
-        "tipo_maquinaria": MaquinariaType.SOLDADORAS,
+        "tipo_maquinaria": "soldadora",
         "detalles_maquinaria": {"amperaje": "300"}
     }
 

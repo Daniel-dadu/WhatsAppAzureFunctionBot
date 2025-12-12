@@ -23,3 +23,4 @@ azure-cosmos
 # Azure Content Safety
 azure-ai-contentsafety
 azure-ai-inference
+python-dotenv

@@ -6,8 +6,7 @@ import requests
 from typing import Dict, Optional
 import logging
 import json
-from maquinaria_config import MAQUINARIA_CONFIG
-from state_management import MaquinariaType
+from maquinaria_config import machinery_config_service
 
 # Lista de productos de interés registrados en HubSpot
 PRODUCTO_INTERESADO = [
@@ -254,19 +253,13 @@ class HubSpotManager:
             return json.dumps(detalles, ensure_ascii=False)
         
         try:
-            # Obtener el tipo de maquinaria como enum
-            tipo_enum = None
-            if isinstance(tipo_maquinaria, str):
-                tipo_enum = MaquinariaType(tipo_maquinaria)
-            else:
-                # Si ya es un enum, usar directamente
-                tipo_enum = tipo_maquinaria
+            # Obtener la configuración directamente usando el string tipo_maquinaria
+            # Ahora machinery_config_service usa strings como keys
+            config = machinery_config_service.get_config(str(tipo_maquinaria))
             
-            # Obtener la configuración para este tipo
-            if tipo_enum not in MAQUINARIA_CONFIG:
+            if not config:
                 return json.dumps(detalles, ensure_ascii=False)
             
-            config = MAQUINARIA_CONFIG[tipo_enum]
             text_parts = []
             
             # Para cada campo en los detalles, buscar su pregunta correspondiente
@@ -274,9 +267,9 @@ class HubSpotManager:
                 if field_value:
                     # Buscar la pregunta para este campo
                     question = None
-                    for field_config in config["fields"]:
-                        if field_config["name"] == field_name:
-                            question = field_config["question"]
+                    for field_config in config.fields:
+                        if field_config.name == field_name:
+                            question = field_config.question
                             break
                     
                     if question:

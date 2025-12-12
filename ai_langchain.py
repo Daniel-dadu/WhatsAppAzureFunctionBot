@@ -11,11 +11,12 @@ from ai_prompts import (
     RESPONSE_GENERATION_PROMPT, 
     INVENTORY_DETECTION_PROMPT
 )
-from maquinaria_config import MAQUINARIA_CONFIG, get_required_fields_for_tipo
-from state_management import MaquinariaType, ConversationState, ConversationStateStore, InMemoryStateStore, FIELDS_CONFIG_PRIORITY
+from maquinaria_config import machinery_config_service, get_required_fields_for_tipo
+from state_management import ConversationState, ConversationStateStore, InMemoryStateStore, FIELDS_CONFIG_PRIORITY
 from datetime import datetime, timezone
 import logging
 from hubspot_manager import HubSpotManager
+from inventory_service import InventoryService
 
 langchain.debug = False
 langchain.verbose = False
@@ -238,17 +239,35 @@ class IntelligentSlotFiller:
         
         try:
             # Nombres de tipos de maquinaria
-            maquinaria_names = " ".join([f"\"{name.value}\"" for name in MaquinariaType])
+            # OBTENER DINÁMICAMENTE LOS NOMBRES DESDE LA CONFIGURACIÓN (Strings)
+            maquinaria_names = " ".join([f"\"{m.type_id}\"" for m in machinery_config_service.get_all_types()])
 
             # Obtener campos disponibles desde el FIELDS_CONFIG_PRIORITY
             fields_available = self._get_fields_available_str()
+
+            # Obtener campos específicos del tipo de maquinaria actual
+            machine_type = current_state.get("tipo_maquinaria")
+            machine_specific_fields = ""
+            
+            if machine_type:
+                # Validar dinámicamente si existe configuración
+                config = machinery_config_service.get_config(machine_type)
+                if config:
+                   field_instructions = []
+                   for field in config.fields:
+                       field_instructions.append(f"- Para {machine_type.upper()}: {field.name} ({field.question})")
+                   machine_specific_fields = "\n".join(field_instructions)
+            
+            if not machine_specific_fields:
+                machine_specific_fields = "- No hay un tipo de maquinaria seleccionado aún, o no hay configuración específica."
 
             response = self.llm.invoke(prompt.format_prompt(
                 message=message,
                 current_state_str=get_current_state_str(current_state),
                 last_bot_question=last_bot_question or "No hay pregunta previa (inicio de conversación)",
                 maquinaria_names=maquinaria_names,
-                fields_available=fields_available
+                fields_available=fields_available,
+                machine_specific_fields=machine_specific_fields
             ))
             
             # Parsear la respuesta JSON
@@ -362,7 +381,11 @@ class IntelligentSlotFiller:
         """Verifica si todos los detalles de maquinaria están completos"""
         tipo = current_state.get("tipo_maquinaria")
         
-        if not tipo or tipo not in MAQUINARIA_CONFIG:
+        if not tipo:
+            return False
+            
+        # Verificar si existe configuración para este tipo
+        if not machinery_config_service.get_config(tipo):
             return False
         
         detalles = current_state.get("detalles_maquinaria", {})
@@ -380,21 +403,21 @@ class IntelligentSlotFiller:
         
         tipo = current_state.get("tipo_maquinaria")
 
-        if not tipo or tipo not in MAQUINARIA_CONFIG:
+        config = machinery_config_service.get_config(tipo)
+        if not config:
             return None
 
-        config = MAQUINARIA_CONFIG[tipo]
         detalles = current_state.get("detalles_maquinaria", {})
 
         # Buscar el primer campo de la configuración que no esté en los detalles
-        for field_info in config["fields"]:
-            field_name = field_info["name"]
+        for field_info in config.fields:
+            field_name = field_info.name
             if not detalles.get(field_name):
                 # Encontrado el siguiente campo a preguntar
                 # Devolver la pregunta fija definida en la configuración centralizada
                 return {
-                    "question": field_info.get("question"), 
-                    "reason": field_info.get("reason"), 
+                    "question": field_info.question, 
+                    "reason": field_info.reason, 
                     "question_type": "detalles_maquinaria"
                 }
 
@@ -461,8 +484,9 @@ class IntelligentSlotFiller:
 class IntelligentResponseGenerator:
     """Genera respuestas inteligentes basadas en el contexto y la información extraída"""
     
-    def __init__(self, azure_config: AzureOpenAIConfig):
+    def __init__(self, azure_config: AzureOpenAIConfig, cosmos_client=None, db_name=None):
         self.llm = azure_config.create_conversational_llm()  # Usar LLM optimizado para conversación
+        self.inventory_service = InventoryService(cosmos_client, db_name)
     
     def generate_response(self, 
         message: str, 
@@ -527,7 +551,9 @@ class IntelligentResponseGenerator:
 
             if is_inventory_question:
                 # Nombres de tipos de maquinaria
-                maquinaria_names = ", ".join([f"\"{name.value}\"" for name in MaquinariaType])
+                # OBTENER DINÁMICAMENTE LOS NOMBRES DESDE LA CONFIGURACIÓN (Strings)
+                maquinaria_names = ", ".join([f"\"{m.type_id}\"" for m in machinery_config_service.get_all_types()])
+                
                 # Cambiar torre_iluminacion por torre de iluminación y plataforma por plataforma de elevación
                 maquinaria_names = maquinaria_names.replace("torre_iluminacion", "torre de iluminación")
                 maquinaria_names = maquinaria_names.replace("plataforma", "plataforma de elevación")
@@ -538,11 +564,42 @@ class IntelligentResponseGenerator:
 
             # Instrucción especial para cuando se pregunta sobre cotización de maquinarias
             if question_type == "quiere_cotizacion":
-                return """Muy bien, contamos con las siguientes maquinarias que pueden satisfacer tus necesidades:
-- Maquina 1
-- Maquina 2
-- Maquina 3...
-¿Quieres que te cotice alguna de estas?"""
+                # START MODIFICATION: Lógica dinámica de recomendación
+                machine_type = current_state.get("tipo_maquinaria")
+                detalles = current_state.get("detalles_maquinaria", {})
+                
+                recommended_machines = []
+                if machine_type:
+                    recommended_machines = self.inventory_service.find_matching_machines(machine_type, detalles)
+                
+                if recommended_machines:
+                    # Formatear lista de máquinas recomendadas
+                    machines_list = ""
+                    for machine in recommended_machines[:3]: # Limitar a top 3
+                         # Intentar construir un nombre descriptivo
+                        modelo = machine.get("modelo", "Modelo Desconocido")
+                        cat = machine.get("categoria", "")
+                        
+                        # Agregar detalles clave según el tipo (simplificado)
+                        extra_info = ""
+                        if "altura_trabajo" in machine:
+                            extra_info += f" ({machine['altura_trabajo']})"
+                        elif "capacidad" in machine: # comp, montacargas, etc
+                             extra_info += f" ({machine['capacidad']})"
+                        elif "cfm" in machine:
+                            extra_info += f" ({machine['cfm']} CFM)"
+
+                        machines_list += f"- {modelo} {extra_info}\n"
+                    
+                    return f"""Muy bien, basándome en tus requerimientos, te recomiendo las siguientes opciones disponibles en nuestro inventario:
+{machines_list}
+¿Te gustaría recibir una cotización formal por alguna de estas?"""
+                else:
+                     # Fallback si no hay coincidencias exactas
+                    return """Entendido. Actualmente no encontré una coincidencia exacta en nuestro inventario con esos requerimientos específicos, pero tenemos muchas opciones que podrían adaptarse.
+ 
+¿Te gustaría que un asesor te contacte para ofrecerte una solución personalizada?"""
+                # END MODIFICATION
             
             # Instrucción especial para datos_empresa
             datos_empresa_instruction = ""
@@ -633,8 +690,8 @@ class InventoryResponder:
     
     def __init__(self, azure_config: AzureOpenAIConfig):
         self.llm = azure_config.create_inventory_llm()  # Usar LLM optimizado para inventario
-        self.inventory = get_inventory()
-    
+        self.inventory = get_inventory() # TODO: Mover esto también a DB si es necesario, por ahora usa el fake
+
     def is_inventory_question(self, message: str) -> bool:
         """Determina si el mensaje del usuario es una pregunta sobre el inventario"""
         try:
@@ -663,11 +720,11 @@ class InventoryResponder:
 class IntelligentLeadQualificationChatbot:
     """Chatbot con slot-filling inteligente que detecta información ya proporcionada"""
     
-    def __init__(self, azure_config: AzureOpenAIConfig, state_store: Optional[ConversationStateStore] = None, send_message_callback=None):
+    def __init__(self, azure_config: AzureOpenAIConfig, state_store: Optional[ConversationStateStore] = None, send_message_callback=None, cosmos_client=None, db_name=None):
         self.azure_config = azure_config
         # Crear instancias con configuraciones específicas para cada propósito
         self.slot_filler = IntelligentSlotFiller(azure_config)
-        self.response_generator = IntelligentResponseGenerator(azure_config)
+        self.response_generator = IntelligentResponseGenerator(azure_config, cosmos_client, db_name)
         self.inventory_responder = InventoryResponder(azure_config)
         
         # Usar el state_store proporcionado o crear uno en memoria por defecto
@@ -917,11 +974,12 @@ class IntelligentLeadQualificationChatbot:
                 debug_print(f"DEBUG: Detalles de maquinaria actualizados: {self.state['detalles_maquinaria']}")
             
             elif key == "tipo_maquinaria":
-                try:
-                    self.state[key] = MaquinariaType(value)
-                    debug_print(f"DEBUG: Campo '{key}' actualizado a (Enum): {self.state[key]}")
-                except ValueError:
-                    # Si el LLM extrae un tipo inválido, lo registramos pero no detenemos el flujo.
+                # Validar dinámicamente si el tipo existe en la configuración
+                config = machinery_config_service.get_config(value)
+                if config:
+                    self.state[key] = value
+                    debug_print(f"DEBUG: Campo '{key}' actualizado a: {value}")
+                else:
                     logging.error(f"ADVERTENCIA: Tipo de maquinaria inválido '{value}' extraído por el LLM.")
             
             elif key == "apellido":

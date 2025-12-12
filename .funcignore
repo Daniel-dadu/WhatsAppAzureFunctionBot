@@ -10,5 +10,6 @@ test
 test.http
 test_chatbot.py
 test_results/
+update_invertory_db/
 .env
 ARQUITECTURA_CHATBOT.md
