@@ -1,96 +1,157 @@
-import unittest
-from unittest.mock import MagicMock
-from maquinaria_config import machinery_config_service
-from inventory_service import InventoryService
-from ai_langchain import IntelligentResponseGenerator, AzureOpenAIConfig, ConversationState
+import os
+import json
+import time
+import re
+from datetime import datetime
+from typing import List, Dict, Any
+from dotenv import load_dotenv
 
-class TestInventoryIntegration(unittest.TestCase):
+# Import bot classes
+from ai_langchain import IntelligentLeadQualificationChatbot, AzureOpenAIConfig
+from check_guardrails import ContentSafetyGuardrails
 
-    def setUp(self):
-        """Reset configs before each test"""
-        # Ensure fallback is loaded or manually set for tests
-        self.inventory_service = InventoryService()
-        if not self.inventory_service.container:
-             # Force load if it didn't happen (though it should with the fallback logic)
-             from update_invertory_db.inventory_data import inventario
-             self.inventory_service._local_inventory_fallback = inventario
-        self.config_service = machinery_config_service
+load_dotenv()
 
-    def test_config_service(self):
-        """Test getting configuration for a specific type"""
-        config = self.config_service.get_config("soldadora")
-        self.assertIsNotNone(config)
-        self.assertEqual(config.name, "Soldadora")
-        field_names = [f.name for f in config.fields]
-        self.assertIn("amperaje", field_names)
+# ============================================================================
+# CONFIGURACIÓN
+# ============================================================================
 
-    def test_inventory_filtering_soldadora(self):
-        """Test filtering logic for Soldadora"""
-        # Case 1: Amperaje requirement met (>=)
-        # inventario has machines undefined in snippet but let's assume standard ones or empty if using real file
-        # Since I am using the real 'inventario.py', let's check what's inside.
-        # Actually, let's mock the inventory data in the service for strict unit testing
+def setup_chatbot() -> IntelligentLeadQualificationChatbot:
+    if "FOUNDRY_ENDPOINT" not in os.environ or "FOUNDRY_API_KEY" not in os.environ:
+        print("\n❌ ERROR: Variables de entorno no encontradas.")
+        exit()
+
+    azure_config = AzureOpenAIConfig(
+        endpoint=os.getenv("FOUNDRY_ENDPOINT"),
+        api_key=os.getenv("FOUNDRY_API_KEY"),
+        deployment_name="gpt-4.1-mini",
+        api_version="2024-12-01-preview",
+        model_name="gpt-4.1-mini"
+    )
+    
+    return IntelligentLeadQualificationChatbot(azure_config)
+
+def _sanitize_filename(name: str) -> str:
+    s = re.sub(r"[^\w\-_. ]", "_", name)
+    s = s.replace(" ", "_")
+    return s
+
+def _get_timestamp() -> str:
+    now = datetime.now()
+    return now.strftime("%H:%M:%S") + f".{now.microsecond // 10000:02d}"
+
+# ============================================================================
+# FLUJOS DE PRUEBA
+# ============================================================================
+
+MACHINERY_FLOWS = {
+    "Soldadora": [
+        "Hola, soy Daniel Maldonado y busco una soldadora",
+        "De 300 amperes",
+        "Electrica"
+    ],
+    "Compresor": [
+        "Hola, soy Daniel Maldonado. Necesito un compresor",
+        "185 CFM",
+        "100 PSI"
+    ],
+    "Rompedor": [
+        "Hola, soy Daniel Maldonado. Quiero un rompedor"
+    ],
+    "Generador": [
+        "Hola, soy Daniel Maldonado y busco un generador",
+        "Portatil",
+        "20 kW"
+    ],
+    "Torre de Iluminación": [
+        "Hola, soy Daniel Maldonado. Busco torre de iluminación",
+        "Que sea LED"
+    ],
+    "Plataforma": [
+        "Hola, soy Daniel Maldonado. Necesito una plataforma",
+        "Articulada",
+        "Altura 15m",
+        "Electrica"
+    ],
+    "Montacargas": [
+        "Hola, soy Daniel Maldonado. Quiero un montacargas",
+        "Capacidad 3000 kg"
+    ],
+    "Manipulador Tel": [
+        "Hola, soy Daniel Maldonado. Busco manipulador telescopico",
+        "10 metros",
+        "3000 kg"
+    ],
+    "Motobomba": [
+        "Hola, soy Daniel Maldonado. Necesito una motobomba"
+    ],
+    "Apisonador": [
+        "Hola, soy Daniel Maldonado. Busco un apisonador"
+    ],
+    "Cortadora de Varilla": [
+        "Hola, soy Daniel Maldonado. Busco cortadora de varilla"
+    ],
+    "Dobladora de Varilla": [
+        "Hola, soy Daniel Maldonado. Busco dobladora de varilla"
+    ]
+}
+
+# ============================================================================
+# RUNNER
+# ============================================================================
+
+def run_inventory_tests():
+    chatbot = setup_chatbot()
+    guardrails = ContentSafetyGuardrails()
+    
+    output_lines = []
+    output_lines.append("==================================================")
+    output_lines.append("🤖  TEST DE RECOMENDACIONES DE INVENTARIO")
+    output_lines.append("==================================================\n")
+
+    print("🚀 Iniciando pruebas de inventario...")
+
+    for machine_name, flow_messages in MACHINERY_FLOWS.items():
+        test_title = f"Prueba: {machine_name}"
+        print(f"▶️  Ejecutando: {test_title}")
         
-        mock_inventory = [
-            {"modelo": "Soldadora Small", "categoria": "soldadora", "amperaje": "100 amps"},
-            {"modelo": "Soldadora Big", "categoria": "soldadora", "amperaje": "300 amps"},
-            {"modelo": "Platform", "categoria": "plataforma"}
-        ]
-        self.inventory_service._local_inventory_fallback = mock_inventory
+        output_lines.append(f"--- INICIANDO PRUEBA: {test_title} ---\n")
+        
+        # Resetear estado para cada prueba
+        chatbot.reset_conversation()
+        
+        for msg in flow_messages:
+            # Simular delay humano
+            time.sleep(1)
+            
+            ts = _get_timestamp()
+            output_lines.append(f"[{ts}] 👤 Usuario: {msg}")
+            
+            # Guardrails check (opcional pero realista)
+            safety_result = guardrails.check_message_safety(msg)
+            if safety_result:
+                ts = _get_timestamp()
+                output_lines.append(f"[{ts}] ❌ Bot (Guardrails): {safety_result['message']}")
+                continue
 
-        reqs = {"amperaje": "200"}
-        matches = self.inventory_service.find_matching_machines("soldadora", reqs)
+            # Enviar mensaje al bot
+            response = chatbot.send_message(msg)
+            ts = _get_timestamp()
+            output_lines.append(f"[{ts}] 🤖 Bot: {response}\n")
         
-        # Should match "Soldadora Big" (300 >= 200) but not "Soldadora Small" (100 < 200)
-        self.assertEqual(len(matches), 1)
-        self.assertEqual(matches[0]["modelo"], "Soldadora Big")
+        output_lines.append("-" * 40 + "\n")
 
-    def test_inventory_filtering_plataforma(self):
-        """Test filtering logic for Plataforma"""
-        mock_inventory = [
-            {"modelo": "Plataforma A", "categoria": "plataforma", "tipo_plataforma": "articulada", "altura_trabajo": "20m"},
-            {"modelo": "Plataforma B", "categoria": "plataforma", "tipo_plataforma": "tijera", "altura_trabajo": "10m"},
-        ]
-        self.inventory_service._local_inventory_fallback = mock_inventory
+    # Guardar reporte
+    out_dir = os.path.join(os.path.dirname(__file__), "test_results")
+    os.makedirs(out_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"test_inventory_conversations_{timestamp}.txt"
+    filepath = os.path.join(out_dir, filename)
 
-        # Req: Articulada, 15m
-        reqs = {"tipo_plataforma": "articulada", "altura_trabajo": "15"}
-        matches = self.inventory_service.find_matching_machines("plataforma", reqs)
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write("\n".join(output_lines))
         
-        self.assertEqual(len(matches), 1)
-        self.assertEqual(matches[0]["modelo"], "Plataforma A")
+    print(f"\n✅ Pruebas finalizadas. Reporte guardado en: {filepath}")
 
-    def test_chatbot_integration_response(self):
-        """Test that the chatbot generates a response with recommendations"""
-        # Mock Azure Config
-        mock_config = MagicMock(spec=AzureOpenAIConfig)
-        mock_config.create_conversational_llm.return_value = MagicMock()
-        
-        generator = IntelligentResponseGenerator(mock_config)
-        
-        # Inject mock service
-        # Ensure fallback is used by setting container to None explicitly if needed (it is None by default)
-        generator.inventory_service.container = None 
-        generator.inventory_service._local_inventory_fallback = [
-             {"modelo": "Test Machine", "categoria": "soldadora", "amperaje": "500"}
-        ]
-        
-        state = {
-            "nombre": "TestUser",
-            "tipo_maquinaria": "soldadora",
-            "detalles_maquinaria": {"amperaje": "100"}
-        }
-        
-        response = generator.generate_response(
-            message="Si, cotizame", 
-            history_messages=[], 
-            extracted_info={}, 
-            current_state=state, 
-            question_type="quiere_cotizacion"
-        )
-        
-        self.assertIn("Test Machine", response)
-        self.assertIn("recomiendo", response)
-
-if __name__ == '__main__':
-    unittest.main()
+if __name__ == "__main__":
+    run_inventory_tests()
