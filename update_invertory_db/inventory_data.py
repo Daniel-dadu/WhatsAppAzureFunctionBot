@@ -46,10 +46,10 @@ inventario = [
     {"modelo": "Koshin GV-5500s", "categoria": "generador", "tipo_generador": "portatil", "potencia": "5.5 kVA", "tipo_alimentacion": "gasolina"},
 
     # CORTADOR DE VARILLAS
-    {"modelo": "Simpedil C54 EVO", "categoria": "cortador_varillas", "tipo_alimentacion": "Eléctrica", "diametro_maximo_varilla": "1.75 pulgadas", "cortes_por_minuto": 37},
+    {"modelo": "Simpedil C54 EVO", "categoria": "cortadora_varillas", "tipo_alimentacion": "Eléctrica", "diametro_maximo_varilla": "1.75 pulgadas", "cortes_por_minuto": 37},
 
     # DOBLADOR DE VARILLAS
-    {"modelo": "Simpedil P54 EVO", "categoria": "doblador_varillas", "tipo_alimentacion": "Eléctrica", "diametro_maximo_varilla": "1.75 pulgadas", "cortes_por_minuto": 6},
+    {"modelo": "Simpedil P54 EVO", "categoria": "dobladora_varillas", "tipo_alimentacion": "Eléctrica", "diametro_maximo_varilla": "1.75 pulgadas", "cortes_por_minuto": 6},
 
     # TORRE DE ILUMINACIÓN
     {

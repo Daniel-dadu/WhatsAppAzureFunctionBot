@@ -6,9 +6,11 @@ from datetime import datetime
 from typing import List, Dict, Any
 from dotenv import load_dotenv
 
+from azure.cosmos import CosmosClient
 # Import bot classes
 from ai_langchain import IntelligentLeadQualificationChatbot, AzureOpenAIConfig
 from check_guardrails import ContentSafetyGuardrails
+from maquinaria_config import machinery_config_service
 
 load_dotenv()
 
@@ -21,6 +23,22 @@ def setup_chatbot() -> IntelligentLeadQualificationChatbot:
         print("\n❌ ERROR: Variables de entorno no encontradas.")
         exit()
 
+    # Configurar Cosmos DB
+    cosmos_client = None
+    db_name = None
+    if "COSMOS_CONNECTION_STRING" in os.environ and "COSMOS_DB_NAME" in os.environ:
+        try:
+            print("🔌 Conectando a Cosmos DB...")
+            cosmos_client = CosmosClient.from_connection_string(os.environ["COSMOS_CONNECTION_STRING"])
+            db_name = os.environ["COSMOS_DB_NAME"]
+            
+            # Re-inicializar servicios globales con el cliente
+            machinery_config_service.__init__(cosmos_client, db_name)
+            print("✅ Conexión a Cosmos DB exitosa.")
+        except Exception as e:
+            print(f"⚠️ Error conectando a Cosmos DB: {e}")
+            print("⚠️ Se usará inventario local (fallback).")
+
     azure_config = AzureOpenAIConfig(
         endpoint=os.getenv("FOUNDRY_ENDPOINT"),
         api_key=os.getenv("FOUNDRY_API_KEY"),
@@ -29,7 +47,7 @@ def setup_chatbot() -> IntelligentLeadQualificationChatbot:
         model_name="gpt-4.1-mini"
     )
     
-    return IntelligentLeadQualificationChatbot(azure_config)
+    return IntelligentLeadQualificationChatbot(azure_config, cosmos_client=cosmos_client, db_name=db_name)
 
 def _sanitize_filename(name: str) -> str:
     s = re.sub(r"[^\w\-_. ]", "_", name)
@@ -48,7 +66,7 @@ MACHINERY_FLOWS = {
     "Soldadora": [
         "Hola, soy Daniel Maldonado y busco una soldadora",
         "De 300 amperes",
-        "Electrica"
+        "combustible"
     ],
     "Compresor": [
         "Hola, soy Daniel Maldonado. Necesito un compresor",

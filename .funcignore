@@ -9,6 +9,8 @@ test
 .cursorignore
 test.http
 test_chatbot.py
+test_inventory_integration.py
+test_main_endpoint.py
 test_results/
 update_invertory_db/
 .env
