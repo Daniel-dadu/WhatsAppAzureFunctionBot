@@ -175,7 +175,7 @@ class ContentSafetyGuardrails:
                 else:
                     return {
                         "type": "content_safety", 
-                        "message": "MENSAJE INVÁLIDO: El mensaje contiene contenido inapropiado, es decir, el usuario probablemente usó lenguaje con contenido sexual, violento, de odio o autoagresión."
+                        "message": "MENSAJE INVÁLIDO: El mensaje probablemente tiene contenido inapropiado, es decir, el usuario probablemente usó lenguaje con contenido sexual, violento, de odio o autoagresión. Indícale que mantengan la conversación centrada en maquinaria si es necesario."
                     }
             
             # Verificar ataques de groundness
