@@ -3,6 +3,13 @@ from typing import List, Dict, Any, Union
 import re
 from maquinaria_config import machinery_config_service
 
+# Importar inventario local para fallback
+try:
+    from update_invertory_db.inventory_data import inventario as local_inventory
+except ImportError:
+    local_inventory = []
+    print("Warning: Could not import local inventory from update_invertory_db.inventory_data")
+
 class InventoryService:
     """
     Servicio para buscar y filtrar maquinaria del inventario
@@ -14,11 +21,14 @@ class InventoryService:
         self.container = None
         
         if cosmos_client and database_name:
-            database = cosmos_client.get_database_client(database_name)
-            self.container = database.get_container_client("machinery_inventory")
+            try:
+                database = cosmos_client.get_database_client(database_name)
+                self.container = database.get_container_client("machinery_inventory")
+            except Exception as e:
+                print(f"Error initializing Cosmos DB container: {e}")
             
-        # Fallback for offline testing if no client provided
-        self._local_inventory_fallback = []
+        # Fallback for offline testing
+        self._local_inventory_fallback = local_inventory
 
     def find_matching_machines(self, machine_type: str, requirements: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
@@ -26,13 +36,12 @@ class InventoryService:
         """
         # Fetch inventory
         if self.container:
-            # Opción 1: Query a la DB filtering por partition key (categoria) si es posible
-            # machine_type id usually matches categoria logic
+            # Opción 1: Query a la DB
             inventory_items = self._fetch_from_db(machine_type)
         else:
             inventory_items = self._local_inventory_fallback
 
-        # Filter in memory (logic remains same for now)
+        # Filter in memory
         filtered_machines = [
             m for m in inventory_items
             if self._matches_category(m, machine_type)
@@ -57,19 +66,8 @@ class InventoryService:
     def _fetch_from_db(self, machine_type: str) -> List[Dict[str, Any]]:
         """
         Obtiene ítems desde Cosmos DB. 
-        Intenta filtrar por categoría si es posible, o trae todo (menos eficiente pero seguro para MVP).
         """
         try:
-            # Nota: 'machine_type' (ej: 'soldadora') podría usarse como partition key /categoria en algunos casos
-            # Pero como inventario.py tiene categorias que no siempre hacen match 1:1, 
-            # hacemos un query amplio o intentamos filtrar por el string.
-            
-            # Para eficiencia, intentemos filtrar por categoría aproximada si sabemos que es partition key
-            # query = f"SELECT * FROM c WHERE c.categoria = '{machine_type}'"
-            # Pero dado el fuzzy match de _matches_category, mejor traemos todo o hacemos un query CONTAINS.
-            # Cosmos no soporta CONTAINS scan eficiente en todos los casos, pero para este volumen está bien.
-            
-            # Query broad:
             query = "SELECT * FROM c"
             items = list(self.container.query_items(
                 query=query,
@@ -82,9 +80,6 @@ class InventoryService:
 
     def _matches_category(self, machine: Dict[str, Any], machine_type: str) -> bool:
         """Verifica si la máquina pertenece a la categoría solicitada"""
-        # Mapeo simple de categorías conocidas para búsquedas más flexibles si es necesario
-        # Ahora machine_type es un string (ej: "soldadora", "plataforma") que coincide con el ID de la config
-        
         target_keyword = machine_type.lower()
         machine_cat = machine.get("categoria", "").lower()
         
@@ -99,12 +94,21 @@ class InventoryService:
             if field.name not in requirements or not requirements[field.name]:
                 continue
                 
-            req_value = requirements[field.name]
+            # El nombre del campo en requirements puede diferir del nombre en inventory si la extracción no es perfecta,
+            # pero asumimos que la extracción usa los nombres definidos en config.fields.
+            # config.fields.name apunta a la key del inventario (ej: amperaje_amps_max).
+            
+            req_value = requirements.get(field.name)
+            # En ciertos casos, la extracción podría devolver el campo "amperaje" en lugar de "amperaje_amps_max"
+            # si el nombre del campo en el prompt no fue actualizado.
+            # Pero IntelligentSlotFiller usa la config para generar los prompts, 
+            # así que el LLM debería extraer "amperaje_amps_max" si ese es el nombre del field.
+            
             machine_value = machine.get(field.name)
             
-            # Si la máquina no tiene el dato, asumimos que NO cumple (o discutible)
-            # Para este MVP, si falta el dato en inventario, no lo recomendamos.
+            # Si la máquina no tiene el dato, asumimos que NO cumple 
             if machine_value is None:
+                # Opcional: si es null, tal vez permitirlo? Por ahora estricto.
                 continue 
 
             if not self._compare_values(req_value, machine_value, field.comparison_operator, field.type):
@@ -115,7 +119,6 @@ class InventoryService:
     def _compare_values(self, req_val: Any, mach_val: Any, operator: str, data_type: str) -> bool:
         """
         Compara valores usando el operador especificado.
-        Intenta convertir a números si es necesario.
         """
         try:
             # Normalización básica
@@ -126,12 +129,13 @@ class InventoryService:
                 return False
 
             if operator == "gte": # Mayor o igual (para capacidades, alturas)
+                # El valor de la máquina (capacidad) debe ser >= requerimiento
                 return float(mach_val_norm) >= float(req_val_norm)
             
             elif operator == "lte": # Menor o igual
                 return float(mach_val_norm) <= float(req_val_norm)
             
-            elif operator == "eq": # Igualdad estricta
+            elif operator == "eq": # Igualdad estricta (case insensitive)
                 return str(mach_val_norm).lower() == str(req_val_norm).lower()
             
             elif operator == "contains": # Contenido (fuzzy match)
@@ -148,14 +152,19 @@ class InventoryService:
         if value is None:
             return None
             
+        # Si ya es el tipo correcto, devolverlo
+        if data_type == "number" and isinstance(value, (int, float)):
+            return float(value)
+            
         str_val = str(value).strip()
         
         if data_type == "number":
-            # Extraer solo el primer número encontrado (ej: "20.12 m" -> 20.12)
-            match = re.search(r"[-+]?\d*\.\d+|\d+", str_val)
-            if match:
-                return float(match.group())
-            return None
+             # Intenta convertir string a float directamente
+             # Si tiene texto extra (unidades), intentamos extraer el primer número
+             match = re.search(r"[-+]?\d*\.\d+|\d+", str_val)
+             if match:
+                 return float(match.group())
+             return None
             
         if data_type == "boolean":
             return str_val.lower() in ["true", "si", "sí", "yes", "1"]

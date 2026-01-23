@@ -27,6 +27,9 @@ def _get_timestamp() -> str:
 # CONFIGURACIÓN INICIAL
 # ============================================================================
 
+from azure.cosmos import CosmosClient
+from maquinaria_config import machinery_config_service
+
 def setup_chatbot() -> IntelligentLeadQualificationChatbot:
     """
     Configura y devuelve una instancia del chatbot.
@@ -38,6 +41,22 @@ def setup_chatbot() -> IntelligentLeadQualificationChatbot:
         print("Por favor, asegúrate de configurar 'FOUNDRY_ENDPOINT' y 'FOUNDRY_API_KEY' para continuar.")
         exit()
 
+    # Configurar Cosmos DB
+    cosmos_client = None
+    db_name = None
+    if "COSMOS_CONNECTION_STRING" in os.environ and "COSMOS_DB_NAME" in os.environ:
+        try:
+            print("🔌 Conectando a Cosmos DB...")
+            cosmos_client = CosmosClient.from_connection_string(os.environ["COSMOS_CONNECTION_STRING"])
+            db_name = os.environ["COSMOS_DB_NAME"]
+            
+            # Re-inicializar servicios globales con el cliente
+            machinery_config_service.__init__(cosmos_client, db_name)
+            print("✅ Conexión a Cosmos DB exitosa.")
+        except Exception as e:
+            print(f"⚠️ Error conectando a Cosmos DB: {e}")
+            print("⚠️ Se usará inventario local (fallback).")
+
     # Configura las credenciales de Azure OpenAI desde las variables de entorno
     azure_config = AzureOpenAIConfig(
         endpoint=os.getenv("FOUNDRY_ENDPOINT"),
@@ -47,7 +66,7 @@ def setup_chatbot() -> IntelligentLeadQualificationChatbot:
         model_name="gpt-4.1-mini"
     )
     
-    chatbot = IntelligentLeadQualificationChatbot(azure_config)
+    chatbot = IntelligentLeadQualificationChatbot(azure_config, cosmos_client=cosmos_client, db_name=db_name)
     return chatbot
 
 # ============================================================================
@@ -300,7 +319,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "apellido": "Perez",
         "tipo_maquinaria": "torre_iluminacion",
         "detalles_maquinaria": {"es_led": True},
-        "quiere_cotizacion": "sí",
+        "quiere_cotizacion": True,
         "nombre_empresa": "MachinesTop",
         "giro_empresa": "venta de maquinaria",
         "lugar_requerimiento": "CDMX",
@@ -315,13 +334,14 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     # Flujo 6: Inferencia de tipo_ayuda
     # ------------------------------------------------------------------------
     flujo_6 = [
-        "Hola, soy Pedro",
+        "Hola, soy Pedro Perez",
         "Quiero una soldadora",
         "Si, de 300 amperes"
     ]
 
     esperado_6 = {
-        "nombre": "Pedro",
+        "nombre": "Pedro Perez",
+        "apellido": "Perez",
         "tipo_ayuda": "maquinaria",  # Esto debe inferirse automáticamente
         "tipo_maquinaria": "soldadora",
         "detalles_maquinaria": {"amperaje": "300"}

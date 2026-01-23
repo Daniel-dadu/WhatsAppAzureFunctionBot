@@ -166,7 +166,7 @@ class ContentSafetyGuardrails:
             logging.info(f"Verificando seguridad de contenido: {content_safety_result}")
             
             # Check allowlist for machinery terms that trigger false positives
-            allowed_terms = ["motobomba", "cortadora", "bomba", "corte"]
+            allowed_terms = ["motobomba", "cortadora", "bomba", "corte", "tijera"]
             is_allowed = any(term in message.lower() for term in allowed_terms)
 
             if content_safety_result:

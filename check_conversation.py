@@ -46,7 +46,8 @@ def clasificar_mensaje(message: str) -> str:
             "   - Información personal del cliente (nombre, empresa, contacto, lugar de requerimiento)\n"
             "   - Preguntas sobre por qué necesita ciertos datos\n"
             "   - Preguntas sobre cómo se llama el asistente\n"
-            "   - Detalles sobre proyectos que requieren maquinaria\n\n"
+            "   - Detalles sobre proyectos que requieren maquinaria\n"
+            "   - Respuestas de selección cuando el usuario elige entre opciones presentadas (ej: 'la segunda', 'me interesa el primero', 'quiero la opción 3')\n\n"
             
             "2. COMPETENCIA_PROHIBIDO - Consultas sobre otros proveedores:\n"
             "   - Preguntas sobre precios de competidores\n"
@@ -63,6 +64,8 @@ def clasificar_mensaje(message: str) -> str:
             "EJEMPLOS IMPORTANTES:\n"
             "- '¿Cuál es el precio de la soldadora Shindaiwa?' → valido\n"
             "- 'Lo necesito de 20 litros' → valido\n"
+            "- 'Me interesa la segunda opción' → valido\n"
+            "- 'Quiero el primero' → valido\n"
             "- '¿Cuál es la capital de México?' → fuera_de_dominio\n"
             "- 'Dame precios de otros proveedores' → competencia_prohibido\n\n"
             

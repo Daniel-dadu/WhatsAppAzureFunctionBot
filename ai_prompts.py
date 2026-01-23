@@ -89,6 +89,14 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - PROHIBIDO inventar campos como: "proyecto", "aplicación", "capacidad_volumen", "capacidad_de_volumen", "volumen", etc.
     - IMPORTANTE: Si el usuario dice "para venta", extráelo como "uso_empresa_o_venta": "venta", y NO como actividad en detalles_maquinaria.
     
+    REGLAS ESPECIALES PARA CAMPOS BOOLEANOS EN DETALLES_MAQUINARIA (PRIORIDAD MÁXIMA):
+    - Para el campo "es_led" (torre de iluminación):
+      * Si el usuario dice "sí", "si", "LED", "quiero LED", "de LED", "la prefiero de LED", "con LED" → es_led: true (BOOLEANO, NO STRING)
+      * Si el usuario dice "no", "no LED", "sin LED", "normal", "halógeno" → es_led: false (BOOLEANO, NO STRING)
+    - IMPORTANTE: El valor debe ser un BOOLEANO JSON (true o false), NO un string ("sí", "si", "true")
+    - Ejemplos correctos: {{"detalles_maquinaria": {{"es_led": true}}}}
+    - Ejemplos INCORRECTOS: {{"detalles_maquinaria": {{"es_led": "sí"}}}}, {{"detalles_maquinaria": {{"es_led": "Si"}}}}
+    
     REGLAS ESPECIALES PARA GIRO_EMPRESA:
     - Si el usuario describe la actividad de su empresa → giro_empresa: [descripción de la actividad]
     - Si el usuario dice "nos dedicamos a la [actividad]" → giro_empresa: [actividad]
@@ -150,15 +158,18 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - IMPORTANTE: Incluso en preguntas sobre inventario, SIEMPRE extraer tipo_maquinaria si se menciona
     
     REGLAS ESPECIALES PARA QUIERE_COTIZACION:
-    - Si la última pregunta del bot contiene "¿Quieres que te cotice" o similar sobre cotización:
-      * Si el usuario dice "sí", "si", "claro", "por favor", "ok", "dale", "adelante", "quiero", "me interesa" → quiere_cotizacion: "sí"
-      * Si el usuario comienza a dar datos de la empresa (nombre, giro, ubicación, correo, teléfono) → quiere_cotizacion: "sí"
-      * Si el usuario selecciona una máquina específica: "quiero la 1", "la primera", "la segunda", "me interesa la 3", "la de [característica]" → quiere_cotizacion: "sí"
-      * Si el usuario dice "no", "no gracias", "no quiero", "no me interesa", "no por ahora", "después", "más tarde" → quiere_cotizacion: "no"
-    - Ejemplos: "sí" → {{"quiere_cotizacion": "sí"}}
-    - Ejemplos: "no" → {{"quiere_cotizacion": "no"}}
-    - Ejemplos: "claro, quiero cotización" → {{"quiere_cotizacion": "sí"}}
-    - Ejemplos: "no gracias" → {{"quiere_cotizacion": "no"}}
+    - Si la última pregunta del bot contiene "¿Quieres que te cotice" o "¿Te gustaría recibir una cotización" o similar sobre cotización:
+      * Si el usuario dice "sí", "si", "claro", "por favor", "ok", "dale", "adelante", "quiero", "me interesa" → quiere_cotizacion: true (BOOLEANO)
+      * Si el usuario comienza a dar datos de la empresa (nombre, giro, ubicación, correo, teléfono) → quiere_cotizacion: true (BOOLEANO)
+      * Si el usuario selecciona una máquina específica: "quiero la 1", "la primera", "la segunda", "me interesa la 3", "la de [característica]" → quiere_cotizacion: true (BOOLEANO)
+      * Si el usuario dice "no", "no gracias", "no quiero", "no me interesa", "no por ahora", "después", "más tarde" → quiere_cotizacion: false (BOOLEANO)
+    - IMPORTANTE: El valor debe ser un BOOLEANO JSON (true o false), NO un string ("sí", "no", "true", "false")
+    - Ejemplos correctos: "sí" → {{"quiere_cotizacion": true}}
+    - Ejemplos correctos: "no" → {{"quiere_cotizacion": false}}
+    - Ejemplos correctos: "claro, quiero cotización" → {{"quiere_cotizacion": true}}
+    - Ejemplos correctos: "no gracias" → {{"quiere_cotizacion": false}}
+    - Ejemplos correctos: "quiero la 1" → {{"quiere_cotizacion": true}}
+    - Ejemplos INCORRECTOS: {{"quiere_cotizacion": "sí"}}, {{"quiere_cotizacion": "no"}}
     - IMPORTANTE: Solo extraer quiere_cotizacion si la última pregunta del bot es sobre cotización
     
     IMPORTANTE: Analiza cuidadosamente el mensaje y extrae TODA la información disponible que corresponda a campos vacíos.

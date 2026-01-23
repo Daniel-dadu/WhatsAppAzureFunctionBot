@@ -8,7 +8,7 @@ machinery_configurations = [
         "name": "Soldadora",
         "fields": [
             {
-                "name": "amperaje",
+                "name": "amperaje_amps_max", # Check against max capacity - matches inventory field
                 "question": "¿cuál es el amperaje que necesitas?",
                 "reason": "Para recomendarte el modelo adecuado según tu trabajo",
                 "type": "number",
@@ -29,7 +29,7 @@ machinery_configurations = [
         "name": "Compresor",
         "fields": [
             {
-                "name": "cfm_requerido",
+                "name": "caudal_cfm_max", # Check against max supplied CFM
                 "question": "¿cuánto volumen de aire en CFM necesitas?",
                 "reason": "Para seleccionar la potencia correcta",
                 "type": "number", 
@@ -37,7 +37,7 @@ machinery_configurations = [
                 "comparison_operator": "gte"
             },
             {
-                "name": "psi_requerido",
+                "name": "presion_psi_max", # Check against max pressure
                 "question": "¿cuánto presión en PSI necesitas?",
                 "reason": "Para seleccionar la potencia correcta",
                 "type": "number", 
@@ -73,8 +73,8 @@ machinery_configurations = [
                 "comparison_operator": "eq"
             },
             {
-                "name": "potencia",
-                "question": "¿cuál es la potencia del generador que requiere en kW?", # Poner los KW que ellos ya manejan
+                "name": "potencia_kw", # Target kW field
+                "question": "¿cuál es la potencia del generador que requiere en kW?", 
                 "reason": "Para seleccionar el generador correcto",
                 "type": "number",
                 "unit": "kW",
@@ -97,11 +97,11 @@ machinery_configurations = [
         "name": "Torre de Iluminación",
         "fields": [
             {
-                "name": "es_led",
-                "question": "¿prefieres iluminación LED?",
+                "name": "tipo_reflector", # Changed from boolean es_led to selection vs inventory field
+                "question": "¿qué tipo de iluminación prefiere (ej. LED)?",
                 "reason": "Para determinar el tipo de iluminación necesario",
-                "type": "boolean",
-                "comparison_operator": "eq"
+                "type": "selection",
+                "comparison_operator": "contains"
             }
         ]
     },
@@ -110,7 +110,7 @@ machinery_configurations = [
         "name": "Montacargas",
         "fields": [
             {
-                "name": "capacidad_carga",
+                "name": "capacidad_carga_kg",
                 "question": "¿qué peso requiere levantar?",
                 "reason": "Para determinar la capacidad necesaria",
                 "type": "number",
@@ -131,7 +131,7 @@ machinery_configurations = [
                 "comparison_operator": "contains"
             },
             {
-                "name": "altura_trabajo",
+                "name": "altura_trabajo_m",
                 "question": "¿cuál es la altura de trabajo que necesitas?",
                 "reason": "Para asegurar que la máquina alcance la altura necesaria",
                 "type": "number",
@@ -139,7 +139,7 @@ machinery_configurations = [
                 "comparison_operator": "gte"
             },
             {
-                "name": "altura_plataforma",
+                "name": "altura_plataforma_m",
                 "question": "¿cuál es la altura de la plataforma que necesitas?",
                 "reason": "Para asegurar que la máquina alcance la altura necesaria",
                 "type": "number",
@@ -160,7 +160,7 @@ machinery_configurations = [
         "name": "Manipulador Telescópico",
         "fields": [
             {
-                "name": "altura",
+                "name": "altura_maxima_m",
                 "question": "¿qué altura necesita?",
                 "reason": "Para determinar la altura necesaria",
                 "type": "number",
@@ -168,7 +168,7 @@ machinery_configurations = [
                 "comparison_operator": "gte"
             },
             {
-                "name": "capacidad",
+                "name": "capacidad_carga_kg",
                 "question": "¿qué peso requiere mover?",
                 "reason": "Para determinar la capacidad necesaria",
                 "type": "number",

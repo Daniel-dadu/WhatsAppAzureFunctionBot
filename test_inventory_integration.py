@@ -79,7 +79,7 @@ MACHINERY_FLOWS = {
     "Generador": [
         "Hola, soy Daniel Maldonado y busco un generador",
         "Portatil",
-        "20 kW"
+        "4.4 kW"
     ],
     "Torre de Iluminación": [
         "Hola, soy Daniel Maldonado. Busco torre de iluminación",

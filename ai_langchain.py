@@ -69,7 +69,9 @@ def get_current_state_str(current_state: ConversationState) -> str:
         if field == "detalles_maquinaria":
             fields_str += f"- {field}: " + json.dumps(current_state.get(field) or {}) + "\n"
         else:
-            fields_str += f"- {field}: " + (current_state.get(field) or "") + "\n"
+            value = current_state.get(field)
+            # Convert to string to handle boolean values like quiere_cotizacion
+            fields_str += f"- {field}: " + (str(value) if value is not None else "") + "\n"
     return fields_str
 
 # ============================================================================
@@ -349,7 +351,7 @@ class IntelligentSlotFiller:
                 }
             
             # Si no quiere cotización, terminamos
-            if "no" in quiere_cotizacion.lower():
+            if quiere_cotizacion is False:
                 return None
 
             # 6. DATOS DE EMPRESA
@@ -866,54 +868,60 @@ class IntelligentLeadQualificationChatbot:
         # Si no es pregunta de inventario ni de requerimientos, continuar con el flujo normal
         debug_print(f"DEBUG: Flujo normal de calificación de leads...")
 
-        # Verificar si la conversación está completa (solo en modo bot)
-        if self.slot_filler.is_conversation_complete(self.state):
-            debug_print(f"DEBUG: Conversación completa!")
-            self.state["completed"] = True
-            final_response = self._get_final_response_message()
-            return self._add_message_and_return_response(final_response, "")
-        
-        # Obtener la siguiente pregunta necesaria
-        next_question = self.slot_filler.get_next_question(self.state)
-
-        if next_question is None:
-            debug_print(f"DEBUG: Estado completo: {self.state}")
-            
-            # Si el usuario dijo "no" a la cotización, responder con mensaje específico
-            quiere_cot = self.state.get("quiere_cotizacion")
-            if quiere_cot and "no" in quiere_cot.lower():
-                self.state["completed"] = True
-                final_message = "Okay, ¿hay algo más en lo que te pueda ayudar?"
-                return self._add_message_and_return_response(final_message, "")
-            
-            self.state["completed"] = True
-            final_message = self._get_final_response_message()
-            return self._add_message_and_return_response(final_message, "")
-
-        next_question_str = next_question["question"]
-        next_question_type = next_question['question_type']
-
-        debug_print(f"DEBUG: Siguiente pregunta: {next_question_str}")
-        debug_print(f"DEBUG: Tipo de siguiente pregunta: {next_question_type}")
-
-        # Extract only the role and content of the history messages
+        # Preparar historial de mensajes para el LLM
         history_messages = [{
             "role": msg["role"],
             "content": msg["content"]
         } for msg in self.state["messages"]]
 
-        # Generar respuesta con LLM
+        next_question_str = None
+        next_question_type = "conversation_complete"
+        # Por defecto, si la conversación está completa, guardamos tipo vacío o un marcador
+        storage_question_type = "" 
+
+        # 1. Verificar si la conversación YA estaba marcada como completa o cumple condiciones
+        if self.slot_filler.is_conversation_complete(self.state):
+            debug_print(f"DEBUG: Conversación completa!")
+            self.state["completed"] = True
+            # Se usan los valores por defecto (None, conversation_complete)
+        
+        else:
+            # 2. Si no está completa, buscar siguiente pregunta
+            next_question_data = self.slot_filler.get_next_question(self.state)
+
+            if next_question_data is None:
+                debug_print(f"DEBUG: Estado completo (sin siguiente pregunta): {self.state}")
+                
+                # Caso especial: Si el usuario dijo "no" a la cotización
+                quiere_cot = self.state.get("quiere_cotizacion")
+                if quiere_cot is False:
+                    self.state["completed"] = True
+                    final_message = "Okay, ¿hay algo más en lo que te pueda ayudar?"
+                    return self._add_message_and_return_response(final_message, "")
+                
+                self.state["completed"] = True
+                # Se usan los valores por defecto
+            else:
+                # 3. Hay una siguiente pregunta
+                next_question_str = next_question_data["question"]
+                next_question_type = next_question_data['question_type']
+                storage_question_type = next_question_type
+
+                debug_print(f"DEBUG: Siguiente pregunta: {next_question_str}")
+                debug_print(f"DEBUG: Tipo de siguiente pregunta: {next_question_type}")
+
+        # Generar respuesta con LLM (Llamada unificada)
         generated_response = self.response_generator.generate_response(
             user_message, 
             history_messages,
             extracted_info, 
             self.state, 
-            next_question_str, 
-            is_inventory_question,
+            next_question=next_question_str, 
+            is_inventory_question=is_inventory_question,
             question_type=next_question_type
         )
         
-        return self._add_message_and_return_response(generated_response, next_question_type)
+        return self._add_message_and_return_response(generated_response, storage_question_type)
         
     def _add_message_and_return_response(self, response: str, question_type: str) -> str:
         """
