@@ -201,7 +201,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "nombre": "Ana Gómez",
         "apellido": "Gómez",
         "tipo_maquinaria": "torre_iluminacion",
-        "detalles_maquinaria": {"es_led": True},
+        "detalles_maquinaria": {"tipo_reflector": "LED"},
         "uso_empresa_o_venta": "uso empresa",
         "nombre_empresa": "Construcciones del Sol",
         "giro_empresa": "construcción de carreteras",
@@ -218,8 +218,10 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     flujo_2 = [
         "Qué tal, soy Roberto. Necesito una plataforma de elevación.",
         "mi apellido es Marquez",
-        "la necesito de 10 metros",
-        "La prefiero de tijera",
+        "La prefiero de articulada",
+        "la necesito de 11 metros",
+        "la necesito de 9 metros de altura",
+        "alimentacion electrica",
         "Trabajo en 'Maquinaria Pesada S.A.' y nos dedicamos a la renta de maquinaria. La maquinaria es para venta.",
         "Estamos ubicados en Jalisco, mi correo es roberto@maqpesada.mx y mi teléfono es 81 8765 4321",
     ]
@@ -229,8 +231,10 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "apellido": "Marquez",
         "tipo_maquinaria": "plataforma",
         "detalles_maquinaria": {
-            "altura_trabajo": "10 metros",
-            "tipo_plataforma": "tijera"
+            "tipo_plataforma": "articulada",
+            "altura_trabajo_m": "11",
+            "altura_plataforma_m": "9",
+            "tipo_alimentacion": "electrica"
         },
         "lugar_requerimiento": "Jalisco",
         "uso_empresa_o_venta": "venta",
@@ -264,7 +268,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "detalles_maquinaria": {
             "actividad": "mineria",
             "tipo_generador": "portátil",
-            "potencia": "20 kW"
+            "potencia_kw": "20"
         },
         "nombre_empresa": "Mineria H&H",
         "giro_empresa": "mineria", # Inferido de "para mineria" en el contexto inicial o actividad
@@ -291,7 +295,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "nombre": "Daniel Marquez",
         "apellido": "Marquez",
         "tipo_maquinaria": "torre_iluminacion",
-        "detalles_maquinaria": {"es_led": True},
+        "detalles_maquinaria": {"tipo_reflector": "LED"},
         "uso_empresa_o_venta": "venta",
         "nombre_empresa": "MachinesCorp",
         "giro_empresa": "No especificado",
@@ -318,7 +322,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "nombre": "Juan Perez",
         "apellido": "Perez",
         "tipo_maquinaria": "torre_iluminacion",
-        "detalles_maquinaria": {"es_led": True},
+        "detalles_maquinaria": {"tipo_reflector": "LED"},
         "quiere_cotizacion": True,
         "nombre_empresa": "MachinesTop",
         "giro_empresa": "venta de maquinaria",
@@ -344,7 +348,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "apellido": "Perez",
         "tipo_ayuda": "maquinaria",  # Esto debe inferirse automáticamente
         "tipo_maquinaria": "soldadora",
-        "detalles_maquinaria": {"amperaje": "300"}
+        "detalles_maquinaria": {"amperaje_amps_max": "300"}
     }
 
     run_conversation_test("Flujo 6: Inferencia de tipo_ayuda", chatbot, flujo_6, esperado_6)

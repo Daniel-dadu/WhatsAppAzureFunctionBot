@@ -33,6 +33,7 @@ class InventoryService:
     def find_matching_machines(self, machine_type: str, requirements: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Encuentra máquinas que coincidan con los requerimientos.
+        Returns machines sorted by relevance (closest match first).
         """
         # Fetch inventory
         if self.container:
@@ -60,6 +61,11 @@ class InventoryService:
         for machine in filtered_machines:
             if self._check_requirements(machine, requirements, config.fields):
                 matching_machines.append(machine)
+        
+        # Sort by relevance: machines closest to requirements appear first
+        matching_machines.sort(
+            key=lambda m: self._calculate_relevance_score(m, requirements, config.fields)
+        )
                 
         return matching_machines
 
@@ -146,6 +152,31 @@ class InventoryService:
         except Exception as e:
             # Si falla la conversión o comparación, asumimos falso
             return False
+
+    def _calculate_relevance_score(self, machine: Dict[str, Any], requirements: Dict[str, Any], fields_config: List[Any]) -> float:
+        """
+        Calculate how closely a machine matches requirements.
+        Lower score = better match (closer to exact requirements).
+        """
+        total_diff = 0.0
+        
+        for field in fields_config:
+            # Only consider fields the user specified
+            if field.name not in requirements or not requirements[field.name]:
+                continue
+            
+            # Only score numeric fields with gte/lte operators
+            if field.type != "number":
+                continue
+            
+            req_val = self._normalize_value(requirements[field.name], "number")
+            mach_val = self._normalize_value(machine.get(field.name), "number")
+            
+            if req_val is not None and mach_val is not None:
+                # Absolute difference between requirement and machine spec
+                total_diff += abs(float(mach_val) - float(req_val))
+        
+        return total_diff
 
     def _normalize_value(self, value: Any, data_type: str) -> Union[float, str, bool, None]:
         """Limpia y convierte valores para comparación"""

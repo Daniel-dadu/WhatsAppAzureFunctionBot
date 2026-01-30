@@ -89,13 +89,22 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - PROHIBIDO inventar campos como: "proyecto", "aplicación", "capacidad_volumen", "capacidad_de_volumen", "volumen", etc.
     - IMPORTANTE: Si el usuario dice "para venta", extráelo como "uso_empresa_o_venta": "venta", y NO como actividad en detalles_maquinaria.
     
-    REGLAS ESPECIALES PARA CAMPOS BOOLEANOS EN DETALLES_MAQUINARIA (PRIORIDAD MÁXIMA):
-    - Para el campo "es_led" (torre de iluminación):
-      * Si el usuario dice "sí", "si", "LED", "quiero LED", "de LED", "la prefiero de LED", "con LED" → es_led: true (BOOLEANO, NO STRING)
-      * Si el usuario dice "no", "no LED", "sin LED", "normal", "halógeno" → es_led: false (BOOLEANO, NO STRING)
-    - IMPORTANTE: El valor debe ser un BOOLEANO JSON (true o false), NO un string ("sí", "si", "true")
-    - Ejemplos correctos: {{"detalles_maquinaria": {{"es_led": true}}}}
-    - Ejemplos INCORRECTOS: {{"detalles_maquinaria": {{"es_led": "sí"}}}}, {{"detalles_maquinaria": {{"es_led": "Si"}}}}
+    REGLAS ESPECIALES PARA TIPO_REFLECTOR EN DETALLES_MAQUINARIA (torre de iluminación):
+    - Para el campo "tipo_reflector" (torre de iluminación):
+      * Si el usuario dice "LED", "quiero LED", "de LED", "la prefiero de LED", "con LED", "que sea LED" → tipo_reflector: "LED" (STRING)
+      * Si el usuario dice "otro", "normal", "convencional" → tipo_reflector: "otro" (STRING)
+    - IMPORTANTE: El valor debe ser un STRING que describa el tipo de iluminación
+    - Ejemplos correctos: {{"detalles_maquinaria": {{"tipo_reflector": "LED"}}}}
+    - Ejemplos correctos: {{"detalles_maquinaria": {{"tipo_reflector": "otro"}}}}
+    
+    REGLAS ESPECIALES PARA TIPO_ALIMENTACION EN DETALLES_MAQUINARIA (plataforma, soldadora):
+    - Para el campo "tipo_alimentacion" (plataforma o soldadora):
+      * Si el usuario dice "eléctrica", "electrica", "eléctrico", "electrico", "de batería", "bateria" → tipo_alimentacion: "electrica" (STRING)
+      * Si el usuario dice "combustible", "diésel", "diesel", "gasolina", "gas", "de motor" → tipo_alimentacion: "combustible" (STRING)
+    - IMPORTANTE: Si la maquinaria actual es "plataforma" o "soldadora" y el usuario menciona "electrica" o "combustible", SIEMPRE extraer como tipo_alimentacion
+    - IMPORTANTE: Si la última pregunta contiene "alimentación" o "eléctrica o combustible", la respuesta del usuario SIEMPRE debe mapearse a tipo_alimentacion
+    - Ejemplos correctos: {{"detalles_maquinaria": {{"tipo_alimentacion": "electrica"}}}}
+    - Ejemplos correctos: {{"detalles_maquinaria": {{"tipo_alimentacion": "combustible"}}}}
     
     REGLAS ESPECIALES PARA GIRO_EMPRESA:
     - Si el usuario describe la actividad de su empresa → giro_empresa: [descripción de la actividad]

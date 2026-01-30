@@ -88,7 +88,8 @@ MACHINERY_FLOWS = {
     "Plataforma": [
         "Hola, soy Daniel Maldonado. Necesito una plataforma",
         "Articulada",
-        "Altura 15m",
+        "Altura de trabajo 15m",
+        "Altura de plataforma 13m",
         "Electrica"
     ],
     "Montacargas": [

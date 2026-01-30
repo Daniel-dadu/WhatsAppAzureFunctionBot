@@ -10,6 +10,7 @@ test
 test.http
 test_chatbot.py
 test_inventory_integration.py
+test_inventory_match_specifications.py
 test_main_endpoint.py
 test_results/
 update_invertory_db/
