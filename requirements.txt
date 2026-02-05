@@ -24,3 +24,6 @@ azure-cosmos
 azure-ai-contentsafety
 azure-ai-inference
 python-dotenv
+
+# SQL Server connectivity
+pyodbc
