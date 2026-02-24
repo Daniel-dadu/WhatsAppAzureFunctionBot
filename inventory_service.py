@@ -2,6 +2,7 @@
 from typing import List, Dict, Any, Union
 import re
 from maquinaria_config import machinery_config_service
+from pricing_service import get_pricing_service
 
 # Importar inventario local para fallback
 try:
@@ -29,6 +30,9 @@ class InventoryService:
             
         # Fallback for offline testing
         self._local_inventory_fallback = local_inventory
+        
+        # Pricing service for SQL Server price lookups
+        self._pricing_service = get_pricing_service()
 
     def find_matching_machines(self, machine_type: str, requirements: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
@@ -66,8 +70,24 @@ class InventoryService:
         matching_machines.sort(
             key=lambda m: self._calculate_relevance_score(m, requirements, config.fields)
         )
+        
+        # NOTE: Prices are NOT enriched here. They are fetched later
+        # when the user completes the cotización flow.
                 
         return matching_machines
+    
+    def _enrich_with_prices(self, machines: List[Dict[str, Any]]) -> None:
+        """
+        Enrich machines with price data from SQL Server.
+        Modifies machines in place.
+        """
+        for machine in machines:
+            modelo = machine.get("modelo", "")
+            price_info = self._pricing_service.get_price(modelo)
+            
+            if price_info:
+                machine["precio"] = price_info["price"]
+                machine["moneda"] = price_info["currency"]
 
     def _fetch_from_db(self, machine_type: str) -> List[Dict[str, Any]]:
         """

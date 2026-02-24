@@ -577,9 +577,11 @@ class IntelligentResponseGenerator:
                 if recommended_machines:
                     # Formatear lista de máquinas recomendadas
                     machines_list = ""
+                    recommended_models = []  # Lista de modelos para guardar en el estado
                     for machine in recommended_machines[:3]: # Limitar a top 3
                          # Intentar construir un nombre descriptivo
                         modelo = machine.get("modelo", "Modelo Desconocido")
+                        recommended_models.append(modelo)  # Guardar modelo
                         cat = machine.get("categoria", "")
                         
                         # Agregar detalles clave según el tipo (simplificado)
@@ -590,8 +592,15 @@ class IntelligentResponseGenerator:
                              extra_info += f" ({machine['capacidad']})"
                         elif "cfm" in machine:
                             extra_info += f" ({machine['cfm']} CFM)"
+                        
+                        # NOTE: Prices are NOT shown in recommendations.
+                        # They will be fetched and displayed only after the user
+                        # completes the cotización flow (all empresa details).
 
-                        machines_list += f"- {modelo} {extra_info}\n"
+                        machines_list += f"- {modelo}{extra_info}\n"
+                    
+                    # Guardar la lista de modelos recomendados en el estado
+                    current_state["maquinas_recomendadas"] = recommended_models
                     
                     return f"""Muy bien, basándome en tus requerimientos, te recomiendo las siguientes opciones disponibles en nuestro inventario:
 {machines_list}
@@ -671,13 +680,37 @@ class IntelligentResponseGenerator:
     
     def generate_final_response(self, current_state: ConversationState) -> str:
         """Genera la respuesta final cuando la conversación está completa"""
-
-        current_state_str = get_current_state_str(current_state)
+        from pricing_service import get_pricing_service
         
-        return f"""¡Perfecto, {current_state['nombre']}! 
-
-He registrado toda su información:
-{current_state_str}
+        # Fetch price for the selected machine only
+        pricing_str = ""
+        maquina_seleccionada = current_state.get("maquina_seleccionada")
+        
+        logging.info(f"[PRICING_DEBUG] generate_final_response: maquina_seleccionada = '{maquina_seleccionada}'")
+        
+        if maquina_seleccionada:
+            try:
+                pricing_service = get_pricing_service()
+                logging.info(f"[PRICING_DEBUG] generate_final_response: pricing_service.is_available() = {pricing_service.is_available()}")
+                price_info = pricing_service.get_price(maquina_seleccionada)
+                
+                logging.info(f"[PRICING_DEBUG] generate_final_response: price_info = {price_info}")
+                
+                if price_info:
+                    precio = price_info["price"]
+                    moneda = price_info.get("currency", "USD")
+                    pricing_str = f"\n\n📋 **Máquina seleccionada:**\n- {maquina_seleccionada}: ${precio:,.0f} {moneda}"
+                    logging.info(f"[PRICING_DEBUG] generate_final_response: Price FOUND - ${precio:,.0f} {moneda}")
+                else:
+                    pricing_str = f"\n\n📋 **Máquina seleccionada:**\n- {maquina_seleccionada}: Precio a consultar"
+                    logging.warning(f"[PRICING_DEBUG] generate_final_response: No price found for '{maquina_seleccionada}'")
+            except Exception as e:
+                logging.error(f"[PRICING_DEBUG] generate_final_response: EXCEPTION fetching price: {type(e).__name__}: {e}")
+                import traceback
+                logging.error(f"[PRICING_DEBUG] generate_final_response: Traceback: {traceback.format_exc()}")
+                pricing_str = f"\n\n📋 **Máquina seleccionada:**\n- {maquina_seleccionada}"
+        
+        return f"""¡Perfecto, {current_state['nombre']}!{pricing_str}
 
 Procederé a generar su cotización. Nos pondremos en contacto con usted pronto.
 
@@ -748,7 +781,8 @@ class IntelligentLeadQualificationChatbot:
             "conversation_mode": "bot", # agente o bot
             "asignado_asesor": None,
             "hubspot_contact_id": None,
-            "quiere_cotizacion": None
+            "quiere_cotizacion": None,
+            "maquinas_recomendadas": []  # Lista de máquinas recomendadas para mapear posición a modelo
         }
         
         # Agregamos los campos que se preguntan al usuario desde el FIELDS_CONFIG_PRIORITY
@@ -758,6 +792,7 @@ class IntelligentLeadQualificationChatbot:
                 state[field] = {}
             else:
                 state[field] = None
+
 
         return state
     
@@ -910,6 +945,11 @@ class IntelligentLeadQualificationChatbot:
                 debug_print(f"DEBUG: Siguiente pregunta: {next_question_str}")
                 debug_print(f"DEBUG: Tipo de siguiente pregunta: {next_question_type}")
 
+        # If conversation is complete, use the final response with prices
+        if self.state.get("completed") and next_question_str is None:
+            final_response = self.response_generator.generate_final_response(self.state)
+            return self._add_message_and_return_response(final_response, storage_question_type)
+
         # Generar respuesta con LLM (Llamada unificada)
         generated_response = self.response_generator.generate_response(
             user_message, 
@@ -952,6 +992,47 @@ class IntelligentLeadQualificationChatbot:
         self.save_conversation()
 
         return response
+    
+    def _map_position_to_model(self, extracted_info: Dict[str, Any], maquinas_recomendadas: List[str]) -> Optional[str]:
+        """
+        Mapea una selección por posición (ej: 'la 1', 'la primera') al modelo de máquina real.
+        Usa el mensaje original del usuario para detectar patrones de selección.
+        """
+        import re
+        
+        # Obtener el último mensaje del usuario
+        last_user_message = ""
+        for msg in reversed(self.state.get("messages", [])):
+            if msg.get("role") == "user" or msg.get("sender") == "lead":
+                last_user_message = msg.get("content", "").lower()
+                break
+        
+        if not last_user_message or not maquinas_recomendadas:
+            return None
+        
+        # Patrones para detectar selección por posición
+        position_patterns = [
+            # "la 1", "el 1", "opción 1", "maquina 1"
+            (r'\b(?:la|el|opci[oó]n|m[aá]quina|n[uú]mero|#?)\s*1\b', 0),
+            (r'\b(?:la|el|opci[oó]n|m[aá]quina|n[uú]mero|#?)\s*2\b', 1),
+            (r'\b(?:la|el|opci[oó]n|m[aá]quina|n[uú]mero|#?)\s*3\b', 2),
+            # "la primera", "el primero"
+            (r'\b(?:la\s+)?primer[ao]?\b', 0),
+            (r'\b(?:la\s+)?segund[ao]?\b', 1),
+            (r'\b(?:la\s+)?tercer[ao]?\b', 2),
+            # Simple "quiero la 1"
+            (r'quiero\s+(?:la\s+)?1\b', 0),
+            (r'quiero\s+(?:la\s+)?2\b', 1),
+            (r'quiero\s+(?:la\s+)?3\b', 2),
+        ]
+        
+        for pattern, index in position_patterns:
+            if re.search(pattern, last_user_message):
+                if index < len(maquinas_recomendadas):
+                    debug_print(f"DEBUG: Patrón '{pattern}' detectado, seleccionando posición {index+1}: {maquinas_recomendadas[index]}")
+                    return maquinas_recomendadas[index]
+        
+        return None
     
     def _update_state_with_extracted_info(self, extracted_info: Dict[str, Any]):
         """
@@ -1012,6 +1093,17 @@ class IntelligentLeadQualificationChatbot:
         if self.state.get("tipo_maquinaria") and not self.state.get("tipo_ayuda"):
             self.state["tipo_ayuda"] = "maquinaria"
             debug_print("DEBUG: Inferido tipo_ayuda='maquinaria' basado en presencia de tipo_maquinaria")
+        
+        # Si el usuario quiere cotización pero no especificó qué máquina por nombre,
+        # intentar inferirla de la selección por posición
+        if self.state.get("quiere_cotizacion") is True and not self.state.get("maquina_seleccionada"):
+            maquinas_recomendadas = self.state.get("maquinas_recomendadas", [])
+            if maquinas_recomendadas:
+                # Mapear selección por posición a modelo real
+                selected_model = self._map_position_to_model(extracted_info, maquinas_recomendadas)
+                if selected_model:
+                    self.state["maquina_seleccionada"] = selected_model
+                    debug_print(f"DEBUG: maquina_seleccionada inferida por posición: '{selected_model}'")
         
     def _get_last_bot_question(self) -> Tuple[Optional[str], Optional[str]]:
         """Obtiene la última pregunta que hizo el bot para proporcionar contexto"""

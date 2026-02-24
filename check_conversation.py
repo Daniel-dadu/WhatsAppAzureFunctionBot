@@ -87,13 +87,28 @@ def clasificar_mensaje(message: str) -> str:
 
         raw_output = response.choices[0].message.content.strip()
         
-        # Buscar el inicio del JSON en la respuesta
+        # Remove markdown code blocks if present
+        if "```json" in raw_output:
+            raw_output = raw_output.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw_output:
+            raw_output = raw_output.split("```")[1].split("```")[0].strip()
+        
+        # Find the first complete JSON object
         json_start = raw_output.find('{')
         if json_start != -1:
-            # Extraer solo la parte del JSON
+            # Extract only the first JSON object
             raw_output = raw_output[json_start:]
-            # Buscar el final del JSON
-            json_end = raw_output.rfind('}') + 1
+            # Find the matching closing brace for the first object
+            brace_count = 0
+            json_end = 0
+            for i, char in enumerate(raw_output):
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        json_end = i + 1
+                        break
             if json_end > 0:
                 raw_output = raw_output[:json_end]
 

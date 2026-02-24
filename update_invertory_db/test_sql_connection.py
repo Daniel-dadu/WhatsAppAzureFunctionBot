@@ -11,10 +11,10 @@ Before running, ensure you have:
 1. Installed pyodbc: pip install pyodbc
 2. Installed ODBC Driver 18 for SQL Server (on macOS: brew install microsoft/mssql-release/msodbcsql18)
 3. Set the required environment variables in your .env file:
-   - SQL_SERVER: Your SQL Server hostname (e.g., myserver.database.windows.net)
-   - SQL_DATABASE: Database name
-   - SQL_USERNAME: Username for authentication
-   - SQL_PASSWORD: Password for authentication
+   - PRICES_SQL_SERVER: Your SQL Server hostname (e.g., myserver.database.windows.net)
+   - PRICES_SQL_DATABASE: Database name
+   - PRICES_SQL_USERNAME: Username for authentication
+   - PRICES_SQL_PASSWORD: Password for authentication
 """
 
 import os
@@ -40,21 +40,21 @@ except ImportError:
 
 def get_connection_string():
     """Build the SQL Server connection string from environment variables."""
-    server = os.environ.get('SQL_SERVER')
-    database = os.environ.get('SQL_DATABASE')
-    username = os.environ.get('SQL_USERNAME')
-    password = os.environ.get('SQL_PASSWORD')
+    server = os.environ.get('PRICES_SQL_SERVER')
+    database = os.environ.get('PRICES_SQL_DATABASE')
+    username = os.environ.get('PRICES_SQL_USERNAME')
+    password = os.environ.get('PRICES_SQL_PASSWORD')
     
     # Validate required environment variables
     missing = []
     if not server:
-        missing.append('SQL_SERVER')
+        missing.append('PRICES_SQL_SERVER')
     if not database:
-        missing.append('SQL_DATABASE')
+        missing.append('PRICES_SQL_DATABASE')
     if not username:
-        missing.append('SQL_USERNAME')
+        missing.append('PRICES_SQL_USERNAME')
     if not password:
-        missing.append('SQL_PASSWORD')
+        missing.append('PRICES_SQL_PASSWORD')
     
     if missing:
         print(f"ERROR: Missing required environment variables: {', '.join(missing)}")
@@ -84,9 +84,9 @@ def test_connection():
     
     connection_string = get_connection_string()
     
-    print(f"\nConnecting to: {os.environ.get('SQL_SERVER')}")
-    print(f"Database: {os.environ.get('SQL_DATABASE')}")
-    print(f"User: {os.environ.get('SQL_USERNAME')}")
+    print(f"\nConnecting to: {os.environ.get('PRICES_SQL_SERVER')}")
+    print(f"Database: {os.environ.get('PRICES_SQL_DATABASE')}")
+    print(f"User: {os.environ.get('PRICES_SQL_USERNAME')}")
     print("-" * 60)
     
     try:

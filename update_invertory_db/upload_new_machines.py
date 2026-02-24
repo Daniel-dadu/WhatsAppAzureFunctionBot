@@ -1,0 +1,82 @@
+"""
+Script para subir SOLO las nuevas máquinas a CosmosDB.
+No modifica ni toca las máquinas existentes.
+"""
+import os
+import json
+import logging
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from azure.cosmos import CosmosClient, PartitionKey, exceptions
+from dotenv import load_dotenv
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Las nuevas máquinas a agregar
+nuevas_maquinas = [
+    {"modelo": "Shindaiwa DG100MI-400", "categoria": "generador", "tipo_generador": "estacionario", "potencia_kva": 100, "potencia_kw": 80.0, "tipo_alimentacion": "diésel"},
+    {"modelo": "LGMG S1932EII", "categoria": "plataforma", "tipo_plataforma": "tijera", "altura_trabajo_m": 7.5, "altura_plataforma_m": 5.8, "tipo_alimentacion": "electrica"},
+    {"modelo": "LGMG MP0607SE", "categoria": "plataforma", "tipo_plataforma": "unipersonal", "altura_trabajo_m": 8.2, "altura_plataforma_m": 6.2, "tipo_alimentacion": "electrica"},
+    {"modelo": "LGMG MP1007SE", "categoria": "plataforma", "tipo_plataforma": "unipersonal", "altura_trabajo_m": 12.1, "altura_plataforma_m": 10.1, "tipo_alimentacion": "electrica"},
+    {"modelo": "LGMG MP1208SE", "categoria": "plataforma", "tipo_plataforma": "unipersonal", "altura_trabajo_m": 14, "altura_plataforma_m": 12, "tipo_alimentacion": "electrica"},
+]
+
+def load_local_settings():
+    load_dotenv()
+    if os.path.exists("local.settings.json"):
+        with open("local.settings.json", "r") as f:
+            settings = json.load(f)
+            if "Values" in settings:
+                for key, value in settings["Values"].items():
+                    os.environ[key] = value
+
+def main():
+    try:
+        load_local_settings()
+
+        connection_string = os.environ.get("COSMOS_CONNECTION_STRING")
+        db_name = os.environ.get("COSMOS_DB_NAME")
+        if not connection_string or not db_name:
+            raise ValueError("COSMOS_CONNECTION_STRING o COSMOS_DB_NAME no están definidos")
+
+        client = CosmosClient.from_connection_string(connection_string)
+        database = client.get_database_client(db_name)
+        container = database.get_container_client("machinery_inventory")
+
+        logger.info(f"Conectado a base de datos: {db_name}")
+        logger.info(f"Intentando subir {len(nuevas_maquinas)} nuevas máquinas...\n")
+
+        agregadas = 0
+        omitidas = 0
+
+        for item in nuevas_maquinas:
+            # Generar ID igual que upload_to_cosmos.py
+            safe_model = "".join(c for c in item["modelo"] if c.isalnum() or c in "-_").lower()
+            item_id = f"{item['categoria']}_{safe_model}"
+            item["id"] = item_id
+
+            # Verificar si ya existe
+            try:
+                existing = container.read_item(item=item_id, partition_key=item["categoria"])
+                logger.warning(f"⚠️  OMITIDA (ya existe): {item['modelo']} [id={item_id}]")
+                omitidas += 1
+            except exceptions.CosmosResourceNotFoundError:
+                # No existe, la creamos
+                container.create_item(item)
+                logger.info(f"✅ AGREGADA: {item['modelo']} [id={item_id}]")
+                agregadas += 1
+
+        logger.info(f"\n--- Resumen ---")
+        logger.info(f"Máquinas agregadas: {agregadas}")
+        logger.info(f"Máquinas omitidas (ya existían): {omitidas}")
+        logger.info(f"Total procesadas: {agregadas + omitidas}")
+
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        raise
+
+if __name__ == "__main__":
+    main()

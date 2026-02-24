@@ -63,10 +63,10 @@ def normalize_for_comparison(code):
 
 def get_sql_server_inventory():
     """Fetch inventory from SQL Server database."""
-    server = os.environ.get('SQL_SERVER')
-    database = os.environ.get('SQL_DATABASE')
-    username = os.environ.get('SQL_USERNAME')
-    password = os.environ.get('SQL_PASSWORD')
+    server = os.environ.get('PRICES_SQL_SERVER')
+    database = os.environ.get('PRICES_SQL_DATABASE')
+    username = os.environ.get('PRICES_SQL_USERNAME')
+    password = os.environ.get('PRICES_SQL_PASSWORD')
     
     connection_string = (
         f"Driver={{ODBC Driver 18 for SQL Server}};"

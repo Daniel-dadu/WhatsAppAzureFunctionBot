@@ -97,6 +97,18 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - Ejemplos correctos: {{"detalles_maquinaria": {{"tipo_reflector": "LED"}}}}
     - Ejemplos correctos: {{"detalles_maquinaria": {{"tipo_reflector": "otro"}}}}
     
+    REGLAS ESPECIALES PARA TIPO_PLATAFORMA EN DETALLES_MAQUINARIA (plataforma):
+    - Para el campo "tipo_plataforma" (plataforma de elevación):
+      * Si el usuario dice "tijera", "de tijera", "tipo tijera", "plataforma tijera" → tipo_plataforma: "tijera"
+      * Si el usuario dice "articulada", "de articulada", "tipo articulada", "brazo articulado" → tipo_plataforma: "articulada"
+      * Si el usuario dice "unipersonal", "personal", "de una persona", "para una persona" → tipo_plataforma: "unipersonal"
+    - IMPORTANTE: Normalizar SIEMPRE a uno de estos valores exactos: "tijera", "articulada", "unipersonal"
+    - NUNCA incluir prefijos como "de" o "tipo" en el valor extraído
+    - Ejemplos correctos: {{"detalles_maquinaria": {{"tipo_plataforma": "tijera"}}}}
+    - Ejemplos correctos: {{"detalles_maquinaria": {{"tipo_plataforma": "articulada"}}}}
+    - Ejemplos correctos: {{"detalles_maquinaria": {{"tipo_plataforma": "unipersonal"}}}}
+    - Ejemplos INCORRECTOS: {{"detalles_maquinaria": {{"tipo_plataforma": "de tijera"}}}}
+    
     REGLAS ESPECIALES PARA TIPO_ALIMENTACION EN DETALLES_MAQUINARIA (plataforma, soldadora):
     - Para el campo "tipo_alimentacion" (plataforma o soldadora):
       * Si el usuario dice "eléctrica", "electrica", "eléctrico", "electrico", "de batería", "bateria" → tipo_alimentacion: "electrica" (STRING)
@@ -180,6 +192,16 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - Ejemplos correctos: "quiero la 1" → {{"quiere_cotizacion": true}}
     - Ejemplos INCORRECTOS: {{"quiere_cotizacion": "sí"}}, {{"quiere_cotizacion": "no"}}
     - IMPORTANTE: Solo extraer quiere_cotizacion si la última pregunta del bot es sobre cotización
+    
+    REGLAS ESPECIALES PARA MAQUINA_SELECCIONADA:
+    - Si el usuario selecciona una máquina específica para cotización, extrae el MODELO EXACTO en maquina_seleccionada
+    - IMPORTANTE: Busca el nombre del modelo en el mensaje del usuario y extráelo textualmente
+    - Si el usuario dice "cotizame el Shindaiwa DGM250MK-D" → maquina_seleccionada: "Shindaiwa DGM250MK-D"
+    - Si el usuario dice "quiero la primera que es [MODELO]" → maquina_seleccionada: "[MODELO]"
+    - Si el usuario dice "me interesa el [MODELO]" → maquina_seleccionada: "[MODELO]"
+    - Si el usuario solo dice "la primera", "la segunda", "la tercera" sin mencionar el modelo, NO extraer maquina_seleccionada (quedará vacío)
+    - Ejemplos correctos: "si, cotizame el primero que es Shindaiwa DGM250MK-D" → {{"quiere_cotizacion": true, "maquina_seleccionada": "Shindaiwa DGM250MK-D"}}
+    - Ejemplos correctos: "quiero cotización del Genie GS-1930" → {{"quiere_cotizacion": true, "maquina_seleccionada": "Genie GS-1930"}}
     
     IMPORTANTE: Analiza cuidadosamente el mensaje y extrae TODA la información disponible que corresponda a campos vacíos.
     

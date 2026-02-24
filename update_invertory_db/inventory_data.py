@@ -79,6 +79,7 @@ inventario = [
     {"modelo": "Shindaiwa DGM600MK-D", "categoria": "generador", "tipo_generador": "estacionario", "potencia_kva": 60, "potencia_kw": 48.0, "tipo_alimentacion": "diésel"},
     {"modelo": "AIRMAN SDG150S",      "categoria": "generador", "tipo_generador": "estacionario", "potencia_kva": 150, "potencia_kw": 120.0, "tipo_alimentacion": "diésel"},
     {"modelo": "AIRMAN SDG100S",      "categoria": "generador", "tipo_generador": "estacionario", "potencia_kva": 100, "potencia_kw": 80.0, "tipo_alimentacion": "diésel"},
+    {"modelo": "Shindaiwa DG100MI-400", "categoria": "generador", "tipo_generador": "estacionario", "potencia_kva": 100, "potencia_kw": 80.0, "tipo_alimentacion": "diésel"},
     {"modelo": "Koshin GV-8000S",     "categoria": "generador", "tipo_generador": "portatil",     "potencia_kva": 9.0, "potencia_kw": 7.2,   "tipo_alimentacion": "gasolina"}, # 7.2kW / 0.8 = 9kVA approx
     {"modelo": "Koshin GV-5500s",     "categoria": "generador", "tipo_generador": "portatil",     "potencia_kva": 5.5, "potencia_kw": 4.4,   "tipo_alimentacion": "gasolina"},
 
@@ -141,6 +142,10 @@ inventario = [
     {"modelo": "LGMG S3246E II", "categoria": "plataforma", "tipo_plataforma": "tijera",     "altura_trabajo_m": 12,    "altura_plataforma_m": 10,    "tipo_alimentacion": "electrica"},
     {"modelo": "LGMG S4046E II", "categoria": "plataforma", "tipo_plataforma": "tijera",     "altura_trabajo_m": 14,    "altura_plataforma_m": 12,    "tipo_alimentacion": "electrica"},
     {"modelo": "LGMG S4650EII",  "categoria": "plataforma", "tipo_plataforma": "tijera",     "altura_trabajo_m": 15.8,  "altura_plataforma_m": 13.8,  "tipo_alimentacion": "electrica"},
+    {"modelo": "LGMG S1932EII", "categoria": "plataforma", "tipo_plataforma": "tijera", "altura_trabajo_m": 7.5, "altura_plataforma_m": 5.8, "tipo_alimentacion": "electrica"},
+    {"modelo": "LGMG MP0607SE", "categoria": "plataforma", "tipo_plataforma": "unipersonal", "altura_trabajo_m": 8.2, "altura_plataforma_m": 6.2, "tipo_alimentacion": "electrica"},
+    {"modelo": "LGMG MP1007SE", "categoria": "plataforma", "tipo_plataforma": "unipersonal", "altura_trabajo_m": 12.1, "altura_plataforma_m": 10.1, "tipo_alimentacion": "electrica"},
+    {"modelo": "LGMG MP1208SE", "categoria": "plataforma", "tipo_plataforma": "unipersonal", "altura_trabajo_m": 14, "altura_plataforma_m": 12, "tipo_alimentacion": "electrica"},
 
     # MANIPULADORES
     {"modelo": "LGMG H625",  "categoria": "manipulador", "altura_maxima_m": 5.94, "capacidad_carga_kg": 2500},

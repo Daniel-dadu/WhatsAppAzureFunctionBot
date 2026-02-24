@@ -353,6 +353,111 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
 
     run_conversation_test("Flujo 6: Inferencia de tipo_ayuda", chatbot, flujo_6, esperado_6)
 
+    # ------------------------------------------------------------------------
+    # Flujo 7: Selección de máquina con nombre específico
+    # Este flujo prueba que se extraiga correctamente el modelo de la máquina
+    # seleccionada y que solo se muestre el precio de esa máquina al final.
+    # ------------------------------------------------------------------------
+    flujo_7 = [
+        "hola, Soy Daniel Maldonado",
+        "quiero un generador",
+        "estacionario",
+        "20 kw",
+        "si, cotizame el primero que es Shindaiwa DGM250MK-D",
+        "trabajo en MachinesCorp, nos dedicamos a la venta de maquinaria y estamos en Guanajuato",
+        "mi correo es daniel@gmail.com y el telefono es 1112223234"
+    ]
+
+    esperado_7 = {
+        "nombre": "Daniel Maldonado",
+        "apellido": "Maldonado",
+        "tipo_maquinaria": "generador",
+        "detalles_maquinaria": {
+            "tipo_generador": "estacionario",
+            "potencia_kw": 20
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Shindaiwa DGM250MK-D",
+        "nombre_empresa": "MachinesCorp",
+        "giro_empresa": "venta de maquinaria",
+        "lugar_requerimiento": "Guanajuato",
+        "uso_empresa_o_venta": "venta",
+        "correo": "daniel@gmail.com",
+        "telefono": "1112223234"
+    }
+
+    run_conversation_test("Flujo 7: Selección de máquina con nombre específico", chatbot, flujo_7, esperado_7)
+
+    # ------------------------------------------------------------------------
+    # Flujo 8: Plataforma S1932EII – verificar que se muestre el precio
+    # Este flujo prueba el ciclo completo: preguntas de plataforma, selección
+    # de máquina, datos de empresa y verificación de que el precio aparezca
+    # en la respuesta final.
+    # ------------------------------------------------------------------------
+    flujo_8 = [
+        "Hola, soy Carlos Ramírez",
+        "Necesito una plataforma de elevación",
+        "de tijera",
+        "la altura de trabajo es de 7 metros y la altura de plataforma es de 5 metros",
+        "eléctrica",
+        "Si, quiero cotizacion de la LGMG S1932EII",
+        "Trabajo en Constructora Norte, nos dedicamos a la construcción, estamos en Monterrey",
+        "Es para uso en nuestra empresa. Mi correo es carlos@connorte.com y mi teléfono es 81 1234 5678"
+    ]
+
+    esperado_8 = {
+        "nombre": "Carlos Ramírez",
+        "apellido": "Ramírez",
+        "tipo_maquinaria": "plataforma",
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "LGMG S1932EII",
+        "nombre_empresa": "Constructora Norte",
+        "giro_empresa": "construcción",
+        "lugar_requerimiento": "Monterrey",
+        "uso_empresa_o_venta": "uso empresa",
+        "correo": "carlos@connorte.com",
+        "telefono": "81 1234 5678"
+    }
+
+    run_conversation_test("Flujo 8: Plataforma S1932EII con precio", chatbot, flujo_8, esperado_8)
+
+    # ------------------------------------------------------------------------
+    # Flujo 9: Selección de máquina con código parcial (sin marca)
+    # Este flujo prueba que el bot muestre el precio incluso cuando el usuario
+    # selecciona una máquina usando solo el código del modelo (ej: "DGM250MK-D")
+    # sin el nombre completo de la marca (ej: "Shindaiwa DGM250MK-D").
+    # Valida el fuzzy matching del pricing service.
+    # ------------------------------------------------------------------------
+    flujo_9 = [
+        "Hola, soy María López",
+        "Necesito un generador",
+        "estacionario",
+        "25 kw",
+        "Me interesa la DGM250MK-D, quiero cotización por favor",
+        "Trabajo en IndustrialMex, nos dedicamos a la manufactura y estamos en Querétaro",
+        "Es para uso de la empresa, mi correo es maria@industrialmex.com y tel 442 111 2233"
+    ]
+
+    esperado_9 = {
+        "nombre": "María López",
+        "apellido": "López",
+        "tipo_maquinaria": "generador",
+        "detalles_maquinaria": {
+            "tipo_generador": "estacionario",
+            "potencia_kw": 25
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "DGM250MK-D",
+        "nombre_empresa": "IndustrialMex",
+        "giro_empresa": "manufactura",
+        "lugar_requerimiento": "Querétaro",
+        "uso_empresa_o_venta": "uso empresa",
+        "correo": "maria@industrialmex.com",
+        "telefono": "442 111 2233"
+    }
+
+    run_conversation_test("Flujo 9: Selección de máquina con código parcial", chatbot, flujo_9, esperado_9)
+
 
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:
@@ -429,6 +534,6 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
 
 if __name__ == "__main__":
     chatbot_instance = setup_chatbot()
-    # define_test_flows(chatbot_instance)
-    test_manually(chatbot_instance)
+    define_test_flows(chatbot_instance)
+    # test_manually(chatbot_instance)
     print("\n🎉 Todas las pruebas han finalizado.")

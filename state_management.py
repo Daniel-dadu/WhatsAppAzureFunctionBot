@@ -11,6 +11,8 @@ class ConversationState(TypedDict):
     tipo_ayuda: Optional[str]  # "maquinaria" | "otro" (refacciones, créditos, etc.)
     tipo_maquinaria: Optional[str] # Ahora es string dinámico
     detalles_maquinaria: Dict[str, Any]
+    maquina_seleccionada: Optional[str]  # Modelo de la máquina seleccionada para cotización
+    maquinas_recomendadas: List[str]  # Lista de modelos recomendados (para mapear "la 1" a modelo)
     nombre_empresa: Optional[str]
     giro_empresa: Optional[str]
     lugar_requerimiento: Optional[str]
@@ -64,6 +66,12 @@ FIELDS_CONFIG_PRIORITY = {
         "description": "Si quiere cotización",
         "question": "¿Quieres que te cotice alguna de las maquinarias disponibles?",
         "reason": "Para ofrecer opciones de maquinaria disponibles",
+        "required": False
+    },
+    "maquina_seleccionada": {
+        "description": "Modelo exacto de la máquina seleccionada para cotización",
+        "question": None,
+        "reason": None,
         "required": False
     },
     "nombre_empresa": {
@@ -340,6 +348,8 @@ class CosmosDBStateStore(ConversationStateStore):
             "tipo_ayuda": state.get("tipo_ayuda"),
             "tipo_maquinaria": state.get("tipo_maquinaria"),
             "detalles_maquinaria": state.get("detalles_maquinaria", {}),
+            "maquina_seleccionada": state.get("maquina_seleccionada"),
+            "maquinas_recomendadas": state.get("maquinas_recomendadas", []),
             "uso_empresa_o_venta": state.get("uso_empresa_o_venta"),
             "nombre_empresa": state.get("nombre_empresa"),
             "giro_empresa": state.get("giro_empresa"),
@@ -378,7 +388,7 @@ class CosmosDBStateStore(ConversationStateStore):
         # Campos a monitorear para cambios
         fields_to_check = [
             "nombre", "apellido", "tipo_ayuda", "tipo_maquinaria", "detalles_maquinaria",
-            "uso_empresa_o_venta", "nombre_empresa", 
+            "maquina_seleccionada", "maquinas_recomendadas", "uso_empresa_o_venta", "nombre_empresa", 
             "giro_empresa", "correo", "telefono", "completed", 
             "lugar_requerimiento", "asignado_asesor", "quiere_cotizacion"
         ]
