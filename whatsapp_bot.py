@@ -41,6 +41,7 @@ class WhatsAppBot:
             self.langchain_config, 
             self.state_store,
             send_message_callback=self.send_message,
+            send_pdf_callback=self.send_pdf_quotation,
             cosmos_client=self.cosmos_client,
             db_name=self.db_name
         )
@@ -142,10 +143,17 @@ class WhatsAppBot:
                 "id": content
             }
         elif message_type == "document":
-            payload["document"] = {
-                "id": content,
-                "filename": "archivo"
-            }
+            # content can be media_id string or dict with id+filename
+            if isinstance(content, dict):
+                payload["document"] = {
+                    "id": content["id"],
+                    "filename": content.get("filename", "archivo")
+                }
+            else:
+                payload["document"] = {
+                    "id": content,
+                    "filename": "archivo"
+                }
         elif message_type == "template":
             payload["template"] = {
                 "name": content,
@@ -188,6 +196,78 @@ class WhatsAppBot:
             
         except Exception as e:
             logging.error(f"Error enviando mensaje a {wa_id}: {e}")
+            return None
+    
+    def upload_media(self, file_bytes: bytes, mime_type: str, filename: str) -> Optional[str]:
+        """
+        Uploads a file to the WhatsApp Media API.
+        Returns the media_id on success, None on failure.
+        """
+        try:
+            url = f"https://graph.facebook.com/{self.version}/{self.phone_number_id}/media"
+            headers = {
+                "Authorization": f"Bearer {self.access_token}",
+            }
+            files = {
+                "file": (filename, file_bytes, mime_type),
+            }
+            data = {
+                "messaging_product": "whatsapp",
+                "type": mime_type,
+            }
+            
+            response = requests.post(url, headers=headers, files=files, data=data, timeout=30)
+            response.raise_for_status()
+            
+            media_id = response.json().get("id")
+            logging.info(f"[PDF] Media uploaded successfully. media_id: {media_id}")
+            return media_id
+            
+        except Exception as e:
+            logging.error(f"[PDF] Error uploading media: {e}")
+            return None
+
+    def send_pdf_quotation(self, wa_id: str, pdf_bytes: bytes, filename: str) -> Optional[str]:
+        """
+        Uploads a PDF and sends it as a WhatsApp document message.
+        Returns the WhatsApp message ID on success, None on failure.
+        """
+        try:
+            # 1. Upload PDF to WhatsApp Media API
+            media_id = self.upload_media(pdf_bytes, "application/pdf", filename)
+            if not media_id:
+                logging.error(f"[PDF] Failed to upload PDF for {wa_id}")
+                return None
+            
+            # 2. Send as document message using existing infrastructure
+            document_content = {
+                "id": media_id,
+                "filename": filename
+            }
+            normalized_recipient = self.normalize_mexican_number(wa_id)
+            payload = {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": normalized_recipient,
+                "type": "document",
+                "document": document_content
+            }
+            
+            headers = {
+                "Content-type": "application/json",
+                "Authorization": f"Bearer {self.access_token}",
+            }
+            
+            url = f"https://graph.facebook.com/{self.version}/{self.phone_number_id}/messages"
+            response = requests.post(url, data=json.dumps(payload), headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            whatsapp_message_id = response.json()["messages"][0]["id"]
+            logging.info(f"[PDF] Quotation PDF sent to {wa_id}. message_id: {whatsapp_message_id}")
+            return whatsapp_message_id
+            
+        except Exception as e:
+            logging.error(f"[PDF] Error sending PDF to {wa_id}: {e}")
             return None
     
     def process_message(self, wa_id: str, message_text: str, whatsapp_message_id: str, hubspot_manager: HubSpotManager) -> None:

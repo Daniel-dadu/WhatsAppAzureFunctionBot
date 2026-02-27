@@ -755,7 +755,7 @@ class InventoryResponder:
 class IntelligentLeadQualificationChatbot:
     """Chatbot con slot-filling inteligente que detecta información ya proporcionada"""
     
-    def __init__(self, azure_config: AzureOpenAIConfig, state_store: Optional[ConversationStateStore] = None, send_message_callback=None, cosmos_client=None, db_name=None):
+    def __init__(self, azure_config: AzureOpenAIConfig, state_store: Optional[ConversationStateStore] = None, send_message_callback=None, send_pdf_callback=None, cosmos_client=None, db_name=None):
         self.azure_config = azure_config
         # Crear instancias con configuraciones específicas para cada propósito
         self.slot_filler = IntelligentSlotFiller(azure_config)
@@ -768,6 +768,9 @@ class IntelligentLeadQualificationChatbot:
         
         # Callback para enviar mensajes por WhatsApp
         self.send_message_callback = send_message_callback
+        
+        # Callback para enviar PDFs por WhatsApp
+        self.send_pdf_callback = send_pdf_callback
         
         # El estado local sigue existiendo para compatibilidad con código existente
         self.state = self._create_empty_state()
@@ -948,7 +951,12 @@ class IntelligentLeadQualificationChatbot:
         # If conversation is complete, use the final response with prices
         if self.state.get("completed") and next_question_str is None:
             final_response = self.response_generator.generate_final_response(self.state)
-            return self._add_message_and_return_response(final_response, storage_question_type)
+            result = self._add_message_and_return_response(final_response, storage_question_type)
+            
+            # Generate and send PDF quotation if applicable
+            self._try_send_pdf_quotation()
+            
+            return result
 
         # Generar respuesta con LLM (Llamada unificada)
         generated_response = self.response_generator.generate_response(
@@ -992,6 +1000,69 @@ class IntelligentLeadQualificationChatbot:
         self.save_conversation()
 
         return response
+
+    def _try_send_pdf_quotation(self):
+        """
+        Attempts to generate and send a PDF quotation via WhatsApp.
+        Only triggers when:
+        - quiere_cotizacion is True
+        - maquina_seleccionada is set
+        - send_pdf_callback is available (running in WhatsApp context)
+        """
+        try:
+            # Check conditions
+            if not self.state.get("quiere_cotizacion"):
+                logging.info("[PDF] Skipping PDF: quiere_cotizacion is not True")
+                return
+            
+            maquina = self.state.get("maquina_seleccionada")
+            if not maquina:
+                logging.info("[PDF] Skipping PDF: no maquina_seleccionada in state")
+                return
+            
+            if not self.send_pdf_callback:
+                logging.info("[PDF] Skipping PDF: no send_pdf_callback (test mode)")
+                return
+            
+            if not self.current_user_id:
+                logging.warning("[PDF] Skipping PDF: no current_user_id set")
+                return
+            
+            logging.info(f"[PDF] Starting PDF generation for machine: {maquina}, user: {self.current_user_id}")
+            
+            # Get price info
+            from pricing_service import get_pricing_service
+            price_info = None
+            try:
+                pricing_service = get_pricing_service()
+                price_info = pricing_service.get_price(maquina)
+                logging.info(f"[PDF] Price info retrieved: {price_info}")
+            except Exception as e:
+                logging.warning(f"[PDF] Could not fetch price for PDF: {e}")
+            
+            # Generate PDF
+            from pdf_service import get_pdf_generator
+            generator = get_pdf_generator()
+            pdf_bytes = generator.generate(self.state, price_info)
+            logging.info(f"[PDF] PDF generated successfully, size: {len(pdf_bytes)} bytes")
+            
+            # Build filename
+            safe_machine_name = maquina.replace(" ", "_").replace("/", "-")
+            filename = f"Cotizacion_{safe_machine_name}.pdf"
+            
+            # Send via WhatsApp
+            logging.info(f"[PDF] Sending PDF '{filename}' to {self.current_user_id}")
+            result = self.send_pdf_callback(self.current_user_id, pdf_bytes, filename)
+            
+            if result:
+                logging.info(f"[PDF] PDF quotation sent successfully. WhatsApp message_id: {result}")
+            else:
+                logging.error(f"[PDF] send_pdf_callback returned None/empty for {self.current_user_id}")
+            
+        except Exception as e:
+            logging.error(f"[PDF] Error generating/sending PDF quotation: {e}")
+            import traceback
+            logging.error(f"[PDF] Traceback: {traceback.format_exc()}")
     
     def _map_position_to_model(self, extracted_info: Dict[str, Any], maquinas_recomendadas: List[str]) -> Optional[str]:
         """

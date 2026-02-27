@@ -27,3 +27,6 @@ python-dotenv
 
 # SQL Server connectivity
 pyodbc
+
+# PDF generation
+fpdf2
