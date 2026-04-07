@@ -1,3 +1,17 @@
+============================================================
+SQL Server Connection Test
+============================================================
+
+Connecting to: gw.hemoeco.com, 5301
+Database: AlphaC_Odoo
+User: alphacbot
+------------------------------------------------------------
+✅ Connection successful!
+
+
+Querying table: [dbo].[inventario_odoo_chatbot]
+============================================================
+
 Columns (7):
   1. PRODUCTO
   2. CODIGO
@@ -15,435 +29,417 @@ Data (showing up to 50 rows):
   PRODUCTO: [RS75] APISONADOR RS75 MARCA SAKAI
   CODIGO: RS75
   CATEGORIA: MAQUINARIA / APISONADOR
-  EXISTENCIA_TOTAL: 17.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 6.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 3245.0000
+  fixed_price: 2986.0000
 
 --- Row 2 ---
-  PRODUCTO: [PDS390SD4B] COMPRESOR MODELO PDS390SD4B MARCA AIRMAN
-  CODIGO: PDS390SD4B
+  PRODUCTO: [PDS185S6C2] COMPRESOR MODELO PDS185S6C2 MARCA AIRMAN
+  CODIGO: PDS185S6C2
   CATEGORIA: MAQUINARIA / COMPRESOR NEUMATICO
-  EXISTENCIA_TOTAL: 1.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
+  EXISTENCIA_TOTAL: 8.0
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 23360.0000
 
 --- Row 3 ---
+  PRODUCTO: [PDS375DP6B] COMPRESOR MODELO PDS375DP6B5 MARCA AIRMAN
+  CODIGO: PDS375DP6B
+  CATEGORIA: MAQUINARIA / COMPRESOR NEUMATICO
+  EXISTENCIA_TOTAL: 10.0
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 51685.0000
+
+--- Row 4 ---
   PRODUCTO: [PDS750S4B1] COMPRESOR MODELO PDS750S4B1 MARCA AIRMAN
   CODIGO: PDS750S4B1
   CATEGORIA: MAQUINARIA / COMPRESOR NEUMATICO
   EXISTENCIA_TOTAL: 3.0
-  pricelist_id: Chatbot Lead (USD)
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 85713.0000
+  fixed_price: 87428.0000
 
---- Row 4 ---
+--- Row 5 ---
   PRODUCTO: [SAS15RD6C] COMPRESOR ESTACIONARIO MODELO SAS15RD6C MARCA AIRMAN, 15KW 60HZ/220V/3PH, 100 PSI R TYPE
   CODIGO: SAS15RD6C
   CATEGORIA: MAQUINARIA / COMPRESORES ELECTRICOS
   EXISTENCIA_TOTAL: 1.0
-  pricelist_id: Chatbot Lead (USD)
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 16265.0000
+  fixed_price: 12588.0000
 
---- Row 5 ---
+--- Row 6 ---
   PRODUCTO: [SAS22RD6E] COMPRESOR ESTACIONARIO MODELO SAS22RD6E MARCA AIRMAN 22KW 60HZ/220V/3PH, 100 PSI R TYPE
   CODIGO: SAS22RD6E
   CATEGORIA: MAQUINARIA / COMPRESORES ELECTRICOS
   EXISTENCIA_TOTAL: 1.0
-  pricelist_id: Chatbot Lead (USD)
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 24673.0000
+  fixed_price: 18571.0000
 
---- Row 6 ---
+--- Row 7 ---
   PRODUCTO: [SAS37RD6E] COMPRESOR ESTACIONARIO MODELO SAS37RD6E MARCA AIRMAN 37KW 60HZ/220V/3PH, 100 PSI R TYPE
   CODIGO: SAS37RD6E
   CATEGORIA: MAQUINARIA / COMPRESORES ELECTRICOS
   EXISTENCIA_TOTAL: 2.0
-  pricelist_id: Chatbot Lead (USD)
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 30465.0000
+  fixed_price: 25226.0000
 
---- Row 7 ---
+--- Row 8 ---
   PRODUCTO: [SAS4SD6C] COMPRESOR ESTACIONARIO MODELO SAS4SD6C MARCA AIRMAN 3.7KW 60HZ/220V/3PH, 100 PSI S TYPE
   CODIGO: SAS4SD6C
   CATEGORIA: MAQUINARIA / COMPRESORES ELECTRICOS
   EXISTENCIA_TOTAL: 2.0
-  pricelist_id: Chatbot Lead (USD)
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 9557.0000
+  fixed_price: 7498.0000
 
---- Row 8 ---
+--- Row 9 ---
   PRODUCTO: [SAS55RD6E] COMPRESOR ESTACIONARIO MODELO SAS55RD6E MARCA AIRMAN 55KW 60HZ/440V/3PH, 100 PSI R TYPE
   CODIGO: SAS55RD6E
   CATEGORIA: MAQUINARIA / COMPRESORES ELECTRICOS
   EXISTENCIA_TOTAL: 2.0
-  pricelist_id: Chatbot Lead (USD)
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 46274.0000
+  fixed_price: 36290.0000
 
---- Row 9 ---
+--- Row 10 ---
   PRODUCTO: [SAS75RD6E] COMPRESOR ESTACIONARIO MODELO SAS75RD6E MARCA AIRMAN 75KW 60HZ/440V/3PH, 100 PSI R TYPE
   CODIGO: SAS75RD6E
   CATEGORIA: MAQUINARIA / COMPRESORES ELECTRICOS
   EXISTENCIA_TOTAL: 2.0
-  pricelist_id: Chatbot Lead (USD)
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 51719.0000
+  fixed_price: 40555.0000
 
---- Row 10 ---
+--- Row 11 ---
   PRODUCTO: [SAS8SD6C] COMPRESOR ESTACIONARIO MODELO SAS8SD6C MARCA AIRMAN 7.5KW 60HZ/220V/3PH, 100 PSI S TYPE
   CODIGO: SAS8SD6C
   CATEGORIA: MAQUINARIA / COMPRESORES ELECTRICOS
   EXISTENCIA_TOTAL: 1.0
-  pricelist_id: Chatbot Lead (USD)
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 13049.0000
-
---- Row 11 ---
-  PRODUCTO: [SMS37ERD6E] COMPRESOR ESTACIONARIO MODELO SMS37RD6E MARCA AIRMAN REGULATOR TYPE	60HZ/440V/3PH, 100 PSI	
-  CODIGO: SMS37ERD6E
-  CATEGORIA: MAQUINARIA / COMPRESORES ELECTRICOS
-  EXISTENCIA_TOTAL: 1.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
+  fixed_price: 11009.0000
 
 --- Row 12 ---
-  PRODUCTO: [SMS75ERD6E] COMPRESOR ESTACIONARIO MODELO SMS75RD6E MARCA AIRMAN REGULATOR TYPE	60HZ/440V/3PH 	
-  CODIGO: SMS75ERD6E
-  CATEGORIA: MAQUINARIA / COMPRESORES ELECTRICOS
-  EXISTENCIA_TOTAL: 1.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
-
---- Row 13 ---
   PRODUCTO: [C54TTF05] CORTADORA DE VARILLA MODELO C54 MARCA SIMPEDIL
   CODIGO: C54TTF05
   CATEGORIA: MAQUINARIA / CORTADORA DE VARILLA
-  EXISTENCIA_TOTAL: 21.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 17.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 11001.0000
+  fixed_price: 10912.0000
 
---- Row 14 ---
-  PRODUCTO: [GW50A-4] DOBLADORA DE VARILLA MODELO GW50A4 MARCA ALPHA C
-  CODIGO: GW50A-4
-  CATEGORIA: MAQUINARIA / DOBLADORA DE VARILLA
-  EXISTENCIA_TOTAL: 1.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
-
---- Row 15 ---
+--- Row 13 ---
   PRODUCTO: [P54TTF06] DOBLADORA VARILLA MODELO P54 MARCA SIMPEDIL
   CODIGO: P54TTF06
   CATEGORIA: MAQUINARIA / DOBLADORA DE VARILLA
-  EXISTENCIA_TOTAL: 22.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 16.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 9351.0000
+  fixed_price: 9275.0000
 
---- Row 16 ---
+--- Row 14 ---
   PRODUCTO: [DG100MI400] GENERADOR MODELO DG100MI-400 MARCA SHINDAIWA 
   CODIGO: DG100MI400
   CATEGORIA: MAQUINARIA / GENERADOR
-  EXISTENCIA_TOTAL: 6.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 2.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
   fixed_price: 34973.0000
 
---- Row 17 ---
+--- Row 15 ---
   PRODUCTO: [DGM250MKD] GENERADOR MODELO DGM250MKD MARCA SHINDAIWA
   CODIGO: DGM250MKD
   CATEGORIA: MAQUINARIA / GENERADOR
-  EXISTENCIA_TOTAL: 6.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 5.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 19429.0000
+  fixed_price: 18844.0000
 
---- Row 18 ---
+--- Row 16 ---
   PRODUCTO: [DGM450MKD] GENERADOR MODELO DGM450MKD MARCA SHINDAIWA
   CODIGO: DGM450MKD
   CATEGORIA: MAQUINARIA / GENERADOR
-  EXISTENCIA_TOTAL: 27.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 22.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 23672.0000
+  fixed_price: 24145.0000
 
---- Row 19 ---
+--- Row 17 ---
   PRODUCTO: [DGM600MKD] GENERADOR MODELO DGM600MKD MARCA SHINDAIWA
   CODIGO: DGM600MKD
   CATEGORIA: MAQUINARIA / GENERADOR
-  EXISTENCIA_TOTAL: 7.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 5.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 17156.0000
+  fixed_price: 29660.0000
 
---- Row 20 ---
-  PRODUCTO: [SDG150S3A6] GENERADOR MODELO SDG150S3A6 MARCA AIRMAN
-  CODIGO: SDG150S3A6
+--- Row 18 ---
+  PRODUCTO: [SDG25S3B1] GENERADOR MODELO SDG25S3B1 MARCA AIRMAN
+  CODIGO: SDG25S3B1
   CATEGORIA: MAQUINARIA / GENERADOR
-  EXISTENCIA_TOTAL: 3.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 5.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 41342.0000
+  fixed_price: 18415.0000
 
---- Row 21 ---
+--- Row 19 ---
   PRODUCTO: [GV5500S] GENERADOR PORTATIL MODELO GV-5500S MARCA KOSHIN
   CODIGO: GV5500S
   CATEGORIA: MAQUINARIA / GENERADOR PORTATIL
-  EXISTENCIA_TOTAL: 56.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 48.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 1614.0000
+  fixed_price: 1476.0000
 
---- Row 22 ---
+--- Row 20 ---
   PRODUCTO: [GV8000S] GENERADOR PORTATIL GV8000S KOSHIN
   CODIGO: GV8000S
   CATEGORIA: MAQUINARIA / GENERADOR PORTATIL
-  EXISTENCIA_TOTAL: 11.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 6.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 2168.0000
+  fixed_price: 1862.0000
 
---- Row 23 ---
+--- Row 21 ---
   PRODUCTO: [H1840] MANIPULADOR MODELO H1840 MARCA LGMG
   CODIGO: H1840
   CATEGORIA: MAQUINARIA / MANIPULADOR
   EXISTENCIA_TOTAL: 1.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 128329.0000
 
---- Row 24 ---
+--- Row 22 ---
   PRODUCTO: [TCB300] TCB-300 CONCRETE BREAKER
   CODIGO: TCB300
   CATEGORIA: MAQUINARIA / MARTILLO NEÚMATICO
-  EXISTENCIA_TOTAL: 1.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
+  EXISTENCIA_TOTAL: 41.0
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 1299.0000
 
---- Row 25 ---
+--- Row 23 ---
   PRODUCTO: [TPB60] MARTILLO NEUMATICO MARCA TOKU MODELO TPB-60
   CODIGO: TPB60
   CATEGORIA: MAQUINARIA / MARTILLO NEÚMATICO
-  EXISTENCIA_TOTAL: 84.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 61.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 1473.0000
+  fixed_price: 1503.0000
 
---- Row 26 ---
+--- Row 24 ---
   PRODUCTO: [TPB90] MARTILLO NEUMATICO MODELO: TPB-90
   CODIGO: TPB90
   CATEGORIA: MAQUINARIA / MARTILLO NEÚMATICO
-  EXISTENCIA_TOTAL: 3.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 28.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 1551.0000
+  fixed_price: 1582.0000
 
---- Row 27 ---
-  PRODUCTO: [CPD30] Montacargas Eléctrico CPD30 Litio
-  CODIGO: CPD30
-  CATEGORIA: MAQUINARIA / MONTACARGAS
-  EXISTENCIA_TOTAL: 2.0
-  pricelist_id: Chatbot Lead (USD)
-  currency_id: USD
-  fixed_price: 37170.0000
-
---- Row 28 ---
+--- Row 25 ---
   PRODUCTO: [KTH100XBAF] MOTOBOMBA MODELO KTH100XBAF MARCA KOSHIN
   CODIGO: KTH100XBAF
   CATEGORIA: MAQUINARIA / MOTOBOMBA
-  EXISTENCIA_TOTAL: 12.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 10.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 2563.0000
+  fixed_price: 2344.0000
 
---- Row 29 ---
+--- Row 26 ---
   PRODUCTO: [KTY100D] MOTOBOMBA MODELO KTY100D MARCA KOSHIN
   CODIGO: KTY100D
   CATEGORIA: MAQUINARIA / MOTOBOMBA
-  EXISTENCIA_TOTAL: 21.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 18.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 4979.0000
+  fixed_price: 4553.0000
 
---- Row 30 ---
+--- Row 27 ---
   PRODUCTO: [A45JELI] PLATAFORMA ARTICULADA MODELO A45JE-LI MARCA LGMG
   CODIGO: A45JELI
   CATEGORIA: MAQUINARIA / PLATAFORMA ARTICULADA
-  EXISTENCIA_TOTAL: 4.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 10.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
   fixed_price: 56104.0000
 
---- Row 31 ---
+--- Row 28 ---
   PRODUCTO: [AR52J] PLATAFORMA ARTICULADA MODELO AR52J MARCA LGMG
   CODIGO: AR52J
   CATEGORIA: MAQUINARIA / PLATAFORMA ARTICULADA
   EXISTENCIA_TOTAL: 2.0
-  pricelist_id: Chatbot Lead (USD)
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
   fixed_price: 75844.0000
 
---- Row 32 ---
+--- Row 29 ---
   PRODUCTO: [AR52J-2] PLATAFORMA ARTICULADA MODELO AR52J-2 MARCA LGMG 
   CODIGO: AR52J-2
   CATEGORIA: MAQUINARIA / PLATAFORMA ARTICULADA
-  EXISTENCIA_TOTAL: 3.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
+  EXISTENCIA_TOTAL: 2.0
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 75844.0000
 
---- Row 33 ---
-  PRODUCTO: [AR60J] PLATAFORMA ARTICULADA MODELO AR60J MARCA LGMG
-  CODIGO: AR60J
-  CATEGORIA: MAQUINARIA / PLATAFORMA ARTICULADA
-  EXISTENCIA_TOTAL: 1.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
-
---- Row 34 ---
+--- Row 30 ---
   PRODUCTO: [AR60J-2] PLATAFORMA ARTICULADA MODELO AR60J-2 MARCA LGMG   
   CODIGO: AR60J-2
   CATEGORIA: MAQUINARIA / PLATAFORMA ARTICULADA
   EXISTENCIA_TOTAL: 1.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 92284.0000
 
---- Row 35 ---
+--- Row 31 ---
   PRODUCTO: [AR60JE-2] PLATAFORMA ARTICULADA MODELO AR60JE-2 MARCA LGMG  
   CODIGO: AR60JE-2
   CATEGORIA: MAQUINARIA / PLATAFORMA ARTICULADA
   EXISTENCIA_TOTAL: 1.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 90724.0000
 
---- Row 36 ---
+--- Row 32 ---
   PRODUCTO: [AR65JE] PLATAFORMA ARTICULADA MODELO AR65JE MARCA LGMG
   CODIGO: AR65JE
   CATEGORIA: MAQUINARIA / PLATAFORMA ARTICULADA
-  EXISTENCIA_TOTAL: 3.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 2.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
   fixed_price: 111083.0000
 
---- Row 37 ---
+--- Row 33 ---
   PRODUCTO: [M2640JE] PLATAFORMA DE MASTIL MODELO M2640JE MARCA LGMG
   CODIGO: M2640JE
   CATEGORIA: MAQUINARIA / PLATAFORMA DE MASTIL
-  EXISTENCIA_TOTAL: 1.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 2.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
   fixed_price: 22419.0000
 
---- Row 38 ---
+--- Row 34 ---
   PRODUCTO: [MP0607SE] PLATAFORMA DE MASTIL MODELO MP0607SE MARCA LGMG
   CODIGO: MP0607SE
   CATEGORIA: MAQUINARIA / PLATAFORMA PERSONAL
   EXISTENCIA_TOTAL: 1.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 6776.0000
 
---- Row 39 ---
+--- Row 35 ---
   PRODUCTO: [MP1208SE] PLATAFORMA DE MASTIL MODELO MP1208SE MARCA LGMG
   CODIGO: MP1208SE
   CATEGORIA: MAQUINARIA / PLATAFORMA PERSONAL
-  EXISTENCIA_TOTAL: 4.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
+  EXISTENCIA_TOTAL: 3.0
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 10477.0000
 
---- Row 40 ---
+--- Row 36 ---
   PRODUCTO: [S1932E-2] PLATAFORMA DE TIJERA MODELO S1932E-2 MARCA LGMG 
   CODIGO: S1932E-2
   CATEGORIA: MAQUINARIA / PLATAFORMA TIJERA
-  EXISTENCIA_TOTAL: 1.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
+  EXISTENCIA_TOTAL: 8.0
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 12988.0000
 
---- Row 41 ---
+--- Row 37 ---
   PRODUCTO: [S1932EII] PLATAFORMA DE TIJERA MODELO S1932EII MARCA LGMG
   CODIGO: S1932EII
   CATEGORIA: MAQUINARIA / PLATAFORMA TIJERA
   EXISTENCIA_TOTAL: 1.0
-  pricelist_id: Chatbot Lead (USD)
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 17187.0000
+  fixed_price: 12988.0000
 
---- Row 42 ---
+--- Row 38 ---
   PRODUCTO: [S2632E-2] PLATAFORMA DE TIJERA MODELO: S2632E-2 MARCA LGMG, 7.8 METROS 
   CODIGO: S2632E-2
   CATEGORIA: MAQUINARIA / PLATAFORMA TIJERA
-  EXISTENCIA_TOTAL: 1.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
+  EXISTENCIA_TOTAL: 2.0
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 19368.0000
 
---- Row 43 ---
+--- Row 39 ---
   PRODUCTO: [S2632EII] PLATAFORMA DE TIJERA MODELO: S2632E II MARCA LGMG, 7.8 METROS
   CODIGO: S2632EII
   CATEGORIA: MAQUINARIA / PLATAFORMA TIJERA
   EXISTENCIA_TOTAL: 1.0
-  pricelist_id: Chatbot Lead (USD)
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
   fixed_price: 19368.0000
 
---- Row 44 ---
+--- Row 40 ---
   PRODUCTO: [S2632EIILI] PLATAFORMA DE TIJERA MODELO: S2632EIILI MARCA LGMG, 7.8 METROS
   CODIGO: S2632EIILI
   CATEGORIA: MAQUINARIA / PLATAFORMA TIJERA
   EXISTENCIA_TOTAL: 3.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 19368.0000
 
---- Row 45 ---
+--- Row 41 ---
+  PRODUCTO: [S3246E-2] PLATAFORMA DE TIJERA MODELO S3246E-2 MARCA LGMG 
+  CODIGO: S3246E-2
+  CATEGORIA: MAQUINARIA / PLATAFORMA TIJERA
+  EXISTENCIA_TOTAL: 15.0
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 20259.0000
+
+--- Row 42 ---
   PRODUCTO: [S4046E-2] PLATAFORMA DE TIJERA MODELO S4046E-2 MARCA LGMG,  12 METROS 
   CODIGO: S4046E-2
   CATEGORIA: MAQUINARIA / PLATAFORMA TIJERA
-  EXISTENCIA_TOTAL: 1.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
-
---- Row 46 ---
-  PRODUCTO: [S4046EII] PLATAFORMA DE TIJERA MODELO S4046EII MARCA LGMG,  12 METROS 
-  CODIGO: S4046EII
-  CATEGORIA: MAQUINARIA / PLATAFORMA TIJERA
-  EXISTENCIA_TOTAL: 2.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 8.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
   fixed_price: 23012.0000
 
---- Row 47 ---
+--- Row 43 ---
+  PRODUCTO: [S4046EII] PLATAFORMA DE TIJERA MODELO S4046EII MARCA LGMG,  12 METROS 
+  CODIGO: S4046EII
+  CATEGORIA: MAQUINARIA / PLATAFORMA TIJERA
+  EXISTENCIA_TOTAL: 1.0
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 23012.0000
+
+--- Row 44 ---
   PRODUCTO: [S4650EIILI] PLATAFORMA DE TIJERA MODELO S4650EIILI MARCA LGMG
   CODIGO: S4650EIILI
   CATEGORIA: MAQUINARIA / PLATAFORMA TIJERA
-  EXISTENCIA_TOTAL: 7.0
-  pricelist_id: None
-  currency_id: None
-  fixed_price: None
+  EXISTENCIA_TOTAL: 6.0
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 26753.0000
 
---- Row 48 ---
+--- Row 45 ---
   PRODUCTO: [SS1230E] PLATAFORMA DE TIJERA MODELO SS1230E MARCA LGMG
   CODIGO: SS1230E
   CATEGORIA: MAQUINARIA / PLATAFORMA TIJERA
-  EXISTENCIA_TOTAL: 4.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 3.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
   fixed_price: 10235.0000
 
---- Row 49 ---
+--- Row 46 ---
+  PRODUCTO: [DGW340DM] SOLDADORA MODELO DGW340DM-D2V MARCA SHINDAIWA
+  CODIGO: DGW340DM
+  CATEGORIA: MAQUINARIA / SOLDADORA DIESEL
+  EXISTENCIA_TOTAL: 10.0
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 17640.0000
+
+--- Row 47 ---
   PRODUCTO: [DGW400DMC] SOLDADORA MODELO DGW400DMC MARCA SHINDAIWA
   CODIGO: DGW400DMC
   CATEGORIA: MAQUINARIA / SOLDADORA DIESEL
@@ -452,14 +448,32 @@ Data (showing up to 50 rows):
   currency_id: None
   fixed_price: None
 
---- Row 50 ---
-  PRODUCTO: [DGW400DMKD] SOLDADORA MODELO DGW400DMK-D2V MARCA SHINDAIWA
-  CODIGO: DGW400DMKD
+--- Row 48 ---
+  PRODUCTO: [DGW500DM200] SOLDADORA MODELO DGW500DM-200 MARCA SHINDAIWA
+  CODIGO: DGW500DM200
   CATEGORIA: MAQUINARIA / SOLDADORA DIESEL
-  EXISTENCIA_TOTAL: 27.0
-  pricelist_id: Chatbot Lead (USD)
+  EXISTENCIA_TOTAL: 14.0
+  pricelist_id: LP Precio Publico 2026 (USD)
   currency_id: USD
-  fixed_price: 20468.0000
+  fixed_price: 24882.0000
+
+--- Row 49 ---
+  PRODUCTO: [DGW600DM] SOLDADORA MODELO DGW600DM MARCA SHINDAIWA
+  CODIGO: DGW600DM
+  CATEGORIA: MAQUINARIA / SOLDADORA DIESEL
+  EXISTENCIA_TOTAL: 1.0
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 38691.0000
+
+--- Row 50 ---
+  PRODUCTO: [EGW185MS] SOLDADORA MODELO EGW185M-S1I MARCA SHINDAIWA
+  CODIGO: EGW185MS
+  CATEGORIA: MAQUINARIA / SOLDADORA GASOLINA
+  EXISTENCIA_TOTAL: 2.0
+  pricelist_id: LP Precio Publico 2026 (USD)
+  currency_id: USD
+  fixed_price: 5326.0000
 
 ============================================================
 Total rows displayed: 50

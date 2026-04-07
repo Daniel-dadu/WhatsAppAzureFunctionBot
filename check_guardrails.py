@@ -86,10 +86,12 @@ class ContentSafetyGuardrails:
             endpoint = self.endpoint
             api_version = self.api_version
 
-            # No es necesario pasar un user prompt, solo se detecta desde los documentos
-            user_prompt = ""
-            # Detecta mejor cuando el mensaje va desde los documentos
-            documents = [message]
+            # El mensaje del usuario se pasa como userPrompt para detectar ataques
+            # directos (jailbreak). El campo 'documents' es para detectar ataques
+            # indirectos en contenido externo (PDFs, emails, etc.) y genera falsos
+            # positivos cuando se usa con mensajes normales del usuario.
+            user_prompt = message
+            documents = []
 
             # Endpoint para el API de Content Safety de Shield Prompt
             response = requests.post(
@@ -107,7 +109,7 @@ class ContentSafetyGuardrails:
             # Handle the API response
             if response.status_code == 200:
                 result = response.json()
-                if result["documentsAnalysis"][0]["attackDetected"]:
+                if result["userPromptAnalysis"]["attackDetected"]:
                     return True
                 return False
             else:

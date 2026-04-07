@@ -19,6 +19,7 @@ class ConversationState(TypedDict):
     uso_empresa_o_venta: Optional[str]
     correo: Optional[str]
     telefono: Optional[str]
+    constancia_fiscal_entregada: Optional[bool]
     # Campos que no se preguntan al usuario
     messages: List[Dict[str, Any]]  # Cambiado para soportar campos adicionales
     conversation_mode: str  # "bot" | "agente"
@@ -78,37 +79,43 @@ FIELDS_CONFIG_PRIORITY = {
         "description": "Nombre de la empresa",
         "question": "¿Cuál es el nombre de su empresa?", 
         "reason": "Para generar la cotización a nombre de su empresa",
-        "required": True
+        "required": False
     },
     "giro_empresa": {
         "description": "Giro o actividad de la empresa",
         "question": "¿Cuál es el giro de su empresa?", 
         "reason": "Para entender mejor sus necesidades específicas",
-        "required": True
+        "required": False
     },
     "lugar_requerimiento": {
         "description": "Ubicación donde se requiere la máquina",
         "question": "¿En qué ubicación del país necesita el equipo?", 
         "reason": "Para coordinar la entrega del equipo",
-        "required": True
+        "required": False
     },
     "uso_empresa_o_venta": {
         "description": "Si es para uso de la empresa o para venta",
         "question": "¿El equipo es para uso de la empresa o para venta?", 
         "reason": "Para ofrecerle los mejores precios",
-        "required": True
+        "required": False
     },
     "correo": {
         "description": "Correo electrónico del usuario",
         "question": "¿Cuál es su correo electrónico?", 
         "reason": "Para enviarle la cotización",
-        "required": True
+        "required": False
     },
     "telefono": {
         "description": "Teléfono del usuario",
         "question": "¿Cuál es su teléfono?", 
         "reason": "Para darle seguimiento personalizado",
-        "required": True
+        "required": False
+    },
+    "constancia_fiscal_entregada": {
+        "description": "Si el usuario ya entregó o adjuntó su Constancia de Situación Fiscal",
+        "question": "Por favor comparta su Constancia de Situación Fiscal",
+        "reason": "Para verificar su información y brindarle precio preferencial",
+        "required": False
     }
 }
 
@@ -360,7 +367,8 @@ class CosmosDBStateStore(ConversationStateStore):
             "conversation_mode": cosmos_doc.get("conversation_mode", "bot"),
             "asignado_asesor": cosmos_doc.get("asignado_asesor"),
             "hubspot_contact_id": cosmos_doc.get("hubspot_contact_id"),
-            "quiere_cotizacion": state.get("quiere_cotizacion")
+            "quiere_cotizacion": state.get("quiere_cotizacion"),
+            "constancia_fiscal_entregada": state.get("constancia_fiscal_entregada", False)
         }
         
         return conversation_state

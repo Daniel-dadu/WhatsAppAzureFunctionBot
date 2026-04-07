@@ -144,24 +144,32 @@ class AzureOpenAIConfig:
 
 def get_pending_empresa_fields(current_state: ConversationState) -> List[str]:
     """
-    Extrae los campos pendientes de la empresa.
+    Extrae los campos pendientes de la empresa según el flujo de venta o uso propio.
     Retorna una lista con los labels de los campos que aún no han sido respondidos.
     """
-    # Campos de empresa que se agrupan en un solo mensaje
-    empresa_fields = {
-        "nombre_empresa": "Nombre de la empresa",
-        "giro_empresa": "Giro de la empresa",
-        "lugar_requerimiento": "Ubicación (estado de la República Mexicana)",
-        "uso_empresa_o_venta": "¿Es para uso de la empresa o para venta?",
-        "correo": "Correo electrónico"
-    }
-    
-    # Obtener campos pendientes
+    uso = current_state.get("uso_empresa_o_venta")
+    if not uso:
+        return ["¿La máquina es para venta/distribución o para uso propio de la empresa?"]
+
     pending_fields = []
-    for field_key, field_label in empresa_fields.items():
-        value = current_state.get(field_key)
-        if not value or value == "":
-            pending_fields.append(field_label)
+    
+    if uso == "venta":
+        if not current_state.get("constancia_fiscal_entregada"):
+            pending_fields.append("Constancia de Situación Fiscal")
+    else:
+        # Campos de empresa que se agrupan en un solo mensaje
+        empresa_fields = {
+            "nombre_empresa": "Nombre de la empresa",
+            "giro_empresa": "Giro de la empresa",
+            "correo": "Correo electrónico",
+            "lugar_requerimiento": "Ubicación (estado de la República Mexicana)"
+        }
+        
+        # Obtener campos pendientes
+        for field_key, field_label in empresa_fields.items():
+            value = current_state.get(field_key)
+            if not value or value == "":
+                pending_fields.append(field_label)
     
     return pending_fields
 
@@ -263,13 +271,22 @@ class IntelligentSlotFiller:
             if not machine_specific_fields:
                 machine_specific_fields = "- No hay un tipo de maquinaria seleccionado aún, o no hay configuración específica."
 
+            # Formatear la lista de máquinas recomendadas para el prompt
+            recomendadas = current_state.get("maquinas_recomendadas", [])
+            if recomendadas:
+                maquinas_lines = [f"  {i+1}. {modelo}" for i, modelo in enumerate(recomendadas)]
+                maquinas_recomendadas_str = "\n".join(maquinas_lines)
+            else:
+                maquinas_recomendadas_str = "  (No hay máquinas recomendadas aún)"
+
             response = self.llm.invoke(prompt.format_prompt(
                 message=message,
                 current_state_str=get_current_state_str(current_state),
                 last_bot_question=last_bot_question or "No hay pregunta previa (inicio de conversación)",
                 maquinaria_names=maquinaria_names,
                 fields_available=fields_available,
-                machine_specific_fields=machine_specific_fields
+                machine_specific_fields=machine_specific_fields,
+                maquinas_recomendadas_str=maquinas_recomendadas_str
             ))
             
             # Parsear la respuesta JSON
@@ -279,6 +296,17 @@ class IntelligentSlotFiller:
             # pero mantenemos la respuesta negativa si no hay conflicto o si es complementaria)
             if isinstance(general_extraction, dict):
                 extracted_data.update(general_extraction)
+            
+            # Lógica determinista de selección implícita
+            quiere_cot_new = extracted_data.get("quiere_cotizacion")
+            quiere_cot_curr = current_state.get("quiere_cotizacion")
+            is_quoting = quiere_cot_new is True or quiere_cot_curr is True
+            
+            if is_quoting and not extracted_data.get("maquina_seleccionada") and not current_state.get("maquina_seleccionada"):
+                recomendadas = current_state.get("maquinas_recomendadas", [])
+                if isinstance(recomendadas, list) and len(recomendadas) == 1:
+                    extracted_data["maquina_seleccionada"] = recomendadas[0]
+                    logging.info(f"Seleccionada automáticamente la única opción recomendada: {recomendadas[0]}")
             
             return extracted_data
             
@@ -340,22 +368,22 @@ class IntelligentSlotFiller:
                 if question_details:
                     return question_details
 
-            # 5. COTIZACIÓN
-            # Preguntar si quiere cotización
+            # 5. COTIZACIÓN / INVENTARIO
+            # Si no hemos recomendado máquinas aún, forzamos este paso para que se active la búsqueda de inventario.
             quiere_cotizacion = current_state.get("quiere_cotizacion")
-            if not quiere_cotizacion:
+            if not current_state.get("maquinas_recomendadas"):
                 return {
                     "question": FIELDS_CONFIG_PRIORITY["quiere_cotizacion"]["question"],
                     "reason": FIELDS_CONFIG_PRIORITY["quiere_cotizacion"]["reason"],
                     "question_type": "quiere_cotizacion"
                 }
             
-            # Si no quiere cotización, terminamos
+            # Si ya se recomendaron máquinas y el usuario no quiere cotización, terminamos
             if quiere_cotizacion is False:
                 return None
 
             # 6. DATOS DE EMPRESA
-            # Si quiere cotización, pedir datos de empresa si faltan
+            # Si quiere cotización o está pendiente, pedir datos de empresa si faltan
             pending_fields = get_pending_empresa_fields(current_state)
             if len(pending_fields) > 0:
                 return {
@@ -472,12 +500,25 @@ class IntelligentSlotFiller:
         tipo = current_state.get("tipo_maquinaria")
         required_fields = get_required_fields_for_tipo(tipo)
         
-        return all(
+        if not all(
             field in detalles and 
             detalles[field] is not None and 
             detalles[field] != ""
             for field in required_fields
-        )
+        ):
+            return False
+
+        # Verificar si quiere cotización
+        quiere_cot = current_state.get("quiere_cotizacion")
+        if quiere_cot is None:
+            return False
+            
+        if quiere_cot is True:
+            # Reutilizamos get_pending_empresa_fields para validar
+            if len(get_pending_empresa_fields(current_state)) > 0:
+                return False
+
+        return True
 
 # ============================================================================
 # SISTEMA DE RESPUESTAS INTELIGENTES
@@ -515,9 +556,9 @@ class IntelligentResponseGenerator:
                 presentation_instruction = """
                 
                 PRESENTACIÓN:
-                Presentate como Alejandro Gómez, asesor comercial de Alpha C.
-                Si en el primer mensaje del usuario este menciona que requiere algún producto o servicio, o solo quiere más información, dile "Hola, sí claro, puedo ayudarte con eso. Soy Alejandro Gómez, asesor comercial de Alpha C." y luego haz la pregunta correspondiente.
-                Si el usuario NO menciona ninguna necesidad (solo saluda o se presenta), dile "Hola, soy Alejandro Gómez, asesor comercial de Alpha C." y luego haz la pregunta correspondiente.
+                Presentate como Enrique Delfin, asesor comercial de Alpha C.
+                Si en el primer mensaje del usuario este menciona que requiere algún producto o servicio, o solo quiere más información, dile "Hola, sí claro, puedo ayudarte con eso. Soy Enrique Delfin, asesor comercial de Alpha C." y luego haz la pregunta correspondiente.
+                Si el usuario NO menciona ninguna necesidad (solo saluda o se presenta), dile "Hola, soy Enrique Delfin, asesor comercial de Alpha C." y luego haz la pregunta correspondiente.
                 IMPORTANTE: SIEMPRE debes incluir tu nombre y cargo en el PRIMER mensaje.
                 """
 
@@ -594,20 +635,26 @@ class IntelligentResponseGenerator:
                             extra_info += f" ({machine['cfm']} CFM)"
                         
                         # NOTE: Prices are NOT shown in recommendations.
-                        # They will be fetched and displayed only after the user
-                        # completes the cotización flow (all empresa details).
-
                         machines_list += f"- {modelo}{extra_info}\n"
                     
                     # Guardar la lista de modelos recomendados en el estado
                     current_state["maquinas_recomendadas"] = recommended_models
                     
-                    return f"""Muy bien, basándome en tus requerimientos, te recomiendo las siguientes opciones disponibles en nuestro inventario:
+                    if current_state.get("quiere_cotizacion") is True:
+                        return f"""Muy bien, basándome en tus requerimientos, te recomiendo las siguientes opciones disponibles en nuestro inventario:
+{machines_list}
+
+Para proceder con la cotización que solicitaste, necesito los siguientes datos. ¿El equipo es para venta/distribución o para uso propio de su empresa?"""
+                    else:
+                        return f"""Muy bien, basándome en tus requerimientos, te recomiendo las siguientes opciones disponibles en nuestro inventario:
 {machines_list}
 ¿Te gustaría recibir una cotización formal por alguna de estas?"""
                 else:
                      # Fallback si no hay coincidencias exactas
-                    return """Entendido. Actualmente no encontré una coincidencia exacta en nuestro inventario con esos requerimientos específicos, pero tenemos muchas opciones que podrían adaptarse.
+                    if current_state.get("quiere_cotizacion") is True:
+                        return """Entendido. Actualmente no encontré una coincidencia exacta en nuestro inventario, pero un asesor experto te buscará una alternativa para cotizarte."""
+                    else:
+                        return """Entendido. Actualmente no encontré una coincidencia exacta en nuestro inventario con esos requerimientos específicos, pero tenemos muchas opciones que podrían adaptarse.
  
 ¿Te gustaría que un asesor te contacte para ofrecerte una solución personalizada?"""
                 # END MODIFICATION
@@ -623,21 +670,38 @@ class IntelligentResponseGenerator:
                 # Agregar instrucción específica para datos_empresa
                 datos_empresa_instruction = """
                 
-                INSTRUCCIÓN ESPECIAL PARA DATOS DE EMPRESA:
+                INSTRUCCIÓN ESPECIAL PARA RECOPILAR DATOS:
                 - Responde inteligentemente pero de forma BREVE al mensaje del usuario
-                - Si el usuario pregunta algo sobre los campos, responde de manera natural y útil
+                - Si el usuario pregunta algo, responde de manera natural y útil
                 - Usa un mensaje como: """
-                if len(pending_fields) == 5:
-                    datos_empresa_instruction += "Para poder generar la cotización, necesito que me compartas los siguientes datos:"
+                should_list_pending_fields = False
+                if len(pending_fields) == 1 and pending_fields[0] == "¿La máquina es para venta/distribución o para uso propio de la empresa?":
+                    datos_empresa_instruction += "Por favor indícame, ¿el equipo es para venta/distribución o para uso propio de su empresa?"
+                elif len(pending_fields) == 1 and pending_fields[0] == "Constancia de Situación Fiscal":
+                    datos_empresa_instruction += "Pide ÚNICAMENTE la Constancia de Situación Fiscal. EXPRESAMENTE PROHIBIDO pedir otro dato como nombre de empresa, teléfono o correo. Usa este mensaje exacto: 'Perfecto, para poder brindarle un precio preferencial como distribuidor, le pido de favor que me comparta por este medio su Constancia de Situación Fiscal.'"
+                elif len(pending_fields) == 4:
+                    datos_empresa_instruction += "Excelente. Para poder generar la cotización, necesito que me comparta los siguientes datos:"
+                    should_list_pending_fields = True
                 else:
-                    datos_empresa_instruction += "También necesito estos otros campos:"
+                    datos_empresa_instruction += "Gracias. También necesito estos otros campos:"
+                    should_list_pending_fields = True
                 
-                datos_empresa_instruction += """
+                if should_list_pending_fields:
+                    pending_fields_bullets = "\n".join([f"- {f}" for f in pending_fields])
+                    datos_empresa_instruction += f"""
+                - Menciona EXPLÍCITAMENTE los campos que faltan (en viñetas) y pídelos en este mismo mensaje, en este orden:
+{pending_fields_bullets}
+                - Si el usuario ya contestó alguno de estos campos en su último mensaje, NO lo repitas ni lo vuelvas a pedir.
+                - NUNCA inventes campos adicionales (por ejemplo: teléfono) si no están en la lista.
+                - IMPORTANTE: NO te despidas, NO cierres la conversación.
+                    """
+                else:
+                    datos_empresa_instruction += """
                 - NUNCA menciones los campos pendientes en tu respuesta, solo responde con la introducción
                 - NUNCA menciones información que se extrajo previamente, ni confirmes la información recién extraída, a menos de que el usuario lo pregunte
                 - IMPORTANTE: NO te despidas, NO digas 'Perfecto, con esto terminamos', NO digas 'Gracias por la información' como cierre.
                 - Debes dejar claro que FALTAN datos y que la conversación continúa.
-                """
+                    """
 
             current_state_str = get_current_state_str(current_state)
             formatedPrompt = prompt.format_prompt(
@@ -659,14 +723,8 @@ class IntelligentResponseGenerator:
             result = response.content.strip()
             debug_print(f"DEBUG: Respuesta conversacional generada: '{result}'")
             
-            # Si es datos_empresa, agregar la lista de campos pendientes hardcoded
-            if question_type == "datos_empresa" and pending_fields:
-                fields_list = "\n".join([f"- {field_label}" for field_label in pending_fields])
-                # Asegurar que haya un salto de línea entre la respuesta de IA y la lista
-                if not result.endswith("\n"):
-                    result = f"{result}\n{fields_list}"
-                else:
-                    result = f"{result}{fields_list}"
+            # Ya no agreamos la lista de campos pendientes hardcoded,
+            # porque el LLM ya incorpora la pregunta dentro del propio texto.
             
             return result
             
@@ -680,6 +738,11 @@ class IntelligentResponseGenerator:
     
     def generate_final_response(self, current_state: ConversationState) -> str:
         """Genera la respuesta final cuando la conversación está completa"""
+        
+        # Revisión rápida: Si es venta, responder y detener
+        if current_state.get("uso_empresa_o_venta") == "venta":
+            return "En un momento te contactará el asesor de la zona para darle el precio preferencial."
+
         from pricing_service import get_pricing_service
         
         # Fetch price for the selected machine only
@@ -1014,6 +1077,10 @@ class IntelligentLeadQualificationChatbot:
             if not self.state.get("quiere_cotizacion"):
                 logging.info("[PDF] Skipping PDF: quiere_cotizacion is not True")
                 return
+
+            if self.state.get("uso_empresa_o_venta") == "venta":
+                logging.info("[PDF] Skipping PDF: uso is 'venta', handoff triggered instead.")
+                return
             
             maquina = self.state.get("maquina_seleccionada")
             if not maquina:
@@ -1064,47 +1131,6 @@ class IntelligentLeadQualificationChatbot:
             import traceback
             logging.error(f"[PDF] Traceback: {traceback.format_exc()}")
     
-    def _map_position_to_model(self, extracted_info: Dict[str, Any], maquinas_recomendadas: List[str]) -> Optional[str]:
-        """
-        Mapea una selección por posición (ej: 'la 1', 'la primera') al modelo de máquina real.
-        Usa el mensaje original del usuario para detectar patrones de selección.
-        """
-        import re
-        
-        # Obtener el último mensaje del usuario
-        last_user_message = ""
-        for msg in reversed(self.state.get("messages", [])):
-            if msg.get("role") == "user" or msg.get("sender") == "lead":
-                last_user_message = msg.get("content", "").lower()
-                break
-        
-        if not last_user_message or not maquinas_recomendadas:
-            return None
-        
-        # Patrones para detectar selección por posición
-        position_patterns = [
-            # "la 1", "el 1", "opción 1", "maquina 1"
-            (r'\b(?:la|el|opci[oó]n|m[aá]quina|n[uú]mero|#?)\s*1\b', 0),
-            (r'\b(?:la|el|opci[oó]n|m[aá]quina|n[uú]mero|#?)\s*2\b', 1),
-            (r'\b(?:la|el|opci[oó]n|m[aá]quina|n[uú]mero|#?)\s*3\b', 2),
-            # "la primera", "el primero"
-            (r'\b(?:la\s+)?primer[ao]?\b', 0),
-            (r'\b(?:la\s+)?segund[ao]?\b', 1),
-            (r'\b(?:la\s+)?tercer[ao]?\b', 2),
-            # Simple "quiero la 1"
-            (r'quiero\s+(?:la\s+)?1\b', 0),
-            (r'quiero\s+(?:la\s+)?2\b', 1),
-            (r'quiero\s+(?:la\s+)?3\b', 2),
-        ]
-        
-        for pattern, index in position_patterns:
-            if re.search(pattern, last_user_message):
-                if index < len(maquinas_recomendadas):
-                    debug_print(f"DEBUG: Patrón '{pattern}' detectado, seleccionando posición {index+1}: {maquinas_recomendadas[index]}")
-                    return maquinas_recomendadas[index]
-        
-        return None
-    
     def _update_state_with_extracted_info(self, extracted_info: Dict[str, Any]):
         """
         Actualiza el estado con la información extraída, confiando en el 
@@ -1122,7 +1148,7 @@ class IntelligentLeadQualificationChatbot:
             # Esto es clave para evitar que una respuesta ambigua posterior
             # borre un dato que ya se había confirmado.
             current_value = self.state.get(key)
-            if key not in ["detalles_maquinaria", "quiere_cotizacion"] and current_value:
+            if key not in ["detalles_maquinaria", "quiere_cotizacion", "maquina_seleccionada"] and current_value:
                 debug_print(f"DEBUG: Campo '{key}' ya tiene valor válido '{current_value}', no se sobrescribe.")
                 continue
 
@@ -1165,16 +1191,23 @@ class IntelligentLeadQualificationChatbot:
             self.state["tipo_ayuda"] = "maquinaria"
             debug_print("DEBUG: Inferido tipo_ayuda='maquinaria' basado en presencia de tipo_maquinaria")
         
-        # Si el usuario quiere cotización pero no especificó qué máquina por nombre,
-        # intentar inferirla de la selección por posición
-        if self.state.get("quiere_cotizacion") is True and not self.state.get("maquina_seleccionada"):
-            maquinas_recomendadas = self.state.get("maquinas_recomendadas", [])
-            if maquinas_recomendadas:
-                # Mapear selección por posición a modelo real
-                selected_model = self._map_position_to_model(extracted_info, maquinas_recomendadas)
-                if selected_model:
-                    self.state["maquina_seleccionada"] = selected_model
-                    debug_print(f"DEBUG: maquina_seleccionada inferida por posición: '{selected_model}'")
+        # Si el LLM extrajo maquina_seleccionada, inferir quiere_cotizacion=True
+        # (seleccionar una máquina implica querer cotización)
+        if self.state.get("maquina_seleccionada") and not self.state.get("quiere_cotizacion"):
+            self.state["quiere_cotizacion"] = True
+            debug_print("DEBUG: Inferido quiere_cotizacion=True por selección de máquina")
+        
+        # Resolve partial model names against recommended machines
+        # e.g. "X-START" → "Trime X-START", "DGM250MK-D" → "Shindaiwa DGM250MK-D"
+        maquina_sel = self.state.get("maquina_seleccionada")
+        maquinas_recomendadas = self.state.get("maquinas_recomendadas", [])
+        if maquina_sel and maquinas_recomendadas:
+            partial_lower = maquina_sel.lower().strip()
+            for full_model in maquinas_recomendadas:
+                if partial_lower in full_model.lower() and partial_lower != full_model.lower():
+                    debug_print(f"DEBUG: maquina_seleccionada resolved: '{maquina_sel}' → '{full_model}'")
+                    self.state["maquina_seleccionada"] = full_model
+                    break
         
     def _get_last_bot_question(self) -> Tuple[Optional[str], Optional[str]]:
         """Obtiene la última pregunta que hizo el bot para proporcionar contexto"""

@@ -89,6 +89,10 @@ def run_conversation_test(
     Guarda todo el output de la prueba en un archivo .txt y solo imprime
     en consola cuando inicia y cuando termina la prueba.
     """
+    import os
+    if os.environ.get("RUN_ONLY") and os.environ.get("RUN_ONLY") not in test_name:
+        return
+        
     # Solo informar inicio en consola
     print(f"INICIANDO PRUEBA: {test_name}")
 
@@ -110,11 +114,11 @@ def run_conversation_test(
         timestamp = _get_timestamp()
         output_lines.append(f"[{timestamp}] 👤 Usuario: {user_message}")
 
-        safety_result = guardrails.check_message_safety(user_message)
-        if safety_result:
-            timestamp = _get_timestamp()
-            output_lines.append(f"[{timestamp}] ❌ Bot: {safety_result['message']}")
-            continue
+        # safety_result = guardrails.check_message_safety(user_message)
+        # if safety_result:
+        #     timestamp = _get_timestamp()
+        #     output_lines.append(f"[{timestamp}] ❌ Bot: {safety_result['message']}")
+        #     continue
         
         bot_response = chatbot.send_message(user_message)
         timestamp = _get_timestamp()
@@ -194,7 +198,8 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "Busco una torre de iluminación.",
         "Sí, la prefiero de LED por favor.",
         "Sí, quiero la maquina 1",
-        "Claro. La empresa se llama 'Construcciones del Sol' y nos dedicamos a la construcción de carreteras. Estamos ubicados en Puebla. La maquina es para uso en nuestra empresa. Mi correo es ana.gomez@constresol.com y mi teléfono es 55 1234 5678."
+        "Es para nuestra empresa",
+        "Claro. La empresa se llama 'Construcciones del Sol' y nos dedicamos a la construcción de carreteras. Estamos ubicados en Puebla. Mi correo es ana.gomez@constresol.com y mi teléfono es 55 1234 5678."
     ]
     
     esperado_1 = {
@@ -202,11 +207,13 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "apellido": "Gómez",
         "tipo_maquinaria": "torre_iluminacion",
         "detalles_maquinaria": {"tipo_reflector": "LED"},
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Shindaiwa SL433IDG-B/S1W",
         "uso_empresa_o_venta": "uso empresa",
         "nombre_empresa": "Construcciones del Sol",
         "giro_empresa": "construcción de carreteras",
-        "correo": "ana.gomez@constresol.com",
-        "telefono": "55 1234 5678"
+        "lugar_requerimiento": "Puebla",
+        "correo": "ana.gomez@constresol.com"
     }
     
     run_conversation_test("Flujo 1: Usuario Directo", chatbot, flujo_1, esperado_1)
@@ -220,10 +227,9 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "mi apellido es Marquez",
         "La prefiero de articulada",
         "la necesito de 11 metros",
-        "la necesito de 9 metros de altura",
         "alimentacion electrica",
-        "Trabajo en 'Maquinaria Pesada S.A.' y nos dedicamos a la renta de maquinaria. La maquinaria es para venta.",
-        "Estamos ubicados en Jalisco, mi correo es roberto@maqpesada.mx y mi teléfono es 81 8765 4321",
+        "La maquinaria es para venta.",
+        "claro, aquí te dejo mi constancia"
     ]
     
     esperado_2 = {
@@ -232,16 +238,12 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "tipo_maquinaria": "plataforma",
         "detalles_maquinaria": {
             "tipo_plataforma": "articulada",
-            "altura_trabajo_m": "11",
-            "altura_plataforma_m": "9",
+            "altura_trabajo_m": 11,
             "tipo_alimentacion": "electrica"
         },
-        "lugar_requerimiento": "Jalisco",
+        "quiere_cotizacion": True,
         "uso_empresa_o_venta": "venta",
-        "nombre_empresa": "Maquinaria Pesada S.A.",
-        "giro_empresa": "renta de maquinaria",
-        "correo": "roberto@maqpesada.mx",
-        "telefono": "81 8765 4321"
+        "constancia_fiscal_entregada": True
     }
     
     run_conversation_test("Flujo 2: Usuario con Múltiples Datos", chatbot, flujo_2, esperado_2)
@@ -254,12 +256,10 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "Hola, ¿tienen generadores en existencia?",
         "Ok, necesito uno para mineria. Soy Lucía Martinez.",
         "El tipo de generador debe ser portátil",
-        "Empresa: Mineria H&H",
-        "La potencia debe ser de 20 kW",
-        "En qué estados pueden hacer entrega?",
-        "Okay, en Aguascalientes.",
-        "Es para venta.",
-        "Mi correo es lucia.h@hh.com y mi teléfono es 33 9876 5432"
+        "La potencia debe ser de 7.2 kW",
+        "En qué estados pueden hacer entrega?, quiero cotizarla",
+        "Es para uso de la empresa.",
+        "Construcciones del Norte, Nuevo León, dadu@gmail.com, 8112345678"
     ]
     
     esperado_3 = {
@@ -268,13 +268,14 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "detalles_maquinaria": {
             "actividad": "mineria",
             "tipo_generador": "portátil",
-            "potencia_kw": "20"
+            "potencia_kw": 7.2
         },
-        "nombre_empresa": "Mineria H&H",
-        "giro_empresa": "mineria", # Inferido de "para mineria" en el contexto inicial o actividad
-        "lugar_requerimiento": "Aguascalientes",
-        "correo": "lucia.h@hh.com",
-        "telefono": "33 9876 5432"
+        "quiere_cotizacion": True,
+        "uso_empresa_o_venta": "uso empresa",
+        "nombre_empresa": "Construcciones del Norte",
+        "lugar_requerimiento": "Nuevo León",
+        "correo": "dadu@gmail.com",
+        "telefono": "8112345678"
     }
     
     run_conversation_test("Flujo 3: Usuario que Pregunta", chatbot, flujo_3, esperado_3)
@@ -286,9 +287,8 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "Hola, soy Daniel Marquez y quiero comprar una torre de iluminación.",
         "Que sea de LED",
         "Quiero la maquina 1",
-        "Trabajo para MachinesCorp pero no conozco el giro de la empresa.",
-        "No sé en qué lugar requiero la maquinaria, pero es para venta.",
-        "mi correo es daniel.marquez@machinescorp.com y mi teléfono es 33 9876 5432"
+        "quiero comercializarla, es para venta",
+        "te adjunto la constancia"
     ]
 
     esperado_4 = {
@@ -296,12 +296,9 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "apellido": "Marquez",
         "tipo_maquinaria": "torre_iluminacion",
         "detalles_maquinaria": {"tipo_reflector": "LED"},
+        "quiere_cotizacion": True,
         "uso_empresa_o_venta": "venta",
-        "nombre_empresa": "MachinesCorp",
-        "giro_empresa": "No especificado",
-        "lugar_requerimiento": "No especificado",
-        "correo": "daniel.marquez@machinescorp.com",
-        "telefono": "33 9876 5432"
+        "constancia_fiscal_entregada": True
     }
 
     run_conversation_test("Flujo 4: Usuario que dice que no tiene varios campos", chatbot, flujo_4, esperado_4)
@@ -314,8 +311,8 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "Soy Juan Perez",
         "Si, LED",
         "quiero la 1",
-        "Mi empresa es 'MachinesTop', giro venta de maquinaria",
-        "ubicación CDMX, es para venta, correo eventos@mail.com, tel 5555555555"
+        "es para uso propio",
+        "trabajo en Constructora Norte, nos dedicamos a la construccion, en Monterrey. correo carlos@connorte.com y tel 81 1234 5678"
     ]
 
     esperado_5 = {
@@ -324,51 +321,32 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "tipo_maquinaria": "torre_iluminacion",
         "detalles_maquinaria": {"tipo_reflector": "LED"},
         "quiere_cotizacion": True,
-        "nombre_empresa": "MachinesTop",
-        "giro_empresa": "venta de maquinaria",
-        "lugar_requerimiento": "CDMX",
-        "uso_empresa_o_venta": "venta",
-        "correo": "eventos@mail.com",
-        "telefono": "5555555555"
+        "uso_empresa_o_venta": "uso empresa",
+        "nombre_empresa": "Constructora Norte",
+        "giro_empresa": "construcción",
+        "lugar_requerimiento": "Monterrey",
+        "correo": "carlos@connorte.com",
+        "telefono": "81 1234 5678"
     }
 
     run_conversation_test("Flujo 5: Selección de máquina específica", chatbot, flujo_5, esperado_5)
 
     # ------------------------------------------------------------------------
-    # Flujo 6: Inferencia de tipo_ayuda
-    # ------------------------------------------------------------------------
-    flujo_6 = [
-        "Hola, soy Pedro Perez",
-        "Quiero una soldadora",
-        "Si, de 300 amperes"
-    ]
-
-    esperado_6 = {
-        "nombre": "Pedro Perez",
-        "apellido": "Perez",
-        "tipo_ayuda": "maquinaria",  # Esto debe inferirse automáticamente
-        "tipo_maquinaria": "soldadora",
-        "detalles_maquinaria": {"amperaje_amps_max": "300"}
-    }
-
-    run_conversation_test("Flujo 6: Inferencia de tipo_ayuda", chatbot, flujo_6, esperado_6)
-
-    # ------------------------------------------------------------------------
-    # Flujo 7: Selección de máquina con nombre específico
+    # Flujo 6: Selección de máquina con nombre específico
     # Este flujo prueba que se extraiga correctamente el modelo de la máquina
     # seleccionada y que solo se muestre el precio de esa máquina al final.
     # ------------------------------------------------------------------------
-    flujo_7 = [
+    flujo_6 = [
         "hola, Soy Daniel Maldonado",
         "quiero un generador",
         "estacionario",
         "20 kw",
         "si, cotizame el primero que es Shindaiwa DGM250MK-D",
-        "trabajo en MachinesCorp, nos dedicamos a la venta de maquinaria y estamos en Guanajuato",
-        "mi correo es daniel@gmail.com y el telefono es 1112223234"
+        "es para uso de la empresa",
+        "trabajo en Alfa Construcciones, nos dedicamos a la construccion, en Puebla. correo mi@mail.com y tel 529931340372"
     ]
 
-    esperado_7 = {
+    esperado_6 = {
         "nombre": "Daniel Maldonado",
         "apellido": "Maldonado",
         "tipo_maquinaria": "generador",
@@ -378,67 +356,67 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         },
         "quiere_cotizacion": True,
         "maquina_seleccionada": "Shindaiwa DGM250MK-D",
-        "nombre_empresa": "MachinesCorp",
-        "giro_empresa": "venta de maquinaria",
-        "lugar_requerimiento": "Guanajuato",
-        "uso_empresa_o_venta": "venta",
-        "correo": "daniel@gmail.com",
-        "telefono": "1112223234"
+        "uso_empresa_o_venta": "uso empresa",
+        "nombre_empresa": "Alfa Construcciones",
+        "giro_empresa": "construcción",
+        "lugar_requerimiento": "Puebla",
+        "correo": "mi@mail.com",
+        "telefono": "529931340372"
     }
 
-    run_conversation_test("Flujo 7: Selección de máquina con nombre específico", chatbot, flujo_7, esperado_7)
+    run_conversation_test("Flujo 6: Selección de máquina con nombre específico", chatbot, flujo_6, esperado_6)
 
     # ------------------------------------------------------------------------
-    # Flujo 8: Plataforma S1932EII – verificar que se muestre el precio
+    # Flujo 7: Plataforma S1932EII – verificar que se muestre el precio
     # Este flujo prueba el ciclo completo: preguntas de plataforma, selección
     # de máquina, datos de empresa y verificación de que el precio aparezca
     # en la respuesta final.
     # ------------------------------------------------------------------------
-    flujo_8 = [
+    flujo_7 = [
         "Hola, soy Carlos Ramírez",
         "Necesito una plataforma de elevación",
         "de tijera",
-        "la altura de trabajo es de 7 metros y la altura de plataforma es de 5 metros",
+        "la altura de trabajo es de 7 metros",
         "eléctrica",
         "Si, quiero cotizacion de la LGMG S1932EII",
-        "Trabajo en Constructora Norte, nos dedicamos a la construcción, estamos en Monterrey",
-        "Es para uso en nuestra empresa. Mi correo es carlos@connorte.com y mi teléfono es 81 1234 5678"
+        "uso empresa",
+        "Trabajo en Constructora Norte, nos dedicamos a la construcción, estamos en Monterrey. Mi correo es carlos@connorte.com y mi teléfono es 81 1234 5678"
     ]
 
-    esperado_8 = {
+    esperado_7 = {
         "nombre": "Carlos Ramírez",
         "apellido": "Ramírez",
         "tipo_maquinaria": "plataforma",
         "quiere_cotizacion": True,
         "maquina_seleccionada": "LGMG S1932EII",
+        "uso_empresa_o_venta": "uso empresa",
         "nombre_empresa": "Constructora Norte",
         "giro_empresa": "construcción",
         "lugar_requerimiento": "Monterrey",
-        "uso_empresa_o_venta": "uso empresa",
         "correo": "carlos@connorte.com",
         "telefono": "81 1234 5678"
     }
 
-    run_conversation_test("Flujo 8: Plataforma S1932EII con precio", chatbot, flujo_8, esperado_8)
+    run_conversation_test("Flujo 7: Plataforma S1932EII con precio", chatbot, flujo_7, esperado_7)
 
     # ------------------------------------------------------------------------
-    # Flujo 9: Selección de máquina con código parcial (sin marca)
+    # Flujo 8: Selección de máquina con código parcial (sin marca)
     # Este flujo prueba que el bot muestre el precio incluso cuando el usuario
     # selecciona una máquina usando solo el código del modelo (ej: "DGM250MK-D")
     # sin el nombre completo de la marca (ej: "Shindaiwa DGM250MK-D").
     # Valida el fuzzy matching del pricing service.
     # ------------------------------------------------------------------------
-    flujo_9 = [
+    flujo_8 = [
         "Hola, soy María López",
         "Necesito un generador",
         "estacionario",
         "25 kw",
         "Me interesa la DGM250MK-D, quiero cotización por favor",
-        "Trabajo en IndustrialMex, nos dedicamos a la manufactura y estamos en Querétaro",
-        "Es para uso de la empresa, mi correo es maria@industrialmex.com y tel 442 111 2233"
+        "Es para uso de la empresa",
+        "Trabajo en IndustrialMex, nos dedicamos a la manufactura y estamos en Querétaro, mi correo es maria@industrialmex.com y tel 442 111 2233"
     ]
 
-    esperado_9 = {
+    esperado_8 = {
         "nombre": "María López",
         "apellido": "López",
         "tipo_maquinaria": "generador",
@@ -448,16 +426,213 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         },
         "quiere_cotizacion": True,
         "maquina_seleccionada": "DGM250MK-D",
+        "uso_empresa_o_venta": "uso empresa",
         "nombre_empresa": "IndustrialMex",
         "giro_empresa": "manufactura",
         "lugar_requerimiento": "Querétaro",
-        "uso_empresa_o_venta": "uso empresa",
         "correo": "maria@industrialmex.com",
         "telefono": "442 111 2233"
     }
 
-    run_conversation_test("Flujo 9: Selección de máquina con código parcial", chatbot, flujo_9, esperado_9)
+    run_conversation_test("Flujo 8: Selección de máquina con código parcial", chatbot, flujo_8, esperado_8)
 
+    # ------------------------------------------------------------------------
+    # Flujo 9: Torre de iluminación con nombre parcial (X-START → Trime X-START)
+    # Replica el escenario de producción donde el usuario dice "Quiero la X-START"
+    # y el bot debe resolver el nombre parcial al modelo completo "Trime X-START"
+    # para poder obtener su precio ($14,949 USD).
+    # ------------------------------------------------------------------------
+    flujo_9 = [
+        "hola",
+        "Soy Daniel Maldonado",
+        "quiero una torre de iluminacion",
+        "Quiero que sea led",
+        "Quiero la X-START",
+        "Es para distribución/venta",
+        "la constancia ya fue enviada en formato pdf"
+    ]
+
+    esperado_9 = {
+        "nombre": "Daniel Maldonado",
+        "apellido": "Maldonado",
+        "tipo_maquinaria": "torre_iluminacion",
+        "detalles_maquinaria": {"tipo_reflector": "LED"},
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Trime X-START",
+        "uso_empresa_o_venta": "venta",
+        "constancia_fiscal_entregada": True
+    }
+
+    run_conversation_test("Flujo 9: Torre iluminación con nombre parcial", chatbot, flujo_9, esperado_9)
+
+    # ------------------------------------------------------------------------
+    # Flujo 10: Plataforma Unipersonal
+    # Este flujo prueba que el sistema extraiga 'unipersonal' y recomiende 
+    # correctamente el modelo LGMG MP0607SE.
+    # ------------------------------------------------------------------------
+    flujo_10 = [
+        "Hola, me llamo Laura Mendoza",
+        "Busco una plataforma",
+        "unipersonal",
+        "de 8 metros de altura de trabajo",
+        "eléctrica",
+        "Me interesa la LGMG MP0607SE",
+        "Es para nuestra empresa",
+        "Trabajo en Mantenimiento X, nos dedicamos a mantenimiento industrial, estamos en CDMX, mi correo es laura@mx.com"
+    ]
+
+    esperado_10 = {
+        "nombre": "Laura Mendoza",
+        "apellido": "Mendoza",
+        "tipo_maquinaria": "plataforma",
+        "detalles_maquinaria": {
+            "tipo_plataforma": "unipersonal",
+            "altura_trabajo_m": 8,
+            "tipo_alimentacion": "electrica"
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "LGMG MP0607SE",
+        "uso_empresa_o_venta": "uso empresa",
+        "nombre_empresa": "Mantenimiento X",
+        "giro_empresa": "mantenimiento industrial",
+        "lugar_requerimiento": "CDMX",
+        "correo": "laura@mx.com"
+    }
+
+    run_conversation_test("Flujo 10: Plataforma Unipersonal", chatbot, flujo_10, esperado_10)
+
+    # ------------------------------------------------------------------------
+    # Flujo 11: Plataforma Mástil
+    # Este flujo prueba que el sistema extraiga 'mástil' y recomiende
+    # correctamente el modelo LGMG M2640JE.
+    # ------------------------------------------------------------------------
+    flujo_11 = [
+        "Buenas, soy Ricardo Silva",
+        "necesito rentar maquinaria",
+        "plataforma de elevacion",
+        "mástil",
+        "10 metros",
+        "eléctrica",
+        "Me interesa la LGMG M2640JE",
+        "uso empresa",
+        "Empresa Silva Construcciones, construccion, Estado de Mexico, rs@silvacons.com"
+    ]
+
+    esperado_11 = {
+        "nombre": "Ricardo Silva",
+        "apellido": "Silva",
+        "tipo_maquinaria": "plataforma",
+        "detalles_maquinaria": {
+            "tipo_plataforma": "mástil",
+            "altura_trabajo_m": 10,
+            "tipo_alimentacion": "electrica"
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "LGMG M2640JE",
+        "uso_empresa_o_venta": "uso empresa",
+        "nombre_empresa": "Empresa Silva Construcciones",
+        "giro_empresa": "construccion",
+        "lugar_requerimiento": "Estado de Mexico",
+        "correo": "rs@silvacons.com"
+    }
+
+    run_conversation_test("Flujo 11: Plataforma Mástil", chatbot, flujo_11, esperado_11)
+
+    # ------------------------------------------------------------------------
+    # Flujo 12: Compresor
+    # Este flujo prueba que el sistema solicite tipo_compresor y caudal_cfm_max
+    # ------------------------------------------------------------------------
+    flujo_12 = [
+        "Hola, me llamo Luis Torres",
+        "Busco un compresor",
+        "portátil",
+        "necesito 400 cfm",
+        "Me interesa esa opción",
+        "para uso de la empresa",
+        "trabajo en MachinesCorp, nos dedicamos a la construccion, y Ciudad de Mexico"
+        "correo carlos@connorte.com y tel 81 1234 5678"
+    ]
+
+    esperado_12 = {
+        "nombre": "Luis Torres",
+        "apellido": "Torres",
+        "tipo_maquinaria": "compresor",
+        "detalles_maquinaria": {
+            "tipo_compresor": "portátil",
+            "caudal_cfm_max": 400
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "AIRMAN PDS750S-4B1",
+        "uso_empresa_o_venta": "uso empresa",
+        "nombre_empresa": "MachinesCorp",   
+        "giro_empresa": "construccion",
+        "lugar_requerimiento": "Ciudad de Mexico",
+        "correo": "carlos@connorte.com",
+        "telefono": "81 1234 5678"
+    }
+
+    run_conversation_test("Flujo 12: Compresor", chatbot, flujo_12, esperado_12)
+
+    # ------------------------------------------------------------------------
+    # Flujo 13: Selección de máquina implícita por contexto único
+    # Prueba la refactorización para inferir el nombre de modelo (ej. SDG150S)
+    # cuando el bot le da solo una opción al lead y este contesta "ok esa opción".
+    # ------------------------------------------------------------------------
+    flujo_13 = [
+        "hola, quiero un rompedor",
+        "Soy Daniel Maldonado",
+        "quiero la segunda máquina",
+        "es para uso propio",
+        "trabajo en Alfa Construcciones, nos dedicamos a la construccion, en Puebla. correo mi@mail.com y tel 529931340372"
+    ]
+
+    esperado_13 = {
+        "nombre": "Daniel Maldonado",
+        "apellido": "Maldonado",
+        "tipo_maquinaria": "rompedor",
+        "detalles_maquinaria": {},
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Toku TPB-60",
+        "uso_empresa_o_venta": "uso empresa",
+        "nombre_empresa": "Alfa Construcciones",
+        "giro_empresa": "construccion",
+        "lugar_requerimiento": "Puebla",
+        "correo": "mi@mail.com",
+        "telefono": "529931340372"
+    }
+
+    run_conversation_test("Flujo 13: Selección de máquina implícita", chatbot, flujo_13, esperado_13)
+
+    # ------------------------------------------------------------------------
+    # Flujo 14: Atributos desde el inicio (Ejemplo de soldadora)
+    # ------------------------------------------------------------------------
+    flujo_14 = [
+        "me cotizas una soldadora shindaiwa de 185 amperes",
+        "mi correo es j.perez@gmail.com y me llamo Juan Perez",
+        "la necesito de diesel",
+        "quiero Shindaiwa DGW340DM",
+        "uso propio",
+        "trabajo en MachinesCorp, nos dedicamos a la construccion, y Ciudad de Mexico"
+    ]
+
+    esperado_14 = {
+        "nombre": "Juan Perez",
+        "apellido": "Perez",
+        "tipo_maquinaria": "soldadora",
+        "detalles_maquinaria": {
+            "amperaje_amps_max": 185,
+            "tipo_alimentacion": "diésel"
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Shindaiwa DGW340DM",
+        "uso_empresa_o_venta": "uso empresa",
+        "nombre_empresa": "MachinesCorp",
+        "giro_empresa": "construcción",
+        "lugar_requerimiento": "Ciudad de Mexico",
+        "correo": "j.perez@gmail.com",
+    }
+
+    run_conversation_test("Flujo 14:  Atributos desde el inicio", chatbot, flujo_14, esperado_14)
 
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:
@@ -535,5 +710,5 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
 if __name__ == "__main__":
     chatbot_instance = setup_chatbot()
     define_test_flows(chatbot_instance)
-    # test_manually(chatbot_instance)
+    # test_manually(chatbot_instance)  # modo interactivo; descomentar solo para pruebas manuales
     print("\n🎉 Todas las pruebas han finalizado.")

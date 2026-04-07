@@ -1,6 +1,7 @@
 
 from typing import List, Dict, Any, Union
 import re
+import unicodedata
 from maquinaria_config import machinery_config_service
 from pricing_service import get_pricing_service
 
@@ -161,11 +162,11 @@ class InventoryService:
             elif operator == "lte": # Menor o igual
                 return float(mach_val_norm) <= float(req_val_norm)
             
-            elif operator == "eq": # Igualdad estricta (case insensitive)
-                return str(mach_val_norm).lower() == str(req_val_norm).lower()
+            if operator == "eq": # Igualdad estricta (case + accent insensitive)
+                return self._strip_accents(str(mach_val_norm).lower()) == self._strip_accents(str(req_val_norm).lower())
             
-            elif operator == "contains": # Contenido (fuzzy match)
-                return str(req_val_norm).lower() in str(mach_val_norm).lower()
+            elif operator == "contains": # Contenido (fuzzy match, accent insensitive)
+                return self._strip_accents(str(req_val_norm).lower()) in self._strip_accents(str(mach_val_norm).lower())
 
             return False
             
@@ -197,6 +198,12 @@ class InventoryService:
                 total_diff += abs(float(mach_val) - float(req_val))
         
         return total_diff
+
+    @staticmethod
+    def _strip_accents(text: str) -> str:
+        """Elimina acentos/diacríticos para comparaciones robustas (ej: portátil → portatil)"""
+        nfkd = unicodedata.normalize('NFKD', text)
+        return ''.join(c for c in nfkd if not unicodedata.combining(c))
 
     def _normalize_value(self, value: Any, data_type: str) -> Union[float, str, bool, None]:
         """Limpia y convierte valores para comparación"""

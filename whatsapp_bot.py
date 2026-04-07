@@ -81,7 +81,7 @@ class WhatsAppBot:
         lead_machine_type = self.chatbot.state.get("tipo_maquinaria", "") if self.chatbot.state.get("tipo_maquinaria") else "nuestra maquinaria"
 
         if template_name == "notificacion_de_leads":
-            return f"Hola {lead_name}, mi nombre es Alejandro Gómez asesor comercial de Alpha C. Me pongo en contacto contigo para dar seguimiento a tu interés en la siguiente maquinaria: {lead_machine_type}. Para continuar con tu solicitud, ¿me podrías confirmar si la maquinaria la requieres para venta o uso propio?"
+            return f"Hola {lead_name}, mi nombre es Enrique Delfin asesor comercial de Alpha C. Me pongo en contacto contigo para dar seguimiento a tu interés en la siguiente maquinaria: {lead_machine_type}. Para continuar con tu solicitud, ¿me podrías confirmar si la maquinaria la requieres para venta o uso propio?"
         elif template_name == "seguimiento_conversacion":
             return f"""Hola {lead_name}, intentamos comunicarnos contigo para brindarte la información del equipo que solicitaste.
             ¿Sigues interesado en recibir la información o una cotización?
@@ -321,11 +321,23 @@ class WhatsAppBot:
     def process_multimedia_msg(self, wa_id: str, multimedia: Dict[str, Any], whatsapp_message_id: str) -> None:
         """
         Procesa un mensaje multimedia entrante.
-        Actualmente solo responde que no se soportan mensajes multimedia.
+        Registra el mensaje e invoca al LLM enviando un texto simulado.
         """
         try:
             logging.info(f"Mensaje multimedia recibido de {wa_id}. Tipo: " + multimedia.get('type') + ".")
             self.state_store.add_single_message(wa_id, multimedia, whatsapp_message_id, self.chatbot.state)
+            
+            # Generar texto descriptivo para el modelo
+            msg_type = multimedia.get('type', 'documento')
+            if msg_type == "document":
+                # Usar esta frase específica para ayudar a que la extracción comprenda que llegó la constancia
+                simulated_text = "Aquí está el archivo PDF adjunto."
+            else:
+                simulated_text = f"[Archivo {msg_type} adjunto recibido]"
+                
+            # Procesar el mensaje con LangChain para generar la respuesta correspondiente
+            self.chatbot.send_message(simulated_text, whatsapp_message_id, hubspot_manager=None)
+            
         except Exception as e:
             logging.error(f"Error procesando mensaje multimedia: {e}")
 

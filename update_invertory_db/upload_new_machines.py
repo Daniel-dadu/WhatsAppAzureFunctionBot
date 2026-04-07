@@ -17,11 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Las nuevas máquinas a agregar
 nuevas_maquinas = [
-    {"modelo": "Shindaiwa DG100MI-400", "categoria": "generador", "tipo_generador": "estacionario", "potencia_kva": 100, "potencia_kw": 80.0, "tipo_alimentacion": "diésel"},
-    {"modelo": "LGMG S1932EII", "categoria": "plataforma", "tipo_plataforma": "tijera", "altura_trabajo_m": 7.5, "altura_plataforma_m": 5.8, "tipo_alimentacion": "electrica"},
-    {"modelo": "LGMG MP0607SE", "categoria": "plataforma", "tipo_plataforma": "unipersonal", "altura_trabajo_m": 8.2, "altura_plataforma_m": 6.2, "tipo_alimentacion": "electrica"},
-    {"modelo": "LGMG MP1007SE", "categoria": "plataforma", "tipo_plataforma": "unipersonal", "altura_trabajo_m": 12.1, "altura_plataforma_m": 10.1, "tipo_alimentacion": "electrica"},
-    {"modelo": "LGMG MP1208SE", "categoria": "plataforma", "tipo_plataforma": "unipersonal", "altura_trabajo_m": 14, "altura_plataforma_m": 12, "tipo_alimentacion": "electrica"},
+    {"modelo": "LGMG M2640JE", "categoria": "plataforma", "tipo_plataforma": "mastil", "altura_trabajo_m": 10, "altura_plataforma_m": 8, "tipo_alimentacion": "electrica"}
 ]
 
 def load_local_settings():

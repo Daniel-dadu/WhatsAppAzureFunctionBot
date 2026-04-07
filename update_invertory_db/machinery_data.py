@@ -17,7 +17,7 @@ machinery_configurations = [
             },
             {
                 "name": "tipo_alimentacion",
-                "question": "¿cuál es el tipo de alimentación que necesitas: eléctrica o combustible?",
+                "question": "¿qué tipo de combustible necesitas: diésel o gasolina?",
                 "reason": "Para recomendarte el modelo adecuado según tu trabajo",
                 "type": "selection",
                 "comparison_operator": "eq"
@@ -29,21 +29,20 @@ machinery_configurations = [
         "name": "Compresor",
         "fields": [
             {
+                "name": "tipo_compresor",
+                "question": "¿qué tipo de compresor necesitas: portátil o estacionario/eléctrico?",
+                "reason": "Para saber el formato y fuente de energía del equipo",
+                "type": "string",
+                "comparison_operator": "contains"
+            },
+            {
                 "name": "caudal_cfm_max", # Check against max supplied CFM
                 "question": "¿cuánto volumen de aire en CFM necesitas?",
-                "reason": "Para seleccionar la potencia correcta",
+                "reason": "Para seleccionar la capacidad correcta",
                 "type": "number", 
                 "unit": "CFM",
                 "comparison_operator": "gte"
-            },
-            {
-                "name": "presion_psi_max", # Check against max pressure
-                "question": "¿cuánto presión en PSI necesitas?",
-                "reason": "Para seleccionar la potencia correcta",
-                "type": "number", 
-                "unit": "PSI",
-                "comparison_operator": "gte"
-            },
+            }
         ]
     },
     {
@@ -125,7 +124,7 @@ machinery_configurations = [
         "fields": [
             {
                 "name": "tipo_plataforma",
-                "question": "¿cuál es el tipo de plataforma que necesitas: articulada o de tijera?",
+                "question": "¿cuál es el tipo de plataforma que necesitas: articulada, de tijera, unipersonal o mástil?",
                 "reason": "Para seleccionar la plataforma correcta",
                 "type": "selection",
                 "comparison_operator": "contains"
@@ -138,14 +137,7 @@ machinery_configurations = [
                 "unit": "m",
                 "comparison_operator": "gte"
             },
-            {
-                "name": "altura_plataforma_m",
-                "question": "¿cuál es la altura de la plataforma que necesitas?",
-                "reason": "Para asegurar que la máquina alcance la altura necesaria",
-                "type": "number",
-                "unit": "m",
-                "comparison_operator": "gte"
-            },
+
             {
                 "name": "tipo_alimentacion",
                 "question": "¿cuál es el tipo de alimentación que necesitas?",

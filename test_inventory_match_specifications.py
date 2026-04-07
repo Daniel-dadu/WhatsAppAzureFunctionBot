@@ -15,11 +15,11 @@ requerimientos del usuario (gracias al ordenamiento por relevancia).
 
 Tipos testeados:
 - soldadora: amperaje_amps_max, tipo_alimentacion (2 tests: 300A y 180A)
-- compresor: caudal_cfm_max, presion_psi_max (4 tests: 200 CFM, 500 CFM, 100 CFM, 750 CFM portátil)
+- compresor: tipo_compresor, caudal_cfm_max (4 tests: 200 CFM, 500 CFM, 100 CFM, 750 CFM portátil)
 - generador: tipo_generador, potencia_kw (3 tests: 20kW estacionario, 5kW portátil, 100kW estacionario)
 - torre_iluminacion: tipo_reflector
 - montacargas: capacidad_carga_kg
-- plataforma: tipo_plataforma, altura_trabajo_m, altura_plataforma_m, tipo_alimentacion (3 tests)
+- plataforma: tipo_plataforma, altura_trabajo_m, tipo_alimentacion (3 tests)
 - manipulador: altura_maxima_m, capacidad_carga_kg
 """
 

@@ -67,9 +67,20 @@ MODEL_CODE_MAPPING = {
     "LGMG AR60J-2": "AR60J-2",
     "LGMG AR60JE-2": "AR60JE-2",
     "LGMG S2632E II": "S2632EII",
+    "LGMG S2632EIILI": "S2632EIILI",
     "LGMG S4046E II": "S4046EII",
     "LGMG SS1230E": "SS1230E",
     "LGMG S1932EII": "S1932EII",
+    "LGMG MP0607SE": "MP0607SE",
+    "LGMG MP1007SE": "MP1007SE",
+    "LGMG MP1208SE": "MP1208SE",
+    "LGMG M2640JE": "M2640JE",
+    
+    # =========================================================================
+    # TORRE DE ILUMINACIÓN (2)
+    # =========================================================================
+    "Shindaiwa SL433IDG-B/S1W": "SL433IDGBS",
+    "Trime X-START": "XSTART",
     
     # =========================================================================
     # CORTADORA DE VARILLAS (1)
@@ -82,9 +93,12 @@ MODEL_CODE_MAPPING = {
     "Simpedil P54 EVO": "P54TTF06",
     
     # =========================================================================
-    # SOLDADORA (1)
+    # SOLDADORA (4)
     # =========================================================================
     "Shindaiwa DGW400DMK": "DGW400DMKD",
+    "Shindaiwa DGW340DM": "DGW340DM",
+    "Shindaiwa DGW500DM": "DGW500DM200",
+    "Shindaiwa EGW185MS": "EGW185MS",
 }
 
 import logging

@@ -39,7 +39,6 @@ def test_generate_quotation_pdf():
         "detalles_maquinaria": {
             "tipo_plataforma": "tijera",
             "altura_trabajo_m": "7",
-            "altura_plataforma_m": "5",
             "tipo_alimentacion": "eléctrica"
         }
     }
