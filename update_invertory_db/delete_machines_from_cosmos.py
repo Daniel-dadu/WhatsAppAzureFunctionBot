@@ -41,9 +41,10 @@ TOKENS_TO_DELETE = [
     "AR65JE-LI",
     "A30JE",
     "SS1932E",
-    "S3246E II",
+
     "S4650EII",
     "X-SOLAR",
+    "S2632EIILI",
 ]
 
 

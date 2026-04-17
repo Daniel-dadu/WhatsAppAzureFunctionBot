@@ -1,4 +1,5 @@
 import json
+import re
 import os
 from typing import Dict, Any, List, Optional, Tuple
 from langchain_openai import AzureChatOpenAI
@@ -142,36 +143,79 @@ class AzureOpenAIConfig:
 # FUNCIONES HELPER
 # ============================================================================
 
+def _is_distribuidor(giro: str) -> bool:
+    """Verifica si el giro corresponde a un distribuidor basado en palabras clave."""
+    if not giro:
+        return False
+    g = giro.lower()
+    distributor_keywords = ["venta", "renta", "distribuidor", "reventa", "distribucion", "distribución"]
+    for keyword in distributor_keywords:
+        if keyword in g:
+            return True
+    return False
+
+def _format_machine_details(machine: Dict[str, Any]) -> str:
+    """Extrae las características técnicas de una máquina en un string amigable."""
+    ignore_keys = {"modelo", "categoria", "id", "_rid", "_self", "_etag", "_attachments", "_ts", "precio", "moneda"}
+    details = []
+    for key, value in machine.items():
+        if key not in ignore_keys and value is not None and str(value).strip() != "":
+            # Convert keys: "altura_trabajo_m" -> "Altura Trabajo M"
+            label = " ".join(word.capitalize() for word in key.split("_"))
+            details.append(f"{label}: {value}")
+    
+    if details:
+        return f" ({', '.join(details)})"
+    return ""
+
 def get_pending_empresa_fields(current_state: ConversationState) -> List[str]:
     """
     Extrae los campos pendientes de la empresa según el flujo de venta o uso propio.
     Retorna una lista con los labels de los campos que aún no han sido respondidos.
     """
     uso = current_state.get("uso_empresa_o_venta")
+    
+    # 1. Primer bloque: uso, correo, ubicacion
     if not uso:
-        return ["¿La máquina es para venta/distribución o para uso propio de la empresa?"]
+        pending = ["si te dedicas a la venta/renta de maquinaria"]
+        if not current_state.get("correo"):
+            pending.append("correo electrónico")
+        if not current_state.get("lugar_requerimiento"):
+            pending.append("ubicación (estado de la República Mexicana)")
+        return pending
 
-    pending_fields = []
-    
-    if uso == "venta":
-        if not current_state.get("constancia_fiscal_entregada"):
-            pending_fields.append("Constancia de Situación Fiscal")
-    else:
-        # Campos de empresa que se agrupan en un solo mensaje
-        empresa_fields = {
-            "nombre_empresa": "Nombre de la empresa",
-            "giro_empresa": "Giro de la empresa",
-            "correo": "Correo electrónico",
-            "lugar_requerimiento": "Ubicación (estado de la República Mexicana)"
-        }
+    pending_basic = []
+    if not current_state.get("correo"):
+        pending_basic.append("correo electrónico")
+    if not current_state.get("lugar_requerimiento"):
+        pending_basic.append("ubicación (estado de la República Mexicana)")
         
-        # Obtener campos pendientes
-        for field_key, field_label in empresa_fields.items():
-            value = current_state.get(field_key)
-            if not value or value == "":
-                pending_fields.append(field_label)
-    
-    return pending_fields
+    if uso == "venta":
+        constancia = current_state.get("constancia_fiscal_entregada")
+        if not constancia: # None
+            return pending_basic + ["Constancia de Situación Fiscal"]
+        elif constancia == "No tiene" or constancia is False:
+            giro = current_state.get("giro_empresa")
+            if not giro:
+                return pending_basic + ["Giro de la empresa"]
+            
+            is_distribuidor = _is_distribuidor(giro)
+            if is_distribuidor:
+                return pending_basic
+            else:
+                if not current_state.get("nombre_empresa"):
+                    return pending_basic + ["Nombre de la empresa"]
+                return pending_basic
+        else:
+            return pending_basic
+            
+    else: # uso == "uso empresa"
+        if not current_state.get("nombre_empresa"):
+            pending_basic.append("Nombre de la empresa")
+        if not current_state.get("giro_empresa"):
+            pending_basic.append("Giro de la empresa")
+            
+        return pending_basic
 
 # ============================================================================
 # SISTEMA DE SLOT-FILLING INTELIGENTE
@@ -183,6 +227,58 @@ class IntelligentSlotFiller:
     def __init__(self, azure_config: AzureOpenAIConfig):
         self.llm = azure_config.create_extraction_llm()  # Usar LLM optimizado para extracción
         self.parser = JsonOutputParser()
+    
+    def _parse_json_robust(self, text: str) -> dict:
+        """
+        Parsing robusto de JSON que maneja:
+        - JSON envuelto en bloques de código markdown (```json ... ```)
+        - Texto extra antes/después del JSON
+        - Respuestas con explicaciones antes del JSON
+        Retorna un dict o lanza una excepción si no se puede parsear.
+        """
+        if not text or not text.strip():
+            return {}
+        
+        original_text = text
+        text = text.strip()
+        
+        # 1. Intentar parseo directo
+        try:
+            result = json.loads(text)
+            if isinstance(result, dict):
+                return result
+        except json.JSONDecodeError:
+            pass
+        
+        # 2. Intentar extraer JSON de bloques de código markdown
+        code_block_match = re.search(r'```(?:json)?\s*\n?(\{[\s\S]*?\})\s*\n?```', text)
+        if code_block_match:
+            try:
+                result = json.loads(code_block_match.group(1))
+                if isinstance(result, dict):
+                    return result
+            except json.JSONDecodeError:
+                pass
+        
+        # 3. Intentar encontrar la primera aparición de un objeto JSON { ... }
+        brace_match = re.search(r'(\{[\s\S]*\})', text)
+        if brace_match:
+            try:
+                result = json.loads(brace_match.group(1))
+                if isinstance(result, dict):
+                    return result
+            except json.JSONDecodeError:
+                pass
+        
+        # 4. Intentar con el parser de LangChain como último recurso
+        try:
+            result = self.parser.parse(original_text)
+            if isinstance(result, dict):
+                return result
+        except Exception:
+            pass
+        
+        raise ValueError(f"No se pudo extraer JSON válido del texto: {text[:200]}")
         
     def detect_negative_response(self, message: str, last_bot_question: Optional[str] = None) -> Optional[Dict[str, str]]:
         """
@@ -204,20 +300,19 @@ class IntelligentSlotFiller:
             
             result = response.content.strip()
             
-            # Intentar parsear como JSON
+            # Verificar si es "None" (no es respuesta negativa)
+            if result.lower().strip('"\'') == "none":
+                return None
+            
+            # Intentar parsear como JSON con método robusto
             try:
-                import json
-                parsed_result = json.loads(result)
+                parsed_result = self._parse_json_robust(result)
                 if isinstance(parsed_result, dict) and "response_type" in parsed_result and "field" in parsed_result:
                     return parsed_result
                 else:
                     return None
-            except json.JSONDecodeError:
-                # Si no es JSON válido, verificar si es "None"
-                if result.lower() == "none":
-                    return None
-                else:
-                    return None
+            except (ValueError, json.JSONDecodeError):
+                return None
                 
         except Exception as e:
             logging.error(f"Error detectando respuesta negativa: {e}")
@@ -289,13 +384,20 @@ class IntelligentSlotFiller:
                 maquinas_recomendadas_str=maquinas_recomendadas_str
             ))
             
-            # Parsear la respuesta JSON
-            general_extraction = self.parser.parse(response.content)
+            # Parsear la respuesta JSON con método robusto
+            raw_content = response.content
+            try:
+                general_extraction = self._parse_json_robust(raw_content)
+            except ValueError as parse_err:
+                logging.error(f"Error parseando JSON de extracción. Respuesta del LLM: '{raw_content[:300]}'. Error: {parse_err}")
+                general_extraction = {}
             
             # Fusionar resultados (la extracción general tiene prioridad si encuentra algo más específico,
             # pero mantenemos la respuesta negativa si no hay conflicto o si es complementaria)
             if isinstance(general_extraction, dict):
                 extracted_data.update(general_extraction)
+            
+            logging.info(f"Extracción completada. Mensaje: '{message[:50]}' → Datos: {json.dumps(extracted_data, ensure_ascii=False, default=str)}")
             
             # Lógica determinista de selección implícita
             quiere_cot_new = extracted_data.get("quiere_cotizacion")
@@ -312,6 +414,8 @@ class IntelligentSlotFiller:
             
         except Exception as e:
             logging.error(f"Error extrayendo información: {e}")
+            import traceback
+            logging.error(f"Traceback: {traceback.format_exc()}")
             return extracted_data
     
     def get_next_question(self, current_state: ConversationState) -> Optional[str]:
@@ -407,6 +511,24 @@ class IntelligentSlotFiller:
             fields_available_str += f"- {field}: " + FIELDS_CONFIG_PRIORITY[field]['description'] + "\n"
         return fields_available_str
     
+    def _get_contextual_required_fields(self, current_state: ConversationState) -> list:
+        """
+        Obtiene los campos requeridos para el tipo de maquinaria actual,
+        filtrando campos condicionales según el contexto.
+        Ej: tipo_alimentacion solo se requiere para plataformas articuladas.
+        """
+        tipo = current_state.get("tipo_maquinaria")
+        required_fields = get_required_fields_for_tipo(tipo)
+        
+        # Para plataformas, tipo_alimentacion solo aplica a "articulada"
+        if tipo == "plataforma":
+            detalles = current_state.get("detalles_maquinaria", {})
+            tipo_plataforma = detalles.get("tipo_plataforma", "")
+            if tipo_plataforma and tipo_plataforma != "articulada":
+                required_fields = [f for f in required_fields if f != "tipo_alimentacion"]
+        
+        return required_fields
+
     def _are_maquinaria_details_complete(self, current_state: ConversationState) -> bool:
         """Verifica si todos los detalles de maquinaria están completos"""
         tipo = current_state.get("tipo_maquinaria")
@@ -419,7 +541,7 @@ class IntelligentSlotFiller:
             return False
         
         detalles = current_state.get("detalles_maquinaria", {})
-        required_fields = get_required_fields_for_tipo(tipo)
+        required_fields = self._get_contextual_required_fields(current_state)
         
         return all(
             field in detalles and 
@@ -439,9 +561,15 @@ class IntelligentSlotFiller:
 
         detalles = current_state.get("detalles_maquinaria", {})
 
+        # Obtener campos requeridos según contexto (ej: tipo_alimentacion solo para articulada)
+        contextual_required = self._get_contextual_required_fields(current_state)
+
         # Buscar el primer campo de la configuración que no esté en los detalles
         for field_info in config.fields:
             field_name = field_info.name
+            # Saltar campos que no aplican en el contexto actual
+            if field_name not in contextual_required:
+                continue
             if not detalles.get(field_name):
                 # Encontrado el siguiente campo a preguntar
                 # Devolver la pregunta fija definida en la configuración centralizada
@@ -496,9 +624,8 @@ class IntelligentSlotFiller:
         if not detalles:
             return False
         
-        # Usar la configuración centralizada para obtener campos obligatorios
-        tipo = current_state.get("tipo_maquinaria")
-        required_fields = get_required_fields_for_tipo(tipo)
+        # Usar la configuración centralizada para obtener campos obligatorios (con contexto)
+        required_fields = self._get_contextual_required_fields(current_state)
         
         if not all(
             field in detalles and 
@@ -626,13 +753,7 @@ class IntelligentResponseGenerator:
                         cat = machine.get("categoria", "")
                         
                         # Agregar detalles clave según el tipo (simplificado)
-                        extra_info = ""
-                        if "altura_trabajo" in machine:
-                            extra_info += f" ({machine['altura_trabajo']})"
-                        elif "capacidad" in machine: # comp, montacargas, etc
-                             extra_info += f" ({machine['capacidad']})"
-                        elif "cfm" in machine:
-                            extra_info += f" ({machine['cfm']} CFM)"
+                        extra_info = _format_machine_details(machine)
                         
                         # NOTE: Prices are NOT shown in recommendations.
                         machines_list += f"- {modelo}{extra_info}\n"
@@ -640,21 +761,25 @@ class IntelligentResponseGenerator:
                     # Guardar la lista de modelos recomendados en el estado
                     current_state["maquinas_recomendadas"] = recommended_models
                     
+                    intro_recomendacion = "la siguiente opción disponible" if len(recommended_models) == 1 else "las siguientes opciones disponibles"
+                    
                     if current_state.get("quiere_cotizacion") is True:
-                        return f"""Muy bien, basándome en tus requerimientos, te recomiendo las siguientes opciones disponibles en nuestro inventario:
+                        cierre_cotizacion = "Para la cotización que solicitaste, ¿te interesa esta opción?" if len(recommended_models) == 1 else "Para la cotización que solicitaste, ¿te interesa alguna de estas opciones?"
+                        return f"""Muy bien, basándome en tus requerimientos, te recomiendo {intro_recomendacion} en nuestro inventario:
 {machines_list}
 
-Para proceder con la cotización que solicitaste, necesito los siguientes datos. ¿El equipo es para venta/distribución o para uso propio de su empresa?"""
+{cierre_cotizacion}"""
                     else:
-                        return f"""Muy bien, basándome en tus requerimientos, te recomiendo las siguientes opciones disponibles en nuestro inventario:
+                        cierre_cotizacion = "¿Te gustaría recibir una cotización formal por esta?" if len(recommended_models) == 1 else "¿Te gustaría recibir una cotización formal por alguna de estas?"
+                        return f"""Muy bien, basándome en tus requerimientos, te recomiendo {intro_recomendacion} en nuestro inventario:
 {machines_list}
-¿Te gustaría recibir una cotización formal por alguna de estas?"""
+{cierre_cotizacion}"""
                 else:
                      # Fallback si no hay coincidencias exactas
                     if current_state.get("quiere_cotizacion") is True:
-                        return """Entendido. Actualmente no encontré una coincidencia exacta en nuestro inventario, pero un asesor experto te buscará una alternativa para cotizarte."""
+                        return """Entendido. No manejamos una máquina en el inventario con esas características, pero un asesor experto te buscará una alternativa para cotizarte."""
                     else:
-                        return """Entendido. Actualmente no encontré una coincidencia exacta en nuestro inventario con esos requerimientos específicos, pero tenemos muchas opciones que podrían adaptarse.
+                        return """Entendido. No manejamos una máquina en el inventario con esas características, pero tenemos muchas opciones que podrían adaptarse.
  
 ¿Te gustaría que un asesor te contacte para ofrecerte una solución personalizada?"""
                 # END MODIFICATION
@@ -675,15 +800,31 @@ Para proceder con la cotización que solicitaste, necesito los siguientes datos.
                 - Si el usuario pregunta algo, responde de manera natural y útil
                 - Usa un mensaje como: """
                 should_list_pending_fields = False
-                if len(pending_fields) == 1 and pending_fields[0] == "¿La máquina es para venta/distribución o para uso propio de la empresa?":
-                    datos_empresa_instruction += "Por favor indícame, ¿el equipo es para venta/distribución o para uso propio de su empresa?"
-                elif len(pending_fields) == 1 and pending_fields[0] == "Constancia de Situación Fiscal":
+                uso = current_state.get("uso_empresa_o_venta")
+                
+                if not uso and "si te dedicas a la venta/renta de maquinaria" in pending_fields:
+                    missing_str = "¿Te dedicas a la venta o renta de maquinaria?"
+                    if "correo electrónico" in pending_fields and "ubicación (estado de la República Mexicana)" in pending_fields:
+                         missing_str += " También me podrías compartir tu correo electrónico y ubicación (estado de la República Mexicana)."
+                    elif "correo electrónico" in pending_fields:
+                         missing_str += " También me podrías compartir tu correo electrónico."
+                    elif "ubicación (estado de la República Mexicana)" in pending_fields:
+                         missing_str += " También me podrías compartir tu ubicación (estado de la República Mexicana)."
+                    datos_empresa_instruction += f"{missing_str}"
+                
+                elif "Constancia de Situación Fiscal" in pending_fields and len(pending_fields) == 1:
                     datos_empresa_instruction += "Pide ÚNICAMENTE la Constancia de Situación Fiscal. EXPRESAMENTE PROHIBIDO pedir otro dato como nombre de empresa, teléfono o correo. Usa este mensaje exacto: 'Perfecto, para poder brindarle un precio preferencial como distribuidor, le pido de favor que me comparta por este medio su Constancia de Situación Fiscal.'"
-                elif len(pending_fields) == 4:
-                    datos_empresa_instruction += "Excelente. Para poder generar la cotización, necesito que me comparta los siguientes datos:"
-                    should_list_pending_fields = True
+                
+                elif pending_fields == ["Giro de la empresa"]:
+                    datos_empresa_instruction += "Pregunta ÚNICAMENTE por el giro de la empresa usando un mensaje como: 'Para continuar, ¿me podrías indicar cuál es el giro de tu empresa?' No uses viñetas."
+                    should_list_pending_fields = False
+                    
+                elif pending_fields == ["Nombre de la empresa"]:
+                    datos_empresa_instruction += "Pregunta ÚNICAMENTE por el nombre de la empresa usando un mensaje como: 'Para generar la cotización, ¿me podrías indicar el nombre de tu empresa?' No uses viñetas."
+                    should_list_pending_fields = False
+
                 else:
-                    datos_empresa_instruction += "Gracias. También necesito estos otros campos:"
+                    datos_empresa_instruction += "Para poder generar la cotización, necesito que me comparta el siguiente dato (o datos):"
                     should_list_pending_fields = True
                 
                 if should_list_pending_fields:
@@ -703,6 +844,10 @@ Para proceder con la cotización que solicitaste, necesito los siguientes datos.
                 - Debes dejar claro que FALTAN datos y que la conversación continúa.
                     """
 
+            tipo_ayuda_instruction = ""
+            if question_type == "tipo_ayuda":
+                tipo_ayuda_instruction = "IMPORTANTÍSIMO: Cuando vayas a preguntar en qué le puedes ayudar al usuario, EXCLUSIVAMENTE usa la frase: '¿En qué te puedo ayudar?' de forma literal y directa, sin agregar texto adicional a la pregunta."
+
             current_state_str = get_current_state_str(current_state)
             formatedPrompt = prompt.format_prompt(
                 user_message=message,
@@ -713,7 +858,8 @@ Para proceder con la cotización que solicitaste, necesito los siguientes datos.
                 inventory_instruction=inventory_instruction,
                 presentation_instruction=presentation_instruction,
                 extracted_name_instruction=extracted_name_instruction,
-                datos_empresa_instruction=datos_empresa_instruction
+                datos_empresa_instruction=datos_empresa_instruction,
+                tipo_ayuda_instruction=tipo_ayuda_instruction
             )
 
             debug_print(f"DEBUG: Prompt conversacional: {formatedPrompt}")
@@ -739,8 +885,18 @@ Para proceder con la cotización que solicitaste, necesito los siguientes datos.
     def generate_final_response(self, current_state: ConversationState) -> str:
         """Genera la respuesta final cuando la conversación está completa"""
         
-        # Revisión rápida: Si es venta, responder y detener
-        if current_state.get("uso_empresa_o_venta") == "venta":
+        uso = current_state.get("uso_empresa_o_venta")
+        constancia = current_state.get("constancia_fiscal_entregada")
+        giro = current_state.get("giro_empresa", "")
+        
+        is_advisor_handoff = False
+        if uso == "venta":
+            if constancia and constancia != "No tiene":
+                is_advisor_handoff = True
+            elif (constancia == "No tiene" or constancia is False) and giro and _is_distribuidor(giro):
+                is_advisor_handoff = True
+                
+        if is_advisor_handoff:
             return "En un momento te contactará el asesor de la zona para darle el precio preferencial."
 
         from pricing_service import get_pricing_service
@@ -762,22 +918,20 @@ Para proceder con la cotización que solicitaste, necesito los siguientes datos.
                 if price_info:
                     precio = price_info["price"]
                     moneda = price_info.get("currency", "USD")
-                    pricing_str = f"\n\n📋 **Máquina seleccionada:**\n- {maquina_seleccionada}: ${precio:,.0f} {moneda}"
+                    pricing_str = f"\n\nMáquina seleccionada:\n- {maquina_seleccionada}: ${precio:,.0f} {moneda}"
                     logging.info(f"[PRICING_DEBUG] generate_final_response: Price FOUND - ${precio:,.0f} {moneda}")
                 else:
-                    pricing_str = f"\n\n📋 **Máquina seleccionada:**\n- {maquina_seleccionada}: Precio a consultar"
+                    pricing_str = f"\n\nMáquina seleccionada:\n- {maquina_seleccionada}: Precio a consultar"
                     logging.warning(f"[PRICING_DEBUG] generate_final_response: No price found for '{maquina_seleccionada}'")
             except Exception as e:
                 logging.error(f"[PRICING_DEBUG] generate_final_response: EXCEPTION fetching price: {type(e).__name__}: {e}")
                 import traceback
                 logging.error(f"[PRICING_DEBUG] generate_final_response: Traceback: {traceback.format_exc()}")
-                pricing_str = f"\n\n📋 **Máquina seleccionada:**\n- {maquina_seleccionada}"
+                pricing_str = f"\n\nMáquina seleccionada:\n- {maquina_seleccionada}"
         
-        return f"""¡Perfecto, {current_state['nombre']}!{pricing_str}
+        return f"""¡Perfecto, {current_state.get('nombre', 'Usuario')}!{pricing_str}
 
-Procederé a generar su cotización. Nos pondremos en contacto con usted pronto.
-
-¿Hay algo más en lo que pueda ayudarle?"""
+Procederé a generar su cotización."""
 
 # ============================================================================
 # RESPONDEDOR DE INVENTARIO
@@ -1142,13 +1296,15 @@ class IntelligentLeadQualificationChatbot:
             if value is None or value == "":
                 continue
 
-            # 2. No sobrescribir campos que ya tienen un valor válido a excepción de detalles_maquinaria y quiere_cotizacion.
-            # detalles_maquinaria se actualiza múltiples veces porque tiene varios subcampos.
-            # quiere_cotizacion puede cambiar si el usuario corrige su respuesta.
+            # 2. No sobrescribir campos que ya tienen un valor válido a excepción de:
+            # - detalles_maquinaria: se actualiza múltiples veces porque tiene varios subcampos.
+            # - quiere_cotizacion: puede cambiar si el usuario corrige su respuesta.
+            # - maquina_seleccionada: puede cambiar si el usuario elige otra máquina.
+            # - tipo_maquinaria: puede cambiar si el usuario cambia de opinión.
             # Esto es clave para evitar que una respuesta ambigua posterior
             # borre un dato que ya se había confirmado.
             current_value = self.state.get(key)
-            if key not in ["detalles_maquinaria", "quiere_cotizacion", "maquina_seleccionada"] and current_value:
+            if key not in ["detalles_maquinaria", "quiere_cotizacion", "maquina_seleccionada", "tipo_maquinaria"] and current_value:
                 debug_print(f"DEBUG: Campo '{key}' ya tiene valor válido '{current_value}', no se sobrescribe.")
                 continue
 
@@ -1163,8 +1319,17 @@ class IntelligentLeadQualificationChatbot:
                 # Validar dinámicamente si el tipo existe en la configuración
                 config = machinery_config_service.get_config(value)
                 if config:
+                    old_tipo = self.state.get("tipo_maquinaria")
                     self.state[key] = value
                     debug_print(f"DEBUG: Campo '{key}' actualizado a: {value}")
+                    
+                    # Si el tipo de maquinaria CAMBIÓ, limpiar campos relacionados
+                    if old_tipo and old_tipo != value:
+                        debug_print(f"DEBUG: Tipo de maquinaria cambió de '{old_tipo}' a '{value}'. Limpiando detalles, recomendaciones y selección.")
+                        self.state["detalles_maquinaria"] = {}
+                        self.state["maquinas_recomendadas"] = []
+                        self.state["maquina_seleccionada"] = None
+                        self.state["quiere_cotizacion"] = None
                 else:
                     logging.error(f"ADVERTENCIA: Tipo de maquinaria inválido '{value}' extraído por el LLM.")
             

@@ -75,6 +75,7 @@ MODEL_CODE_MAPPING = {
     "LGMG MP1007SE": "MP1007SE",
     "LGMG MP1208SE": "MP1208SE",
     "LGMG M2640JE": "M2640JE",
+    "LGMG S3246E II": "S3246E-2",
     
     # =========================================================================
     # TORRE DE ILUMINACIÓN (2)

@@ -105,7 +105,8 @@ inventario = [
     {"modelo": "LGMG S2632E II", "categoria": "plataforma", "tipo_plataforma": "tijera",     "altura_trabajo_m": 10,    "altura_plataforma_m": 8,     "tipo_alimentacion": "electrica"},
     {"modelo": "LGMG S4046E II", "categoria": "plataforma", "tipo_plataforma": "tijera",     "altura_trabajo_m": 14,    "altura_plataforma_m": 12,    "tipo_alimentacion": "electrica"},
     {"modelo": "LGMG S1932EII", "categoria": "plataforma", "tipo_plataforma": "tijera", "altura_trabajo_m": 7.5, "altura_plataforma_m": 5.8, "tipo_alimentacion": "electrica"},
-    {"modelo": "LGMG S2632EIILI", "categoria": "plataforma", "tipo_plataforma": "tijera", "altura_trabajo_m": 10, "altura_plataforma_m": 8, "tipo_alimentacion": "electrica"},
+
+    {"modelo": "LGMG S3246E II", "categoria": "plataforma", "tipo_plataforma": "tijera", "altura_trabajo_m": 12, "altura_plataforma_m": 10, "tipo_alimentacion": "electrica"},
     {"modelo": "LGMG MP0607SE", "categoria": "plataforma", "tipo_plataforma": "unipersonal", "altura_trabajo_m": 8.2, "altura_plataforma_m": 6.2, "tipo_alimentacion": "electrica"},
     {"modelo": "LGMG MP1007SE", "categoria": "plataforma", "tipo_plataforma": "unipersonal", "altura_trabajo_m": 12.1, "altura_plataforma_m": 10.1, "tipo_alimentacion": "electrica"},
     {"modelo": "LGMG MP1208SE", "categoria": "plataforma", "tipo_plataforma": "unipersonal", "altura_trabajo_m": 14, "altura_plataforma_m": 12, "tipo_alimentacion": "electrica"},

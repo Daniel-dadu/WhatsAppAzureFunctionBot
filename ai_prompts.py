@@ -52,26 +52,35 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     MENSAJE DEL USUARIO: {message}
     
     INSTRUCCIONES:
-    1. Solo extrae campos que estén VACÍOS en el estado actual
-    2. Para detalles_maquinaria, solo incluye campos específicos que no estén ya llenos
-    3. Responde SOLO en formato JSON válido
-    4. IMPORTANTE: Si el mensaje del usuario no contiene información nueva para campos vacíos, responde con {{}} (JSON vacío)
-    5. NO extraigas información de campos que ya están llenos, A MENOS de que el usuario elija una máquina recomendada y necesites actualizar maquina_seleccionada.
-    6. CLASIFICACIÓN INTELIGENTE: Si la última pregunta es sobre un campo específico, clasifica la respuesta en ese campo
+    1. Solo extrae campos que estén VACÍOS en el estado actual, CON EXCEPCIÓN de tipo_maquinaria y detalles_maquinaria que SÍ pueden ser re-extraídos si el usuario cambia de opinión (ver regla de CAMBIO DE OPINIÓN abajo).
+    2. Para detalles_maquinaria, incluye campos específicos que el usuario mencione, incluso si ya tienen valor (el usuario puede corregir o cambiar sus respuestas).
+    3. Responde SOLO en formato JSON válido, sin texto ni explicaciones adicionales
+    4. Si el mensaje del usuario no contiene ABSOLUTAMENTE NINGUNA información relevante para campos vacíos, responde con {{}} (JSON vacío). Pero si el mensaje contiene un nombre, apellido, tipo de maquinaria, correo, teléfono, o cualquier dato relevante, SIEMPRE extráelo.
+    5. NO extraigas información de campos que ya están llenos, A MENOS de que: (a) el usuario elija una máquina recomendada y necesites actualizar maquina_seleccionada, o (b) el usuario cambie de opinión sobre tipo_maquinaria o detalles_maquinaria.
+    6. CLASIFICACIÓN INTELIGENTE: Si la última pregunta es sobre un campo específico, clasifica la respuesta en ese campo. Ejemplo: si la última pregunta es "¿Con quién tengo el gusto?" y el usuario dice "Me llamo Ana", extrae {{"nombre": "Ana"}}.
     7. IMPORTANTE: giro_empresa y detalles_maquinaria.actividad son campos INDEPENDIENTES. Si la información aplica para ambos, extráela en AMBOS.
     
-    REGLAS DE ORO (PRIORIDAD ALTA):
-    1. Si el usuario menciona una empresa ("Trabajo en X", "Soy de X", "Empresa X", "Vengo de X"), SIEMPRE extrae "nombre_empresa": "X".
-    2. Si el usuario menciona un correo, SIEMPRE extrae "correo".
-    3. Si el usuario menciona un teléfono, SIEMPRE extrae "telefono".
-    4. Si hay información positiva y negativa, SIEMPRE extrae la positiva.
-    5. Si el usuario dice "nos dedicamos a [actividad]" o describe su actividad, SIEMPRE extrae "giro_empresa": "[actividad]".
-    6. Si la última pregunta del bot pregunta si el equipo es "para uso" o "para venta" (o variaciones como "para venta/distribución o para uso propio"), SIEMPRE clasifica la respuesta del usuario en "uso_empresa_o_venta":
-       - Cualquier indicación de uso propio, uso de empresa, uso interno → "uso empresa" (exactamente este string)
-       - Cualquier indicación de venta, reventa, distribución, comercialización → "venta" (exactamente este string)
-       - Ejemplos: "Es para nuestra empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
-       - Ejemplos: "es para uso propio" → {{"uso_empresa_o_venta": "uso empresa"}}
-       - Ejemplos: "es para uso de la empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
+    CAMBIO DE OPINIÓN DEL USUARIO (PRIORIDAD ALTA):
+    - Si el usuario indica que quiere CAMBIAR el tipo de maquinaria (ej: "mejor quiero una soldadora", "no, prefiero un generador", "cambia a compresor"), SIEMPRE extrae el nuevo tipo_maquinaria, AUNQUE ya tenga un valor en el estado.
+    - Si el usuario quiere cambiar un detalle específico de maquinaria (ej: "mejor de 15 metros", "no, la quiero de diésel", "cámbialo a articulada"), SIEMPRE extrae el nuevo valor en detalles_maquinaria, AUNQUE ya tenga un valor.
+    - Ejemplos:
+      * Estado: tipo_maquinaria = "plataforma", usuario dice "mejor quiero una soldadora" → {{"tipo_maquinaria": "soldadora"}}
+      * Estado: detalles_maquinaria.altura_trabajo_m = 10, usuario dice "mejor de 15 metros" → {{"detalles_maquinaria": {{"altura_trabajo_m": 15}}}}
+      * Estado: detalles_maquinaria.tipo_plataforma = "tijera", usuario dice "mejor articulada" → {{"detalles_maquinaria": {{"tipo_plataforma": "articulada"}}}}
+    
+    REGLAS DE ORO (PRIORIDAD MÁXIMA - SIEMPRE APLICAN):
+    1. Si el usuario dice su nombre ("soy [nombre]", "me llamo [nombre]", "mi nombre es [nombre]"), SIEMPRE extrae "nombre". Si incluye apellido, TAMBIÉN extrae "apellido". NUNCA retornes {{}} cuando el usuario dice su nombre.
+    2. Si el usuario dice su apellido ("mi apellido es [apellido]", "apellido [apellido]"), SIEMPRE extrae "apellido". NUNCA retornes {{}} cuando el usuario dice su apellido.
+    3. Si el usuario menciona una empresa ("Trabajo en X", "Soy de X", "Empresa X", "Vengo de X"), SIEMPRE extrae "nombre_empresa": "X".
+    4. Si el usuario menciona un correo, SIEMPRE extrae "correo".
+    5. Si el usuario menciona un teléfono, SIEMPRE extrae "telefono".
+    6. Si hay información positiva y negativa, SIEMPRE extrae la positiva.
+    7. Si el usuario dice "nos dedicamos a [actividad]" o describe su actividad, SIEMPRE extrae "giro_empresa": "[actividad]".
+    8. Si la última pregunta del bot pregunta si el usuario "se dedica a la venta/renta de maquinaria" (o variaciones de uso vs venta), SIEMPRE clasifica la respuesta del usuario en "uso_empresa_o_venta":
+       - Cualquier respuesta afirmativa ("sí", "si me dedico", "renta", "soy distribuidor") o indicación de venta, reventa, distribución, comercialización → "venta" (exactamente este string)
+       - Cualquier respuesta negativa ("no", "no me dedico a eso", "es para uso propio", "para mi empresa", "uso interno") o indicación de uso propio, uso de empresa, uso interno → "uso empresa" (exactamente este string)
+       - Ejemplos: "Sí me dedico a la venta" → {{"uso_empresa_o_venta": "venta"}}
+       - Ejemplos: "No, la quiero para usarla yo" → {{"uso_empresa_o_venta": "uso empresa"}}
        - Ejemplos: "uso empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
        - Ejemplos: "quiero comercializarla, es para venta" → {{"uso_empresa_o_venta": "venta"}}
        - Ejemplos: "para distribución" → {{"uso_empresa_o_venta": "venta"}}
@@ -79,13 +88,16 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     CAMPOS A EXTRAER (solo si están vacíos):
     {fields_available}
 
-    REGLAS ESPECIALES PARA NOMBRES:
-    - Si el usuario dice "soy [nombre]", "me llamo [nombre]", "hola, soy [nombre]" → extraer nombre y apellido
+    REGLAS ESPECIALES PARA NOMBRES (PRIORIDAD MÁXIMA):
+    - Si el usuario dice "soy [nombre]", "me llamo [nombre]", "hola, soy [nombre]", "mi nombre es [nombre]" → extraer nombre (y apellido si aplica)
+    - Si el usuario dice "mi apellido es [apellido]" → extraer apellido
     - Para nombres de 1 palabra: llenar solo "nombre"
     - Para nombres de 2+ palabras: llenar "nombre" con la primera palabra y "apellido" con el resto
-    - Ejemplos: "soy Paco" → nombre: "Paco"
-    - Ejemplos: "soy Paco Perez" → nombre: "Paco", apellido: "Perez"
-    - Ejemplos: "soy Paco Perez Diaz" → nombre: "Paco", apellido: "Perez Diaz"
+    - Ejemplos: "Me llamo Ana" → {{"nombre": "Ana"}}
+    - Ejemplos: "soy Paco" → {{"nombre": "Paco"}}
+    - Ejemplos: "soy Paco Perez" → {{"nombre": "Paco", "apellido": "Perez"}}
+    - Ejemplos: "soy Paco Perez Diaz" → {{"nombre": "Paco", "apellido": "Perez Diaz"}}
+    - Ejemplos: "Mi apellido es Gómez" → {{"apellido": "Gómez"}}
 
     Los tipos de maquinaria disponibles para el campo tipo_maquinaria son:
     {maquinaria_names}
@@ -93,13 +105,13 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     REGLAS ADICIONALES PARA DETALLES DE MAQUINARIA (PRIORIDAD MÁXIMA - STRICT MODE):
     {machine_specific_fields}
     - IMPORTANTE: Usa EXACTAMENTE los nombres de campos listados arriba (keys del JSON).
-    - NO uses sinónimos ni inventes nombres. Si el usuario dice "volumen", usa el campo correspondiente (ej. "cfm_requerido").
+    - NO uses sinónimos ni inventes nombres. Si el usuario dice "volumen", usa el campo correspondiente (ej. "caudal_cfm_max").
     - NO extraigas campos que no estén en esta lista.
     - PROHIBIDO inventar campos como: "proyecto", "aplicación", "capacidad_volumen", "capacidad_de_volumen", "volumen", etc.
     - IMPORTANTE: Si el usuario dice "para venta", extráelo como "uso_empresa_o_venta": "venta", y NO como actividad en detalles_maquinaria.
     
     REGLAS ESPECIALES PARA VALORES NUMÉRICOS:
-    - IMPORTANTE: Si un campo representa una cantidad numérica (ej. "altura_plataforma_m", "altura_trabajo_m", "potencia_kw", "amperaje_amps_max", "capacidad_carga_kg", "cfm_requerido", etc.), el valor extraído DEBE SER UN NÚMERO (INTEGER O FLOAT), NUNCA UN STRING.
+    - IMPORTANTE: Si un campo representa una cantidad numérica (ej. "altura_plataforma_m", "altura_trabajo_m", "potencia_kw", "amperaje_amps_max", "capacidad_carga_kg", "caudal_cfm_max", etc.), el valor extraído DEBE SER UN NÚMERO (INTEGER O FLOAT), NUNCA UN STRING.
     - Ejemplos correctos: {{"detalles_maquinaria": {{"altura_trabajo_m": 11, "capacidad_carga_kg": 900}}}}
     - Ejemplos correctos: {{"detalles_maquinaria": {{"potencia_kw": 20}}}}
     - Ejemplos INCORRECTOS: {{"detalles_maquinaria": {{"altura_trabajo_m": "11", "capacidad_carga_kg": "900"}}}}
@@ -129,6 +141,7 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - IMPORTANTE: Las reglas de extracción son DIFERENTES según el tipo de maquinaria actual:
     
     A) Para PLATAFORMA (tipo_maquinaria = "plataforma"):
+       - IMPORTANTE: tipo_alimentacion SOLO se debe extraer cuando tipo_plataforma es "articulada". Para tijera, unipersonal y mástil, NO extraer tipo_alimentacion ya que todas son eléctricas.
        * Si el usuario dice "eléctrica", "electrica", "eléctrico", "electrico", "de batería", "bateria" → tipo_alimentacion: "electrica" (STRING)
        * Si el usuario dice "combustible", "diésel", "diesel", "gasolina", "gas", "de motor" → tipo_alimentacion: "combustible" (STRING)
        - Ejemplos correctos: {{"detalles_maquinaria": {{"tipo_alimentacion": "electrica"}}}}
@@ -156,24 +169,23 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - Ejemplo: Pregunta "¿A qué se dedican?" + Respuesta "Nos dedicamos a la mineria" → giro_empresa: "mineria"
     
     REGLAS ESPECIALES PARA USO_EMPRESA_O_VENTA:
-    - IMPORTANTE: Si la última pregunta del bot es sobre si el equipo es "para uso de la empresa o para venta" (o variaciones como "para venta/distribución o para uso propio"), la respuesta del usuario SIEMPRE debe ser clasificada como uso_empresa_o_venta.
-    - PARA VENTA: Si el usuario indica que el equipo es para reventa, distribución o comercialización:
-      * "para venta", "es para vender", "para comercializar", "distribución", "para reventa", "para distribuir" → uso_empresa_o_venta: "venta"
-    - PARA USO EMPRESA: Si el usuario indica que el equipo es para su propia empresa, uso interno o uso propio:
-      * "para uso", "para usar", "para trabajo interno", "uso propio", "uso empresa" → uso_empresa_o_venta: "uso empresa"
+    - IMPORTANTE: Si la última pregunta del bot es sobre "si te dedicas a la venta/renta de maquinaria" (o variaciones como "para venta/distribución o para uso propio"), la respuesta del usuario SIEMPRE debe ser clasificada como uso_empresa_o_venta.
+    - PARA VENTA: Si el usuario responde afirmativamente, dice que sí vende/renta, o que es para reventa/distribución:
+      * "sí", "si me dedico", "venta de maquinaria", "renta", "para venta", "es para vender", "para comercializar", "distribución" → uso_empresa_o_venta: "venta"
+    - PARA USO EMPRESA: Si el usuario responde negativamente, dice que es para uso propio, o uso de la empresa:
+      * "no", "no me dedico a eso", "es para uso propio", "para mi empresa", "uso interno", "para trabajo interno" → uso_empresa_o_venta: "uso empresa"
       * "es para nuestra empresa", "es para la empresa", "es para uso de la empresa" → uso_empresa_o_venta: "uso empresa"
-      * "uso propio", "para nosotros", "para uso interno", "para uso nuestro" → uso_empresa_o_venta: "uso empresa"
-      * "para mi empresa", "para nuestra operación", "para nuestro uso" → uso_empresa_o_venta: "uso empresa"
-    - IMPORTANTE: El valor SIEMPRE debe ser exactamente "uso empresa" o "venta" (STRING), no variaciones como "uso propio", "para la empresa", etc.
+    - IMPORTANTE: El valor SIEMPRE debe ser exactamente "uso empresa" o "venta" (STRING).
     - Ejemplos correctos:
-      * Pregunta: "¿El equipo es para uso de la empresa o para venta?" + "Es para nuestra empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
-      * Pregunta: "¿Es para venta/distribución o para uso propio?" + "Es para uso de la empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
+      * Pregunta: "¿Te dedicas a la venta/renta de maquinaria?" + "No, es para nuestra empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
+      * Pregunta: "¿Te dedicas a la venta/renta de maquinaria?" + "Sí, vendemos" → {{"uso_empresa_o_venta": "venta"}}
       * Pregunta: "¿El equipo es para venta o para uso propio?" + "es para uso propio" → {{"uso_empresa_o_venta": "uso empresa"}}
-      * Pregunta: "¿El equipo es para venta o para uso propio?" + "uso empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
       * Pregunta: "¿El equipo es para venta o para uso propio?" + "Para venta" → {{"uso_empresa_o_venta": "venta"}}
     
     REGLAS ESPECIALES PARA CONSTANCIA_FISCAL_ENTREGADA:
     - Si el bot requirió la Constancia de Situación Fiscal y el usuario adjuntó documento, foto, o reponde con textos similares a "aquí la adjunto", "ya te la mandé", "listo", "claro que sí", "aquí está" → constancia_fiscal_entregada: true (BOOLEANO)
+    - Si el usuario dice que "no la tiene", "no", "no cuento con ella", "después", "te la debo", "no tengo la constancia", "no la tengo" → constancia_fiscal_entregada: "No tiene" (STRING)
+    - EJEMPLO MÚLTIPLE: Si el bot pide ubicación y constancia y el usuario responde "estamos en Querétaro, pero no tengo la constancia" → {{"lugar_requerimiento": "Querétaro", "constancia_fiscal_entregada": "No tiene"}}
     
     REGLAS ESPECIALES PARA TIPO_AYUDA:
     - Si la última pregunta es "¿En qué te puedo ayudar?" o similar, analiza si el usuario menciona:
@@ -188,7 +200,8 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - Mensaje: "me llamo Mauricio Martinez Rodriguez" → {{"nombre": "Mauricio", "apellido": "Martinez Rodriguez"}}
     - Mensaje: "venta de maquinaria" → {{"giro_empresa": "venta de maquinaria"}}
     - Mensaje: "construcción y mantenimiento" → {{"giro_empresa": "construcción y mantenimiento"}}
-    - Mensaje: "para venta" → {{"uso_empresa_o_venta": "venta"}}
+    - Mensaje: "no, es para uso propio" → {{"uso_empresa_o_venta": "uso empresa"}}
+    - Mensaje: "sí me dedico a la renta" → {{"uso_empresa_o_venta": "venta"}}
     - Mensaje: "en la Ciudad de México" → {{"lugar_requerimiento": "Ciudad de México"}}
     - Mensaje: "daniel@empresa.com" → {{"correo": "daniel@empresa.com"}}
     - Mensaje: "555-1234" → {{"telefono": "555-1234"}}
@@ -197,11 +210,9 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - Última pregunta: "¿En qué compañía trabajas?" + Mensaje: "Facebook" → {{"nombre_empresa": "Facebook"}}
     - Última pregunta: "¿Cuál es el giro de su empresa?" + Mensaje: "Construcción" → {{"giro_empresa": "Construcción"}}
     - Última pregunta: "¿Cuál es su correo electrónico?" + Mensaje: "daniel@empresa.com" → {{"correo": "daniel@empresa.com"}}
-    - Última pregunta: "¿Es para uso de la empresa o para venta?" + Mensaje: "Para venta" → {{"uso_empresa_o_venta": "venta"}}
-    - Última pregunta: "¿Es para venta/distribución o para uso propio?" + Mensaje: "Es para nuestra empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
+    - Última pregunta: "¿Te dedicas a la venta/renta de maquinaria?" + Mensaje: "Sí" → {{"uso_empresa_o_venta": "venta"}}
+    - Última pregunta: "¿Te dedicas a la venta/renta de maquinaria?" + Mensaje: "No, es para nuestra empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
     - Última pregunta: "¿El equipo es para venta o para uso propio?" + Mensaje: "Es para uso de la empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
-    - Última pregunta: "¿El equipo es para venta o para uso propio?" + Mensaje: "uso empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
-    - Última pregunta: "¿El equipo es para venta o para uso propio?" + Mensaje: "es para uso propio" → {{"uso_empresa_o_venta": "uso empresa"}}
     - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Necesito una soldadora" → {{"tipo_ayuda": "maquinaria"}}
     - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Quiero información sobre créditos" → {{"tipo_ayuda": "otro"}}
     - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Refacciones" → {{"tipo_ayuda": "otro"}}
@@ -289,6 +300,7 @@ RESPONSE_GENERATION_PROMPT = ChatPromptTemplate.from_template(
     {inventory_instruction}
     {presentation_instruction}
     {datos_empresa_instruction}
+    {tipo_ayuda_instruction}
     
     INSTRUCCIONES:
     1. No repitas información que ya confirmaste anteriormente 

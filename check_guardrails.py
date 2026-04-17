@@ -59,7 +59,7 @@ class ContentSafetyGuardrails:
 
             categories = response["categoriesAnalysis"]
             for category in categories:
-                if category["severity"] > 1:
+                if category["severity"] > 3:
                     return True
             return False
 
@@ -167,8 +167,18 @@ class ContentSafetyGuardrails:
             content_safety_result = self.check_content_safety(message)
             logging.info(f"Verificando seguridad de contenido: {content_safety_result}")
             
-            # Check allowlist for machinery terms that trigger false positives
-            allowed_terms = ["motobomba", "cortadora", "bomba", "corte", "tijera"]
+            # Check allowlist for machinery/business terms that trigger false positives
+            allowed_terms = [
+                "motobomba", "cortadora", "bomba", "corte", "tijera",
+                "soldadora", "soldadoras", "soldar", "soldadura",
+                "cotiza", "cotizame", "cotización", "cotizacion", "coticemos",
+                "generador", "compresor", "plataforma", "montacargas",
+                "torre", "iluminación", "iluminacion", "rompedor", "martillo",
+                "dobladora", "apisonador", "manipulador",
+                "diesel", "diésel", "gasolina", "combustible", "eléctrica", "electrica",
+                "maquinaria", "maquina", "máquina", "equipo",
+                "prefiero", "quiero", "necesito", "primera", "segunda", "tercera"
+            ]
             is_allowed = any(term in message.lower() for term in allowed_terms)
 
             if content_safety_result:

@@ -46,7 +46,7 @@ machinery_configurations = [
         ]
     },
     {
-        "type_id": "rompedor",
+        "type_id": "rompedor", # tambi'en se llaman martillo
         "name": "Rompedor",
         "fields": []
     },
@@ -95,7 +95,7 @@ machinery_configurations = [
         "type_id": "torre_iluminacion",
         "name": "Torre de Iluminación",
         "fields": [
-            {
+            { # TODO: no hacer esta pregunta
                 "name": "tipo_reflector", # Changed from boolean es_led to selection vs inventory field
                 "question": "¿qué tipo de iluminación prefiere (ej. LED)?",
                 "reason": "Para determinar el tipo de iluminación necesario",
@@ -151,7 +151,7 @@ machinery_configurations = [
         "type_id": "manipulador",
         "name": "Manipulador Telescópico",
         "fields": [
-            {
+            { # TODO: no hacer esta pregunta
                 "name": "altura_maxima_m",
                 "question": "¿qué altura necesita?",
                 "reason": "Para determinar la altura necesaria",
