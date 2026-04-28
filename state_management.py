@@ -16,7 +16,7 @@ class ConversationState(TypedDict):
     nombre_empresa: Optional[str]
     giro_empresa: Optional[str]
     lugar_requerimiento: Optional[str]
-    uso_empresa_o_venta: Optional[str]
+    tipo_cliente: Optional[str]
     correo: Optional[str]
     telefono: Optional[str]
     constancia_fiscal_entregada: Optional[bool]
@@ -93,9 +93,9 @@ FIELDS_CONFIG_PRIORITY = {
         "reason": "Para coordinar la entrega del equipo",
         "required": False
     },
-    "uso_empresa_o_venta": {
-        "description": "Si es para uso de la empresa o para venta",
-        "question": "¿El equipo es para uso de la empresa o para venta?", 
+    "tipo_cliente": {
+        "description": "Si es un cliente final o distribuidor",
+        "question": "¿El equipo es para venta o renta?", 
         "reason": "Para ofrecerle los mejores precios",
         "required": False
     },
@@ -357,7 +357,7 @@ class CosmosDBStateStore(ConversationStateStore):
             "detalles_maquinaria": state.get("detalles_maquinaria", {}),
             "maquina_seleccionada": state.get("maquina_seleccionada"),
             "maquinas_recomendadas": state.get("maquinas_recomendadas", []),
-            "uso_empresa_o_venta": state.get("uso_empresa_o_venta"),
+            "tipo_cliente": state.get("tipo_cliente"),
             "nombre_empresa": state.get("nombre_empresa"),
             "giro_empresa": state.get("giro_empresa"),
             "correo": state.get("correo"),
@@ -396,7 +396,7 @@ class CosmosDBStateStore(ConversationStateStore):
         # Campos a monitorear para cambios
         fields_to_check = [
             "nombre", "apellido", "tipo_ayuda", "tipo_maquinaria", "detalles_maquinaria",
-            "maquina_seleccionada", "maquinas_recomendadas", "uso_empresa_o_venta", "nombre_empresa", 
+            "maquina_seleccionada", "maquinas_recomendadas", "tipo_cliente", "nombre_empresa", 
             "giro_empresa", "correo", "telefono", "completed", 
             "lugar_requerimiento", "asignado_asesor", "quiere_cotizacion"
         ]

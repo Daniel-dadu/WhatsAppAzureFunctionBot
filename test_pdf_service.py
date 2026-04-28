@@ -33,7 +33,7 @@ def test_generate_quotation_pdf():
         "nombre_empresa": "Constructora Norte SA de CV",
         "giro_empresa": "construcción",
         "lugar_requerimiento": "Nuevo León",
-        "uso_empresa_o_venta": "uso empresa",
+        "tipo_cliente": "uso empresa",
         "correo": "carlos@connorte.com",
         "telefono": "81 1234 5678",
         "detalles_maquinaria": {
@@ -85,7 +85,7 @@ def test_generate_without_price():
         "nombre_empresa": "IndustrialMex",
         "giro_empresa": "manufactura",
         "lugar_requerimiento": "Querétaro",
-        "uso_empresa_o_venta": "uso empresa",
+        "tipo_cliente": "uso empresa",
         "correo": "maria@industrialmex.com",
         "telefono": "442 111 2233",
     }

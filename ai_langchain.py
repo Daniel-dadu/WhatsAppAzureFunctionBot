@@ -154,6 +154,15 @@ def _is_distribuidor(giro: str) -> bool:
             return True
     return False
 
+def _is_compresor_estacionario(current_state: dict) -> bool:
+    """Verifica si el lead está solicitando un compresor estacionario.
+    En ese caso, el bot no cotiza automáticamente y deriva a un asesor."""
+    if current_state.get("tipo_maquinaria") != "compresor":
+        return False
+    detalles = current_state.get("detalles_maquinaria", {})
+    tipo_compresor = str(detalles.get("tipo_compresor", "")).lower()
+    return "estacionario" in tipo_compresor or "electrico" in tipo_compresor or "eléctrico" in tipo_compresor
+
 def _format_machine_details(machine: Dict[str, Any]) -> str:
     """Extrae las características técnicas de una máquina en un string amigable."""
     ignore_keys = {"modelo", "categoria", "id", "_rid", "_self", "_etag", "_attachments", "_ts", "precio", "moneda"}
@@ -173,7 +182,7 @@ def get_pending_empresa_fields(current_state: ConversationState) -> List[str]:
     Extrae los campos pendientes de la empresa según el flujo de venta o uso propio.
     Retorna una lista con los labels de los campos que aún no han sido respondidos.
     """
-    uso = current_state.get("uso_empresa_o_venta")
+    uso = current_state.get("tipo_cliente")
     
     # 1. Primer bloque: uso, correo, ubicacion
     if not uso:
@@ -190,7 +199,7 @@ def get_pending_empresa_fields(current_state: ConversationState) -> List[str]:
     if not current_state.get("lugar_requerimiento"):
         pending_basic.append("ubicación (estado de la República Mexicana)")
         
-    if uso == "venta":
+    if uso == "distribuidor":
         constancia = current_state.get("constancia_fiscal_entregada")
         if not constancia: # None
             return pending_basic + ["Constancia de Situación Fiscal"]
@@ -209,7 +218,7 @@ def get_pending_empresa_fields(current_state: ConversationState) -> List[str]:
         else:
             return pending_basic
             
-    else: # uso == "uso empresa"
+    else: # uso == "cliente_final"
         if not current_state.get("nombre_empresa"):
             pending_basic.append("Nombre de la empresa")
         if not current_state.get("giro_empresa"):
@@ -473,16 +482,23 @@ class IntelligentSlotFiller:
                     return question_details
 
             # 5. COTIZACIÓN / INVENTARIO
-            # Si no hemos recomendado máquinas aún, forzamos este paso para que se active la búsqueda de inventario.
-            quiere_cotizacion = current_state.get("quiere_cotizacion")
-            if not current_state.get("maquinas_recomendadas"):
-                return {
-                    "question": FIELDS_CONFIG_PRIORITY["quiere_cotizacion"]["question"],
-                    "reason": FIELDS_CONFIG_PRIORITY["quiere_cotizacion"]["reason"],
-                    "question_type": "quiere_cotizacion"
-                }
+            # Para compresores estacionarios: saltar recomendaciones, auto-set quiere_cotizacion y pasar a datos_empresa
+            if _is_compresor_estacionario(current_state):
+                if current_state.get("quiere_cotizacion") is None:
+                    current_state["quiere_cotizacion"] = True
+                # Saltar directamente a datos_empresa (paso 6)
+            else:
+                # Si no hemos recomendado máquinas aún, forzamos este paso para que se active la búsqueda de inventario.
+                quiere_cotizacion = current_state.get("quiere_cotizacion")
+                if not current_state.get("maquinas_recomendadas"):
+                    return {
+                        "question": FIELDS_CONFIG_PRIORITY["quiere_cotizacion"]["question"],
+                        "reason": FIELDS_CONFIG_PRIORITY["quiere_cotizacion"]["reason"],
+                        "question_type": "quiere_cotizacion"
+                    }
             
             # Si ya se recomendaron máquinas y el usuario no quiere cotización, terminamos
+            quiere_cotizacion = current_state.get("quiere_cotizacion")
             if quiere_cotizacion is False:
                 return None
 
@@ -526,6 +542,21 @@ class IntelligentSlotFiller:
             tipo_plataforma = detalles.get("tipo_plataforma", "")
             if tipo_plataforma and tipo_plataforma != "articulada":
                 required_fields = [f for f in required_fields if f != "tipo_alimentacion"]
+                
+        # Para soldadoras, tipo_alimentacion se omite si el amperaje > 200
+        if tipo == "soldadora":
+            detalles = current_state.get("detalles_maquinaria", {})
+            amperaje = detalles.get("amperaje_amps_max")
+            if amperaje is not None:
+                try:
+                    if float(amperaje) > 200:
+                        required_fields = [f for f in required_fields if f != "tipo_alimentacion"]
+                except ValueError:
+                    pass
+        
+        # Para compresores estacionarios, saltar CFM (asesor se encarga)
+        if _is_compresor_estacionario(current_state):
+            required_fields = [f for f in required_fields if f != "caudal_cfm_max"]
         
         return required_fields
 
@@ -683,9 +714,9 @@ class IntelligentResponseGenerator:
                 presentation_instruction = """
                 
                 PRESENTACIÓN:
-                Presentate como Enrique Delfin, asesor comercial de Alpha C.
-                Si en el primer mensaje del usuario este menciona que requiere algún producto o servicio, o solo quiere más información, dile "Hola, sí claro, puedo ayudarte con eso. Soy Enrique Delfin, asesor comercial de Alpha C." y luego haz la pregunta correspondiente.
-                Si el usuario NO menciona ninguna necesidad (solo saluda o se presenta), dile "Hola, soy Enrique Delfin, asesor comercial de Alpha C." y luego haz la pregunta correspondiente.
+                Presentate como Alphi, asesor comercial de Alpha C.
+                Si en el primer mensaje del usuario este menciona que requiere algún producto o servicio, o solo quiere más información, dile "Hola, sí claro, puedo ayudarte con eso. Soy Alphi, asesor comercial de Alpha C." y luego haz la pregunta correspondiente.
+                Si el usuario NO menciona ninguna necesidad (solo saluda o se presenta), dile "Hola, soy Alphi, asesor comercial de Alpha C." y luego haz la pregunta correspondiente.
                 IMPORTANTE: SIEMPRE debes incluir tu nombre y cargo en el PRIMER mensaje.
                 """
 
@@ -746,7 +777,7 @@ class IntelligentResponseGenerator:
                     # Formatear lista de máquinas recomendadas
                     machines_list = ""
                     recommended_models = []  # Lista de modelos para guardar en el estado
-                    for machine in recommended_machines[:3]: # Limitar a top 3
+                    for machine in recommended_machines: # Cantidad controlada por filtro de proximidad
                          # Intentar construir un nombre descriptivo
                         modelo = machine.get("modelo", "Modelo Desconocido")
                         recommended_models.append(modelo)  # Guardar modelo
@@ -755,8 +786,22 @@ class IntelligentResponseGenerator:
                         # Agregar detalles clave según el tipo (simplificado)
                         extra_info = _format_machine_details(machine)
                         
+                        warning_msg = ""
+                        if machine.get("categoria") == "soldadora" and machine.get("amperaje_amps_max") == 185 and str(machine.get("tipo_alimentacion", "")).lower() == "gasolina":
+                            req_amp = detalles.get("amperaje_amps_max")
+                            if req_amp is not None:
+                                try:
+                                    if 185 < float(req_amp) <= 200:
+                                        warning_msg = " (Nota: Esta soldadora funcionará dependiendo del tipo de electrodo o la varilla a utilizar)"
+                                except ValueError:
+                                    pass
+                        
+                        # Nota para soldadoras de alto amperaje (400A y 500A) que soportan 2 usuarios simultáneos
+                        if machine.get("categoria") == "soldadora" and machine.get("amperaje_amps_max", 0) >= 390:
+                            warning_msg += " (Nota: Esta soldadora tiene la ventaja de poder ser utilizada por 2 usuarios al mismo tiempo)"
+                        
                         # NOTE: Prices are NOT shown in recommendations.
-                        machines_list += f"- {modelo}{extra_info}\n"
+                        machines_list += f"- {modelo}{extra_info}{warning_msg}\n"
                     
                     # Guardar la lista de modelos recomendados en el estado
                     current_state["maquinas_recomendadas"] = recommended_models
@@ -800,17 +845,19 @@ class IntelligentResponseGenerator:
                 - Si el usuario pregunta algo, responde de manera natural y útil
                 - Usa un mensaje como: """
                 should_list_pending_fields = False
-                uso = current_state.get("uso_empresa_o_venta")
+                uso = current_state.get("tipo_cliente")
                 
                 if not uso and "si te dedicas a la venta/renta de maquinaria" in pending_fields:
-                    missing_str = "¿Te dedicas a la venta o renta de maquinaria?"
-                    if "correo electrónico" in pending_fields and "ubicación (estado de la República Mexicana)" in pending_fields:
-                         missing_str += " También me podrías compartir tu correo electrónico y ubicación (estado de la República Mexicana)."
-                    elif "correo electrónico" in pending_fields:
-                         missing_str += " También me podrías compartir tu correo electrónico."
-                    elif "ubicación (estado de la República Mexicana)" in pending_fields:
-                         missing_str += " También me podrías compartir tu ubicación (estado de la República Mexicana)."
-                    datos_empresa_instruction += f"{missing_str}"
+                    # Construir lista enumerada de campos pendientes
+                    numbered_items = []
+                    numbered_items.append("¿Te dedicas a la venta o renta de maquinaria?")
+                    if "correo electrónico" in pending_fields:
+                        numbered_items.append("Correo electrónico")
+                    if "ubicación (estado de la República Mexicana)" in pending_fields:
+                        numbered_items.append("Estado de la República Mexicana")
+                    numbered_list = "\n".join([f"{i+1}. {item}" for i, item in enumerate(numbered_items)])
+                    datos_empresa_instruction += f"""Claro, para avanzar con la cotización necesito algunos datos de tu empresa.
+{numbered_list}"""
                 
                 elif "Constancia de Situación Fiscal" in pending_fields and len(pending_fields) == 1:
                     datos_empresa_instruction += "Pide ÚNICAMENTE la Constancia de Situación Fiscal. EXPRESAMENTE PROHIBIDO pedir otro dato como nombre de empresa, teléfono o correo. Usa este mensaje exacto: 'Perfecto, para poder brindarle un precio preferencial como distribuidor, le pido de favor que me comparta por este medio su Constancia de Situación Fiscal.'"
@@ -824,14 +871,16 @@ class IntelligentResponseGenerator:
                     should_list_pending_fields = False
 
                 else:
-                    datos_empresa_instruction += "Para poder generar la cotización, necesito que me comparta el siguiente dato (o datos):"
+                    dato_str = "estos datos" if len(pending_fields) > 1 else "este dato"
+                    datos_empresa_instruction += f"También necesito {dato_str}:"
                     should_list_pending_fields = True
                 
                 if should_list_pending_fields:
-                    pending_fields_bullets = "\n".join([f"- {f}" for f in pending_fields])
+                    pending_fields_numbered = "\n".join([f"{i+1}. {f}" for i, f in enumerate(pending_fields)])
                     datos_empresa_instruction += f"""
-                - Menciona EXPLÍCITAMENTE los campos que faltan (en viñetas) y pídelos en este mismo mensaje, en este orden:
-{pending_fields_bullets}
+                - Menciona EXPLÍCITAMENTE los campos que faltan en una LISTA ENUMERADA (1. 2. 3.) y pídelos en este mismo mensaje, en este orden:
+{pending_fields_numbered}
+                - NUNCA uses viñetas (•) ni guiones (-). SIEMPRE usa números (1. 2. 3.).
                 - Si el usuario ya contestó alguno de estos campos en su último mensaje, NO lo repitas ni lo vuelvas a pedir.
                 - NUNCA inventes campos adicionales (por ejemplo: teléfono) si no están en la lista.
                 - IMPORTANTE: NO te despidas, NO cierres la conversación.
@@ -885,12 +934,12 @@ class IntelligentResponseGenerator:
     def generate_final_response(self, current_state: ConversationState) -> str:
         """Genera la respuesta final cuando la conversación está completa"""
         
-        uso = current_state.get("uso_empresa_o_venta")
+        uso = current_state.get("tipo_cliente")
         constancia = current_state.get("constancia_fiscal_entregada")
         giro = current_state.get("giro_empresa", "")
         
         is_advisor_handoff = False
-        if uso == "venta":
+        if uso == "distribuidor":
             if constancia and constancia != "No tiene":
                 is_advisor_handoff = True
             elif (constancia == "No tiene" or constancia is False) and giro and _is_distribuidor(giro):
@@ -898,6 +947,10 @@ class IntelligentResponseGenerator:
                 
         if is_advisor_handoff:
             return "En un momento te contactará el asesor de la zona para darle el precio preferencial."
+        
+        # Compresores estacionarios: siempre handoff a asesor especializado
+        if _is_compresor_estacionario(current_state):
+            return f"Gracias por tu información, {current_state.get('nombre', 'Usuario')}. Un asesor especializado en compresores estacionarios se comunicará contigo para profundizar al respecto."
 
         from pricing_service import get_pricing_service
         
@@ -1232,8 +1285,8 @@ class IntelligentLeadQualificationChatbot:
                 logging.info("[PDF] Skipping PDF: quiere_cotizacion is not True")
                 return
 
-            if self.state.get("uso_empresa_o_venta") == "venta":
-                logging.info("[PDF] Skipping PDF: uso is 'venta', handoff triggered instead.")
+            if self.state.get("tipo_cliente") == "distribuidor":
+                logging.info("[PDF] Skipping PDF: uso is 'distribuidor', handoff triggered instead.")
                 return
             
             maquina = self.state.get("maquina_seleccionada")

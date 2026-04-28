@@ -16,7 +16,7 @@ requerimientos del usuario (gracias al ordenamiento por relevancia).
 Tipos testeados:
 - soldadora: amperaje_amps_max, tipo_alimentacion (2 tests: 300A y 180A)
 - compresor: tipo_compresor, caudal_cfm_max (4 tests: 200 CFM, 500 CFM, 100 CFM, 750 CFM portátil)
-- generador: tipo_generador, potencia_kw (3 tests: 20kW estacionario, 5kW portátil, 100kW estacionario)
+- generador: potencia_kw (3 tests: 20kW, 5kW, 100kW)
 - torre_iluminacion: tipo_reflector
 - montacargas: capacidad_carga_kg
 - plataforma: tipo_plataforma, altura_trabajo_m, tipo_alimentacion (3 tests)
@@ -179,42 +179,39 @@ CONVERSATIONAL_TESTS = [
     # GENERADOR (2 campos) - Test estacionario
     # --------------------------------------------------------------------
     {
-        "name": "Generador estacionario 20kW",
+        "name": "Generador 20kW",
         "conversation_flow": [
             "Hola, soy Daniel Maldonado y busco un generador",
-            "Estacionario",
             "20 kW"
         ],
         "expected_first_machine": "Shindaiwa DGM250MK-D",
-        "description": "Debería recomendar DGM250MK-D (exactamente 20kW estacionario)"
+        "description": "Debería recomendar DGM250MK-D (exactamente 20kW)"
     },
     
     # --------------------------------------------------------------------
     # GENERADOR (2 campos) - Test portátil
     # --------------------------------------------------------------------
     {
-        "name": "Generador portátil 5kW",
+        "name": "Generador 5kW",
         "conversation_flow": [
             "Hola, soy Daniel Maldonado y busco un generador",
-            "portatil",  # Sin acento para coincidir con inventario
             "5 kW"
         ],
         "expected_first_machine": "Koshin GV-8000S",
-        "description": "Debería recomendar GV-8000S (7.2kW portátil, el más cercano a 5kW)"
+        "description": "Debería recomendar GV-8000S (7.2kW, el más cercano a 5kW)"
     },
     
     # --------------------------------------------------------------------
     # GENERADOR (2 campos) - Test estacionario alta potencia
     # --------------------------------------------------------------------
     {
-        "name": "Generador estacionario 100kW (alta potencia)",
+        "name": "Generador 100kW (alta potencia)",
         "conversation_flow": [
             "Hola, soy Daniel Maldonado y busco un generador",
-            "Estacionario",
             "100 kW"
         ],
         "expected_first_machine": "AIRMAN SDG150S",
-        "description": "Debería recomendar SDG150S (120kW estacionario, el más cercano a 100kW)"
+        "description": "Debería recomendar SDG150S (120kW, el más cercano a 100kW)"
     },
     
     # --------------------------------------------------------------------

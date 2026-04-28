@@ -31,7 +31,7 @@ machinery_configurations = [
             {
                 "name": "tipo_compresor",
                 "question": "¿qué tipo de compresor necesitas: portátil o estacionario/eléctrico?",
-                "reason": "Para saber el formato y fuente de energía del equipo",
+                "reason": "Para recomendarte el modelo adecuado según tu trabajo",
                 "type": "string",
                 "comparison_operator": "contains"
             },
@@ -64,13 +64,6 @@ machinery_configurations = [
         "type_id": "generador",
         "name": "Generador",
         "fields": [
-            {
-                "name": "tipo_generador",
-                "question": "¿cuál es el tipo de generador que requiere: estacionario o portátil?",
-                "reason": "Para seleccionar el generador correcto",
-                "type": "selection",
-                "comparison_operator": "eq"
-            },
             {
                 "name": "potencia_kw", # Target kW field
                 "question": "¿cuál es la potencia del generador que requiere en kW?", 
@@ -151,14 +144,6 @@ machinery_configurations = [
         "type_id": "manipulador",
         "name": "Manipulador Telescópico",
         "fields": [
-            { # TODO: no hacer esta pregunta
-                "name": "altura_maxima_m",
-                "question": "¿qué altura necesita?",
-                "reason": "Para determinar la altura necesaria",
-                "type": "number",
-                "unit": "m",
-                "comparison_operator": "gte"
-            },
             {
                 "name": "capacidad_carga_kg",
                 "question": "¿qué peso requiere mover?",

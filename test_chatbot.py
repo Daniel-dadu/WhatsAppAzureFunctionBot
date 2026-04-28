@@ -209,7 +209,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "detalles_maquinaria": {"tipo_reflector": "LED"},
         "quiere_cotizacion": True,
         "maquina_seleccionada": "Shindaiwa SL433IDG-B/S1W",
-        "uso_empresa_o_venta": "uso empresa",
+        "tipo_cliente": "cliente_final",
         "nombre_empresa": "Construcciones del Sol",
         "giro_empresa": "construcción de carreteras",
         "lugar_requerimiento": "Puebla",
@@ -243,7 +243,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
             "tipo_alimentacion": "electrica"
         },
         "quiere_cotizacion": True,
-        "uso_empresa_o_venta": "venta",
+        "tipo_cliente": "distribuidor",
         "lugar_requerimiento": "CDMX",
         "correo": "rob@ventas.com",
         "constancia_fiscal_entregada": True
@@ -258,7 +258,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     flujo_3 = [
         "Hola, ¿tienen generadores en existencia?",
         "Ok, necesito uno para mineria. Soy Lucía Martinez.",
-        "El tipo de generador debe ser portátil",
         "La potencia debe ser de 7.2 kW",
         "En qué estados pueden hacer entrega?, quiero cotizarla",
         "Sí, dadu@gmail.com, la necesito en Tamaulipas",
@@ -269,12 +268,10 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "nombre": "Lucía Martinez",
         "tipo_maquinaria": "generador",
         "detalles_maquinaria": {
-            "actividad": "mineria",
-            "tipo_generador": "portátil",
             "potencia_kw": 7.2
         },
         "quiere_cotizacion": True,
-        "uso_empresa_o_venta": "uso empresa",
+        "tipo_cliente": "distribuidor",
         "nombre_empresa": "Construcciones del Norte",
         "lugar_requerimiento": "Tamaulipas",
         "correo": "dadu@gmail.com",
@@ -304,8 +301,8 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
             "altura_trabajo_m": 10
         },
         "quiere_cotizacion": True,
-        "maquina_seleccionada": "LGMG S3246E II",
-        "uso_empresa_o_venta": "uso empresa",
+        "maquina_seleccionada": "LGMG S2632E II",
+        "tipo_cliente": "cliente_final",
         "nombre_empresa": "MachinesCorp",
         "giro_empresa": "construcción",
         "lugar_requerimiento": "Puebla",
@@ -335,7 +332,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "tipo_maquinaria": "torre_iluminacion",
         "detalles_maquinaria": {"tipo_reflector": "LED"},
         "quiere_cotizacion": True,
-        "uso_empresa_o_venta": "venta",
+        "tipo_cliente": "distribuidor",
         "correo": "juan@gmail.com",
         "lugar_requerimiento": "Tlaxcala",
         "constancia_fiscal_entregada": "No tiene",
@@ -353,7 +350,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     flujo_6 = [
         "hola, Soy Daniel Maldonado",
         "quiero un generador",
-        "estacionario",
         "20 kw",
         "si, cotizame el primero que es Shindaiwa DGM250MK-D",
         "es para uso de la empresa",
@@ -365,12 +361,11 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "apellido": "Maldonado",
         "tipo_maquinaria": "generador",
         "detalles_maquinaria": {
-            "tipo_generador": "estacionario",
             "potencia_kw": 20
         },
         "quiere_cotizacion": True,
         "maquina_seleccionada": "Shindaiwa DGM250MK-D",
-        "uso_empresa_o_venta": "uso empresa",
+        "tipo_cliente": "cliente_final",
         "nombre_empresa": "Alfa Construcciones",
         "giro_empresa": "construcción",
         "lugar_requerimiento": "Puebla",
@@ -390,7 +385,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     flujo_8 = [
         "Hola, soy María López",
         "Necesito un generador",
-        "estacionario",
         "25 kw",
         "Me interesa la DG100MI-400, quiero cotización por favor",
         "No, estamos en Chiapas",
@@ -402,12 +396,11 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "apellido": "López",
         "tipo_maquinaria": "generador",
         "detalles_maquinaria": {
-            "tipo_generador": "estacionario",
             "potencia_kw": 25
         },
         "quiere_cotizacion": True,
         "maquina_seleccionada": "DG100MI-400",
-        "uso_empresa_o_venta": "uso empresa",
+        "tipo_cliente": "cliente_final",
         "nombre_empresa": "IndustrialMex",
         "giro_empresa": "manufactura",
         "lugar_requerimiento": "Chiapas",
@@ -427,11 +420,10 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     flujo_9 = [
         "hola, quiero un generador",
         "Daniel Maldonado",
-        "portátil",
         "7.2 kw",
         "y me puedes cotizar también una plataforma de 10 metros de altura",
         "de tijera",
-        "Quiero la segunda",
+        "Quiero esa",
         "es para uso de la empresa",
         "nos dedicamos a la construcción",
         "trabajo en MachinesCorp en Puebla",
@@ -444,8 +436,8 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "tipo_maquinaria": "plataforma",
         "detalles_maquinaria": {"altura_trabajo_m": 10, "tipo_plataforma": "tijera"},
         "quiere_cotizacion": True,
-        "maquina_seleccionada": "LGMG S3246E II",
-        "uso_empresa_o_venta": "uso empresa",
+        "maquina_seleccionada": "LGMG S2632E II",
+        "tipo_cliente": "cliente_final",
         "nombre_empresa": "MachinesCorp",
         "giro_empresa": "construcción",
         "lugar_requerimiento": "Puebla",
@@ -465,12 +457,10 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "Busco una plataforma",
         "unipersonal",
         "de 8 metros de altura de trabajo",
-        "eléctrica",
         "Me interesa la LGMG MP0607SE",
         "dadu@gmail.com",
-        "ah sí, nos dedicamos a la renta",
-        "estamos ubicados en Querératro, pero no tengo la constancia",
-        "nos dedicamos a la minería",
+        "ah sí, nos dedicamos a la renta de maquinaria",
+        "estamos ubicados en Querétaro, pero no tengo la constancia",
         "mi empresa es MachinesTop"
     ]
 
@@ -481,14 +471,13 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "detalles_maquinaria": {
             "tipo_plataforma": "unipersonal",
             "altura_trabajo_m": 8,
-            "tipo_alimentacion": "electrica"
         },
         "quiere_cotizacion": True,
-        "uso_empresa_o_venta": "venta",
+        "tipo_cliente": "distribuidor",
         "lugar_requerimiento": "Querétaro",
         "correo": "dadu@gmail.com",
         "constancia_fiscal_entregada": "No tiene",
-        "giro_empresa": "minería",
+        "giro_empresa": "renta de maquinaria",
         "nombre_empresa": "MachinesTop",
         "maquina_seleccionada": "LGMG MP0607SE"
     }
@@ -508,7 +497,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "10 metros",
         "eléctrica",
         "Me interesa la LGMG M2640JE",
-        "uso empresa",
+        "cliente_final",
         "Empresa Silva Construcciones, construcción, Estado de Mexico, rs@silvacons.com"
     ]
 
@@ -523,8 +512,8 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         },
         "quiere_cotizacion": True,
         "maquina_seleccionada": "LGMG M2640JE",
-        "uso_empresa_o_venta": "uso empresa",
-        "nombre_empresa": "Empresa Silva Construcciones",
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "Silva Construcciones",
         "giro_empresa": "construcción",
         "lugar_requerimiento": "Estado de Mexico",
         "correo": "rs@silvacons.com"
@@ -556,8 +545,8 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
             "caudal_cfm_max": 400
         },
         "quiere_cotizacion": True,
-        "maquina_seleccionada": "AIRMAN PDS750S-4B1",
-        "uso_empresa_o_venta": "uso empresa",
+        "maquina_seleccionada": "AIRMAN PDS400S",
+        "tipo_cliente": "cliente_final",
         "nombre_empresa": "MachinesCorp",   
         "giro_empresa": "construcción",
         "lugar_requerimiento": "Ciudad de Mexico",
@@ -587,7 +576,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "detalles_maquinaria": {},
         "quiere_cotizacion": True,
         "maquina_seleccionada": "Toku TPB-60",
-        "uso_empresa_o_venta": "uso empresa",
+        "tipo_cliente": "cliente_final",
         "nombre_empresa": "Alfa Construcciones",
         "giro_empresa": "construcción",
         "lugar_requerimiento": "Puebla",
@@ -606,7 +595,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "la necesito de diesel",
         "quiero la 340",
         "uso propio",
-        "trabajo en MachinesCorp, nos dedicamos a la construcción, y Ciudad de Mexico"
+        "trabajo en MachinesCorp, nos dedicamos a la construcción, y estamos en Ciudad de México"
     ]
 
     esperado_14 = {
@@ -619,19 +608,80 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         },
         "quiere_cotizacion": True,
         "maquina_seleccionada": "Shindaiwa DGW340DM",
-        "uso_empresa_o_venta": "uso empresa",
+        "tipo_cliente": "cliente_final",
         "nombre_empresa": "MachinesCorp",
         "giro_empresa": "construcción",
-        "lugar_requerimiento": "Ciudad de Mexico",
+        "lugar_requerimiento": "Ciudad de México",
         "correo": "j.perez@gmail.com",
+        "telefono": None
     }
 
-    run_conversation_test("Flujo 14:  Atributos desde el inicio", chatbot, flujo_14, esperado_14)
+    run_conversation_test("Flujo 14: Atributos desde el inicio", chatbot, flujo_14, esperado_14)
 
     # ------------------------------------------------------------------------
-    # Flujo 15: Cambio de tipo de maquinaria (plataforma → soldadora)
+    # Flujo 15: Soldadora <= 200A 
     # ------------------------------------------------------------------------
     flujo_15 = [
+        "Hola, soy Daniel Perez, quiero una soldadora de 200 amperes",
+        "gasolina",
+        "quiero esa opción",
+        "cliente_final",
+        "trabajo en X, giro industrial, Ciudad de Mexico, correo d@mail.com tel 555"
+    ]
+
+    esperado_15 = {
+        "nombre": "Daniel Perez",
+        "apellido": "Perez",
+        "tipo_maquinaria": "soldadora",
+        "detalles_maquinaria": {
+            "amperaje_amps_max": 200,
+            "tipo_alimentacion": "gasolina"
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Shindaiwa EGW185MS",
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "X",
+        "giro_empresa": "giro industrial",
+        "lugar_requerimiento": "Ciudad de Mexico",
+        "correo": "d@mail.com",
+        "telefono": "555"
+    }
+
+    run_conversation_test("Flujo 15: Soldadora", chatbot, flujo_15, esperado_15)
+
+    # ------------------------------------------------------------------------
+    # Flujo 16: Soldadora > 200A (Omite Combustible)
+    # ------------------------------------------------------------------------
+    flujo_16 = [
+        "quiero una soldadora de 300 amperes, soy Luis Torres",
+        "quiero la primera",
+        "para venta",
+        "Soy de la Cdmx, luis@mail.com, tel 555"
+    ]
+
+    esperado_16 = {
+        "nombre": "Luis Torres",
+        "apellido": "Torres",
+        "tipo_maquinaria": "soldadora",
+        "detalles_maquinaria": {
+            "amperaje_amps_max": 300
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Shindaiwa DGW340DM",
+        "tipo_cliente": "distribuidor",
+        "nombre_empresa": None,
+        "giro_empresa": None,
+        "lugar_requerimiento": "Ciudad de México",
+        "correo": "luis@mail.com",
+        "telefono": "555"
+    }
+
+    run_conversation_test("Flujo 16: Soldadora (Omite fuel)", chatbot, flujo_16, esperado_16)
+
+    # ------------------------------------------------------------------------
+    # Flujo 17: Cambio de tipo de maquinaria (plataforma → soldadora)
+    # ------------------------------------------------------------------------
+    flujo_17 = [
         "hola, soy Daniel Maldonado y quiero una plataforma",
         "la quiero de tijera",
         "no, prefiero que me coticemos una soldadora",
@@ -642,7 +692,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "ya mandé la constancia"
     ]
 
-    esperado_15 = {
+    esperado_17 = {
         "nombre": "Daniel Maldonado",
         "apellido": "Maldonado",
         "tipo_maquinaria": "soldadora",
@@ -652,13 +702,228 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         },
         "quiere_cotizacion": True,
         "maquina_seleccionada": "Shindaiwa DGW340DM",
-        "uso_empresa_o_venta": "venta",
+        "tipo_cliente": "distribuidor",
         "lugar_requerimiento": "Guanajuato",
         "correo": "dan@gmail.com",
         "constancia_fiscal_entregada": True
     }
 
-    run_conversation_test("Flujo 15: Cambio de tipo de maquinaria", chatbot, flujo_15, esperado_15)
+    run_conversation_test("Flujo 17: Cambio de tipo de maquinaria", chatbot, flujo_17, esperado_17)
+
+    # ------------------------------------------------------------------------
+    # Flujo 18: Generador Portátil < 5 kW → Ofrecer modelo de 5 kW (GV-5500s)
+    # ------------------------------------------------------------------------
+    flujo_18 = [
+        "Hola, soy Carlos Ruiz y necesito un generador",
+        "3 kw",
+        "quiero esa opción",
+        "cliente_final",
+        "trabajo en ElectroServ, nos dedicamos al mantenimiento, Monterrey, correo carlos@electroserv.com tel 8181234567"
+    ]
+
+    esperado_18 = {
+        "nombre": "Carlos Ruiz",
+        "apellido": "Ruiz",
+        "tipo_maquinaria": "generador",
+        "detalles_maquinaria": {
+            "potencia_kw": 3
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Koshin GV-5500s",
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "ElectroServ",
+        "giro_empresa": "mantenimiento",
+        "lugar_requerimiento": "Monterrey",
+        "correo": "carlos@electroserv.com",
+        "telefono": "8181234567"
+    }
+
+    run_conversation_test("Flujo 18: Generador Portátil", chatbot, flujo_18, esperado_18)
+
+    # ------------------------------------------------------------------------
+    # Flujo 19: Generador Portátil 5-8 kW → Ofrecer modelo de 8 kW (GV-8000S)
+    # ------------------------------------------------------------------------
+    flujo_19 = [
+        "Hola, soy Ana Torres y necesito un generador",
+        "7 kw",
+        "quiero esa opción",
+        "cliente_final",
+        "trabajo en MaquiNorte, giro industrial, Guadalajara, correo ana@maquinorte.com tel 3312345678"
+    ]
+
+    esperado_19 = {
+        "nombre": "Ana Torres",
+        "apellido": "Torres",
+        "tipo_maquinaria": "generador",
+        "detalles_maquinaria": {
+            "potencia_kw": 7
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Koshin GV-8000S",
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "MaquiNorte",
+        "giro_empresa": "industrial",
+        "lugar_requerimiento": "Guadalajara",
+        "correo": "ana@maquinorte.com",
+        "telefono": "3312345678"
+    }
+
+    run_conversation_test("Flujo 19: Generador Portátil", chatbot, flujo_19, esperado_19)
+
+    # ------------------------------------------------------------------------
+    # Flujo 20: Generador Portátil > 8 kW → Saltar a modelo de 25 kW (DGM250MK-D)
+    # ------------------------------------------------------------------------
+    flujo_20 = [
+        "Hola, soy Pedro Méndez y necesito un generador",
+        "10 kw",
+        "quiero esa opción",
+        "no, es para uso de mi empresa",
+        "trabajo en ConstruMex, giro construcción, Querétaro, correo pedro@construmex.com tel 4421234567"
+    ]
+
+    esperado_20 = {
+        "nombre": "Pedro Méndez",
+        "apellido": "Méndez",
+        "tipo_maquinaria": "generador",
+        "detalles_maquinaria": {
+            "potencia_kw": 10
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Shindaiwa DGM250MK-D",
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "ConstruMex",
+        "giro_empresa": "construcción",
+        "lugar_requerimiento": "Querétaro",
+        "correo": "pedro@construmex.com",
+        "telefono": "4421234567"
+    }
+
+    run_conversation_test("Flujo 20: Generador Portátil", chatbot, flujo_20, esperado_20)
+
+    # ------------------------------------------------------------------------
+    # Flujo 21: Compresor Portátil ≤ 185 CFM → SOLO AIRMAN PDS185S-6C2
+    # ------------------------------------------------------------------------
+    flujo_21 = [
+        "Hola, soy Roberto Díaz y necesito un compresor",
+        "portátil",
+        "150 cfm",
+        "quiero esa opción",
+        "cliente_final",
+        "trabajo en AireTech, giro industrial, Monterrey, correo roberto@airetech.com tel 8187654321"
+    ]
+
+    esperado_21 = {
+        "nombre": "Roberto Díaz",
+        "apellido": "Díaz",
+        "tipo_maquinaria": "compresor",
+        "detalles_maquinaria": {
+            "tipo_compresor": "portátil",
+            "caudal_cfm_max": 150
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "AIRMAN PDS185S-6C2",
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "AireTech",
+        "giro_empresa": "industrial",
+        "lugar_requerimiento": "Monterrey",
+        "correo": "roberto@airetech.com",
+        "telefono": "8187654321"
+    }
+
+    run_conversation_test("Flujo 21: Compresor Portátil", chatbot, flujo_21, esperado_21)
+
+    # ------------------------------------------------------------------------
+    # Flujo 22: Compresor Portátil > 185 CFM y ≤ 375 CFM → SOLO AIRMAN PDSF375S-DP
+    # ------------------------------------------------------------------------
+    flujo_22 = [
+        "Hola, soy Laura Vega y necesito un compresor",
+        "portátil",
+        "300 cfm",
+        "quiero esa opción",
+        "cliente_final",
+        "trabajo en CompresoresMX, giro minería, Chihuahua, correo laura@compresores.mx tel 6141234567"
+    ]
+
+    esperado_22 = {
+        "nombre": "Laura Vega",
+        "apellido": "Vega",
+        "tipo_maquinaria": "compresor",
+        "detalles_maquinaria": {
+            "tipo_compresor": "portátil",
+            "caudal_cfm_max": 300
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "AIRMAN PDSF375S-DP",
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "CompresoresMX",
+        "giro_empresa": "minería",
+        "lugar_requerimiento": "Chihuahua",
+        "correo": "laura@compresores.mx",
+        "telefono": "6141234567"
+    }
+
+    run_conversation_test("Flujo 22: Compresor Portátil", chatbot, flujo_22, esperado_22)
+
+    # ------------------------------------------------------------------------
+    # Flujo 23: Compresor Portátil > 375 CFM → Recomendaciones normales
+    # ------------------------------------------------------------------------
+    flujo_23 = [
+        "Hola, soy Miguel Sánchez y necesito un compresor",
+        "portátil",
+        "400 cfm",
+        "quiero la primera",
+        "cliente_final",
+        "trabajo en IndustrialNorte, giro manufactura, Saltillo, correo miguel@industrialnorte.com tel 8441234567"
+    ]
+
+    esperado_23 = {
+        "nombre": "Miguel Sánchez",
+        "apellido": "Sánchez",
+        "tipo_maquinaria": "compresor",
+        "detalles_maquinaria": {
+            "tipo_compresor": "portátil",
+            "caudal_cfm_max": 400
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "AIRMAN PDS400S",
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "IndustrialNorte",
+        "giro_empresa": "manufactura",
+        "lugar_requerimiento": "Saltillo",
+        "correo": "miguel@industrialnorte.com",
+        "telefono": "8441234567"
+    }
+
+    run_conversation_test("Flujo 23: Compresor Portátil", chatbot, flujo_23, esperado_23)
+
+    # ------------------------------------------------------------------------
+    # Flujo 24: Compresor Portátil > 375 CFM → Recomendaciones normales
+    # ------------------------------------------------------------------------
+    flujo_24 = [
+        "quiero una soldadora de 300 amperes, soy Luis Torres",
+        "quiero la segunda opción",
+        "no, nos dedicamos al mantenimiento",
+        "trabajo en Edifica, Saltillo, correo miguel@industrialnorte.com tel 8441234567"
+    ]
+
+    esperado_24 = {
+        "nombre": "Luis Torres",
+        "apellido": "Torres",
+        "tipo_maquinaria": "soldadora",
+        "detalles_maquinaria": {
+            "amperaje_amps_max": 300
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Shindaiwa DGW400DMK",
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "Edifica",
+        "giro_empresa": "mantenimiento",
+        "lugar_requerimiento": "Saltillo",
+        "correo": "miguel@industrialnorte.com",
+        "telefono": "8441234567"
+    }
+
+    run_conversation_test("Flujo 24: Compresor Portátil", chatbot, flujo_24, esperado_24)
 
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:

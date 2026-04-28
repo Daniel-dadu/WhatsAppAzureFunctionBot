@@ -233,7 +233,7 @@ class QuotationPDFGenerator:
         pdf.set_font("Helvetica", "B", 9)
         pdf.cell(30, 5, "Uso:", border=0)
         pdf.set_font("Helvetica", "", 9)
-        pdf.cell(col_width - 30, 5, state.get("uso_empresa_o_venta") or "-", border=0, ln=True)
+        pdf.cell(col_width - 30, 5, state.get("tipo_cliente") or "-", border=0, ln=True)
 
         y_left_end = pdf.get_y()
 

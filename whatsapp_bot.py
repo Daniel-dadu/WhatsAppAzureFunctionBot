@@ -81,7 +81,7 @@ class WhatsAppBot:
         lead_machine_type = self.chatbot.state.get("tipo_maquinaria", "") if self.chatbot.state.get("tipo_maquinaria") else "nuestra maquinaria"
 
         if template_name == "notificacion_de_leads":
-            return f"Hola {lead_name}, mi nombre es Enrique Delfin asesor comercial de Alpha C. Me pongo en contacto contigo para dar seguimiento a tu interés en la siguiente maquinaria: {lead_machine_type}. Para continuar con tu solicitud, ¿me podrías confirmar si la maquinaria la requieres para venta o uso propio?"
+            return f"Hola {lead_name}, mi nombre es Alphi, asesor comercial de Alpha C. Me pongo en contacto contigo para dar seguimiento a tu interés en la siguiente maquinaria: {lead_machine_type}. Para continuar con tu solicitud, ¿me podrías confirmar si la maquinaria la requieres para venta o uso propio?"
         elif template_name == "seguimiento_conversacion":
             return f"""Hola {lead_name}, intentamos comunicarnos contigo para brindarte la información del equipo que solicitaste.
             ¿Sigues interesado en recibir la información o una cotización?
@@ -421,7 +421,7 @@ class WhatsAppBot:
         🔍 Detalles maquinaria: {state.get('detalles_maquinaria', 'No especificado')}
         💼 Nombre empresa: {state.get('nombre_empresa', 'No especificado')}
         💼 Giro empresa: {state.get('giro_empresa', 'No especificado')}
-        💼 Tipo de uso: {state.get('uso_empresa_o_venta', 'No especificado')}
+        💼 Tipo de uso: {state.get('tipo_cliente', 'No especificado')}
         📧 Correo: {state.get('correo', 'No especificado')}
         📱 Teléfono: {state.get('telefono', 'No especificado')}
         📍 Lugar requerimiento: {state.get('lugar_requerimiento', 'No especificado')}

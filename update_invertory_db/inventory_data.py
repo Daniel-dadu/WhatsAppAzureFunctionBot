@@ -48,7 +48,12 @@ inventario = [
     {"modelo": "AIRMAN SAS22RD6E", "categoria": "compresor", "tipo_compresor": "estacionario/eléctrico", "caudal_cfm_max": 144.79, "presion_psi_max": 100},
     {"modelo": "AIRMAN SAS8SD6C",  "categoria": "compresor", "tipo_compresor": "estacionario/eléctrico", "caudal_cfm_max": 35.31,  "presion_psi_max": 135},
     {"modelo": "AIRMAN SAS4SD6C",  "categoria": "compresor", "tipo_compresor": "estacionario/eléctrico", "caudal_cfm_max": 15.53,  "presion_psi_max": 120},
+    {"modelo": "AIRMAN PDS830S",        "categoria": "compresor", "tipo_compresor": "portátil", "caudal_cfm_max": 830, "presion_psi_max": 150},
+    {"modelo": "AIRMAN PDSG750VRS-4C5", "categoria": "compresor", "tipo_compresor": "portátil", "caudal_cfm_max": 900, "presion_psi_max": 100},
     {"modelo": "AIRMAN PDS750S-4B1",    "categoria": "compresor", "tipo_compresor": "portátil", "caudal_cfm_max": 750, "presion_psi_max": 100},
+    {"modelo": "AIRMAN PDS400S",        "categoria": "compresor", "tipo_compresor": "portátil", "caudal_cfm_max": 400, "presion_psi_max": 100},
+    {"modelo": "AIRMAN PDSF375S-DP",    "categoria": "compresor", "tipo_compresor": "portátil", "caudal_cfm_max": 375, "presion_psi_max": 100},
+    {"modelo": "AIRMAN PDS185S-6C2",    "categoria": "compresor", "tipo_compresor": "portátil", "caudal_cfm_max": 185, "presion_psi_max": 100},
 
     # ROMPEDOR
     {"modelo": "Toku TCB-300", "categoria": "rompedor", "tipo_alimentacion": "neumatico", "peso_kg": 30},

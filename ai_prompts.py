@@ -75,15 +75,19 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     4. Si el usuario menciona un correo, SIEMPRE extrae "correo".
     5. Si el usuario menciona un teléfono, SIEMPRE extrae "telefono".
     6. Si hay información positiva y negativa, SIEMPRE extrae la positiva.
-    7. Si el usuario dice "nos dedicamos a [actividad]" o describe su actividad, SIEMPRE extrae "giro_empresa": "[actividad]".
-    8. Si la última pregunta del bot pregunta si el usuario "se dedica a la venta/renta de maquinaria" (o variaciones de uso vs venta), SIEMPRE clasifica la respuesta del usuario en "uso_empresa_o_venta":
-       - Cualquier respuesta afirmativa ("sí", "si me dedico", "renta", "soy distribuidor") o indicación de venta, reventa, distribución, comercialización → "venta" (exactamente este string)
-       - Cualquier respuesta negativa ("no", "no me dedico a eso", "es para uso propio", "para mi empresa", "uso interno") o indicación de uso propio, uso de empresa, uso interno → "uso empresa" (exactamente este string)
-       - Ejemplos: "Sí me dedico a la venta" → {{"uso_empresa_o_venta": "venta"}}
-       - Ejemplos: "No, la quiero para usarla yo" → {{"uso_empresa_o_venta": "uso empresa"}}
-       - Ejemplos: "uso empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
-       - Ejemplos: "quiero comercializarla, es para venta" → {{"uso_empresa_o_venta": "venta"}}
-       - Ejemplos: "para distribución" → {{"uso_empresa_o_venta": "venta"}}
+    7. Si el usuario dice "nos dedicamos a [actividad]" o describe su actividad, SIEMPRE extrae "giro_empresa": "[actividad]". EXCEPCIÓN: Si la actividad es "renta de maquinaria", "venta de maquinaria", "distribución de maquinaria" o similar y tipo_cliente está vacío, TAMBIÉN extrae tipo_cliente: "distribuidor" (ver regla 8).
+    8. REGLA PRIORITARIA PARA tipo_cliente (aplica SIN IMPORTAR cuál fue la última pregunta del bot):
+       - Si el usuario menciona que se dedica a la RENTA, VENTA, DISTRIBUCIÓN o COMERCIALIZACIÓN de maquinaria/equipos, y tipo_cliente está vacío → SIEMPRE extraer tipo_cliente: "distribuidor"
+       - Si el usuario dice que es para USO PROPIO, USO DE LA EMPRESA, USO INTERNO, y tipo_cliente está vacío → SIEMPRE extraer tipo_cliente: "cliente_final"
+       - Cualquier respuesta afirmativa ("sí", "si me dedico", "renta", "soy distribuidor") o indicación de venta, reventa, distribución, renta de maquinaria, comercialización → "distribuidor" (exactamente este string)
+       - Cualquier respuesta negativa ("no", "no me dedico a eso", "es para uso propio", "para mi empresa", "uso interno") o indicación de uso propio, uso de empresa, uso interno → "cliente_final" (exactamente este string)
+       - IMPORTANTE: Si el usuario dice "nos dedicamos a la renta/venta de maquinaria" o similar, SIEMPRE es tipo_cliente: "distribuidor", NO solo giro_empresa.
+       - Ejemplos: "Sí me dedico a la venta" → {{"tipo_cliente": "distribuidor"}}
+       - Ejemplos: "nos dedicamos a la renta de maquinaria" → {{"tipo_cliente": "distribuidor", "giro_empresa": "renta de maquinaria"}}
+       - Ejemplos: "No, la quiero para usarla yo" → {{"tipo_cliente": "cliente_final"}}
+       - Ejemplos: "uso propio" → {{"tipo_cliente": "cliente_final"}}
+       - Ejemplos: "quiero comercializarla, es para venta" → {{"tipo_cliente": "distribuidor"}}
+       - Ejemplos: "para distribución" → {{"tipo_cliente": "distribuidor"}}
     
     CAMPOS A EXTRAER (solo si están vacíos):
     {fields_available}
@@ -108,7 +112,7 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - NO uses sinónimos ni inventes nombres. Si el usuario dice "volumen", usa el campo correspondiente (ej. "caudal_cfm_max").
     - NO extraigas campos que no estén en esta lista.
     - PROHIBIDO inventar campos como: "proyecto", "aplicación", "capacidad_volumen", "capacidad_de_volumen", "volumen", etc.
-    - IMPORTANTE: Si el usuario dice "para venta", extráelo como "uso_empresa_o_venta": "venta", y NO como actividad en detalles_maquinaria.
+    - IMPORTANTE: Si el usuario dice "para venta", extráelo como "tipo_cliente": "distribuidor", y NO como actividad en detalles_maquinaria.
     
     REGLAS ESPECIALES PARA VALORES NUMÉRICOS:
     - IMPORTANTE: Si un campo representa una cantidad numérica (ej. "altura_plataforma_m", "altura_trabajo_m", "potencia_kw", "amperaje_amps_max", "capacidad_carga_kg", "caudal_cfm_max", etc.), el valor extraído DEBE SER UN NÚMERO (INTEGER O FLOAT), NUNCA UN STRING.
@@ -168,19 +172,23 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - Ejemplo: Pregunta "¿Cuál es el giro?" + Respuesta "Mineria" → giro_empresa: "Mineria"
     - Ejemplo: Pregunta "¿A qué se dedican?" + Respuesta "Nos dedicamos a la mineria" → giro_empresa: "mineria"
     
-    REGLAS ESPECIALES PARA USO_EMPRESA_O_VENTA:
-    - IMPORTANTE: Si la última pregunta del bot es sobre "si te dedicas a la venta/renta de maquinaria" (o variaciones como "para venta/distribución o para uso propio"), la respuesta del usuario SIEMPRE debe ser clasificada como uso_empresa_o_venta.
-    - PARA VENTA: Si el usuario responde afirmativamente, dice que sí vende/renta, o que es para reventa/distribución:
-      * "sí", "si me dedico", "venta de maquinaria", "renta", "para venta", "es para vender", "para comercializar", "distribución" → uso_empresa_o_venta: "venta"
-    - PARA USO EMPRESA: Si el usuario responde negativamente, dice que es para uso propio, o uso de la empresa:
-      * "no", "no me dedico a eso", "es para uso propio", "para mi empresa", "uso interno", "para trabajo interno" → uso_empresa_o_venta: "uso empresa"
-      * "es para nuestra empresa", "es para la empresa", "es para uso de la empresa" → uso_empresa_o_venta: "uso empresa"
-    - IMPORTANTE: El valor SIEMPRE debe ser exactamente "uso empresa" o "venta" (STRING).
+    REGLAS ESPECIALES PARA tipo_cliente:
+    - PRIORIDAD MÁXIMA: Esta regla aplica SIN IMPORTAR cuál fue la última pregunta del bot. Si el usuario menciona renta/venta/distribución de maquinaria, SIEMPRE extraer tipo_cliente.
+    - PARA distribuidor: Si el usuario responde afirmativamente, dice que sí vende/renta, o que es para reventa/distribución:
+      * "sí", "si me dedico", "venta de maquinaria", "renta", "para venta", "es para vender", "para comercializar", "distribución" → tipo_cliente: "distribuidor"
+      * "nos dedicamos a la renta", "nos dedicamos a la renta de maquinaria", "renta de maquinaria", "renta de equipo", "rentamos maquinaria" → tipo_cliente: "distribuidor"
+    - PARA cliente_final: Si el usuario responde negativamente, dice que es para uso propio, o uso de la empresa:
+      * "no", "no me dedico a eso", "es para uso propio", "para mi empresa", "uso interno", "para trabajo interno" → tipo_cliente: "cliente_final"
+      * "es para nuestra empresa", "es para la empresa", "es para uso de la empresa" → tipo_cliente: "cliente_final"
+    - IMPORTANTE: El valor SIEMPRE debe ser exactamente "cliente_final" o "distribuidor" (STRING).
+    - IMPORTANTE: Si el usuario dice que se dedica a la RENTA o VENTA de maquinaria/equipos, SIEMPRE es tipo_cliente: "distribuidor". Extraer AMBOS: tipo_cliente Y giro_empresa si aplica.
     - Ejemplos correctos:
-      * Pregunta: "¿Te dedicas a la venta/renta de maquinaria?" + "No, es para nuestra empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
-      * Pregunta: "¿Te dedicas a la venta/renta de maquinaria?" + "Sí, vendemos" → {{"uso_empresa_o_venta": "venta"}}
-      * Pregunta: "¿El equipo es para venta o para uso propio?" + "es para uso propio" → {{"uso_empresa_o_venta": "uso empresa"}}
-      * Pregunta: "¿El equipo es para venta o para uso propio?" + "Para venta" → {{"uso_empresa_o_venta": "venta"}}
+      * "No, es para nuestra empresa" → {{"tipo_cliente": "cliente_final"}}
+      * "Sí, vendemos" → {{"tipo_cliente": "distribuidor"}}
+      * "nos dedicamos a la renta de maquinaria" → {{"tipo_cliente": "distribuidor", "giro_empresa": "renta de maquinaria"}}
+      * "ah sí, nos dedicamos a la renta de maquinaria" → {{"tipo_cliente": "distribuidor", "giro_empresa": "renta de maquinaria"}}
+      * "es para uso propio" → {{"tipo_cliente": "cliente_final"}}
+      * "Para venta" → {{"tipo_cliente": "distribuidor"}}
     
     REGLAS ESPECIALES PARA CONSTANCIA_FISCAL_ENTREGADA:
     - Si el bot requirió la Constancia de Situación Fiscal y el usuario adjuntó documento, foto, o reponde con textos similares a "aquí la adjunto", "ya te la mandé", "listo", "claro que sí", "aquí está" → constancia_fiscal_entregada: true (BOOLEANO)
@@ -200,8 +208,8 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - Mensaje: "me llamo Mauricio Martinez Rodriguez" → {{"nombre": "Mauricio", "apellido": "Martinez Rodriguez"}}
     - Mensaje: "venta de maquinaria" → {{"giro_empresa": "venta de maquinaria"}}
     - Mensaje: "construcción y mantenimiento" → {{"giro_empresa": "construcción y mantenimiento"}}
-    - Mensaje: "no, es para uso propio" → {{"uso_empresa_o_venta": "uso empresa"}}
-    - Mensaje: "sí me dedico a la renta" → {{"uso_empresa_o_venta": "venta"}}
+    - Mensaje: "no, es para uso propio" → {{"tipo_cliente": "cliente_final"}}
+    - Mensaje: "sí me dedico a la renta" → {{"tipo_cliente": "distribuidor"}}
     - Mensaje: "en la Ciudad de México" → {{"lugar_requerimiento": "Ciudad de México"}}
     - Mensaje: "daniel@empresa.com" → {{"correo": "daniel@empresa.com"}}
     - Mensaje: "555-1234" → {{"telefono": "555-1234"}}
@@ -210,9 +218,9 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - Última pregunta: "¿En qué compañía trabajas?" + Mensaje: "Facebook" → {{"nombre_empresa": "Facebook"}}
     - Última pregunta: "¿Cuál es el giro de su empresa?" + Mensaje: "Construcción" → {{"giro_empresa": "Construcción"}}
     - Última pregunta: "¿Cuál es su correo electrónico?" + Mensaje: "daniel@empresa.com" → {{"correo": "daniel@empresa.com"}}
-    - Última pregunta: "¿Te dedicas a la venta/renta de maquinaria?" + Mensaje: "Sí" → {{"uso_empresa_o_venta": "venta"}}
-    - Última pregunta: "¿Te dedicas a la venta/renta de maquinaria?" + Mensaje: "No, es para nuestra empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
-    - Última pregunta: "¿El equipo es para venta o para uso propio?" + Mensaje: "Es para uso de la empresa" → {{"uso_empresa_o_venta": "uso empresa"}}
+    - Última pregunta: "¿Te dedicas a la venta/renta de maquinaria?" + Mensaje: "Sí" → {{"tipo_cliente": "distribuidor"}}
+    - Última pregunta: "¿Te dedicas a la venta/renta de maquinaria?" + Mensaje: "No, es para nuestra empresa" → {{"tipo_cliente": "cliente_final"}}
+    - Última pregunta: "¿El equipo es para venta o para uso propio?" + Mensaje: "Es para uso de la empresa" → {{"tipo_cliente": "cliente_final"}}
     - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Necesito una soldadora" → {{"tipo_ayuda": "maquinaria"}}
     - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Quiero información sobre créditos" → {{"tipo_ayuda": "otro"}}
     - Última pregunta: "¿En qué te puedo ayudar?" + Mensaje: "Refacciones" → {{"tipo_ayuda": "otro"}}
@@ -241,7 +249,7 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
     - Si la última pregunta del bot contiene "¿Quieres que te cotice" o "¿Te gustaría recibir una cotización" o similar sobre cotización:
       * Si el usuario dice "sí", "si", "claro", "por favor", "ok", "dale", "adelante", "quiero", "me interesa" → quiere_cotizacion: true (BOOLEANO)
       * Si el usuario comienza a dar datos de la empresa (nombre, giro, ubicación, correo, teléfono) o el tipo de uso (venta o uso propio) → quiere_cotizacion: true (BOOLEANO)
-      * Si el usuario proporciona la respuesta a si el equipo es para "uso propio" o "venta" → quiere_cotizacion: true (BOOLEANO)
+      * Si el usuario proporciona la respuesta a si el equipo es para "uso propio" o "distribuidor" → quiere_cotizacion: true (BOOLEANO)
       * Si el usuario selecciona una máquina específica: "quiero la 1", "la primera", "la segunda", "me interesa la 3", "la de [característica]" → quiere_cotizacion: true (BOOLEANO)
       * Si el usuario dice "no", "no gracias", "no quiero", "no me interesa", "no por ahora", "después", "más tarde" → quiere_cotizacion: false (BOOLEANO)
     - IMPORTANTE: El valor debe ser un BOOLEANO JSON (true o false), NO un string ("sí", "no", "true", "false")
@@ -279,7 +287,7 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_template(
 
 RESPONSE_GENERATION_PROMPT = ChatPromptTemplate.from_template(
     """
-    Eres Enrique Delfin, un asesor comercial en Alpha C y un asistente de ventas profesional especializado en maquinaria de la empresa.
+    Eres Alphi, un asesor comercial en Alpha C y un asistente de ventas profesional especializado en maquinaria de la empresa.
     Estás continuando una conversación con un lead.
     Tu trabajo recolectar información de manera natural y conversacional, con un tono casual y amigable.
 
@@ -308,6 +316,7 @@ RESPONSE_GENERATION_PROMPT = ChatPromptTemplate.from_template(
     3. Si hay una siguiente pregunta, hazla de manera natural
     4. NO inventes preguntas adicionales
     5. Si no hay siguiente pregunta, simplemente confirma la información recibida y termina la conversación
+    6. FORMATO: Cuando necesites pedir múltiples datos al usuario, SIEMPRE usa una lista enumerada (1. 2. 3.). NUNCA uses viñetas (•), guiones (-) ni párrafos corridos para listar datos que necesitas.
     
     Genera una respuesta natural y apropiada:
     """

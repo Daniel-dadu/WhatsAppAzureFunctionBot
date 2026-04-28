@@ -16,7 +16,7 @@ MODEL_CODE_MAPPING = {
     "Sakai RS75": "RS75",
     
     # =========================================================================
-    # COMPRESOR (7)
+    # COMPRESOR (9)
     # =========================================================================
     "AIRMAN SAS22RD6E": "SAS22RD6E",
     "AIRMAN SAS37RD6E": "SAS37RD6E",
@@ -25,6 +25,8 @@ MODEL_CODE_MAPPING = {
     "AIRMAN SAS75RD6E": "SAS75RD6E",
     "AIRMAN SAS8SD6C": "SAS8SD6C",
     "AIRMAN PDS750S-4B1": "PDS750S4B1",
+    "AIRMAN PDS185S-6C2": "PDS185S6C2",
+    "AIRMAN PDSF375S-DP": "PDS375DP6B",
     
     # =========================================================================
     # ROMPEDOR / MARTILLO NEUMÁTICO (3)
