@@ -83,10 +83,15 @@ class InventoryService:
         if machine_type == "compresor":
             matching_machines = self._apply_compressor_portable_rules(matching_machines, requirements, filtered_machines)
         
+        # Reglas especiales para soldadoras
+        if machine_type == "soldadora":
+            matching_machines = self._apply_soldadora_rules(matching_machines, requirements, filtered_machines)
+        
         # NOTE: Prices are NOT enriched here. They are fetched later
         # when the user completes the cotización flow.
-                
-        return matching_machines
+        
+        # Limitar a máximo 2 opciones para no abrumar al lead
+        return matching_machines[:2]
     
     def _apply_generator_portable_rules(self, matching_machines: List[Dict[str, Any]], requirements: Dict[str, Any], all_generators: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -159,6 +164,31 @@ class InventoryService:
         
         else:
             # > 375 CFM: recomendaciones normales
+            return matching_machines
+    def _apply_soldadora_rules(self, matching_machines: List[Dict[str, Any]], requirements: Dict[str, Any], all_soldadoras: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Reglas especiales para soldadoras:
+        - Si el cliente solicita ≤ 200 A → Ofrecer SOLO Shindaiwa EGW185MS (185A, gasolina)
+        - Si solicita más de 200 A → Recomendaciones normales (modelos diésel)
+        """
+        req_amp = requirements.get("amperaje_amps_max")
+        if req_amp is None:
+            return matching_machines
+        
+        try:
+            req_amp_val = float(req_amp)
+        except (ValueError, TypeError):
+            return matching_machines
+        
+        if req_amp_val <= 200:
+            # SOLO ofrecer Shindaiwa EGW185MS
+            for m in all_soldadoras:
+                if m.get("modelo") == "Shindaiwa EGW185MS":
+                    return [m]
+            return matching_machines
+        
+        else:
+            # > 200A: recomendaciones normales (filtro de proximidad ya aplicó)
             return matching_machines
 
     def _enrich_with_prices(self, machines: List[Dict[str, Any]]) -> None:

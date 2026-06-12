@@ -1,0 +1,88 @@
+@startuml
+start
+
+:FLUJO 1: Lead manda el primer mensaje;
+
+if (¿El lead especifica lo que necesita?) then (No)
+  :Responder con "Hola, soy Alejandro Gómez, 
+  asesor comercial de Alpha C, ¿con quién tengo el gusto?";
+else (Sí)
+  :Responder con "Hola,  sí claro, con gusto te podemos dar 
+  más información. Soy Alejandro Gómez, asesor comercial de Alpha C, 
+  ¿con quién tengo el gusto?";
+endif
+
+if (¿Nombre contiene más de una palabra?) then (No)
+  :Preguntar "Okay, ¿me puedes decir también cuál es tu apellido?";
+else (Sí)
+  :Continuar;
+endif
+
+if (¿El lead ya mencionó el tipo de maquinaria que requiere?) then (No)
+  :Preguntar "Muy bien, ¿en qué te podemos ayudar?";
+  if ("¿Desea adquirir maquinaria?") then (Sí)
+    :Preguntar "Entiendo, ¿qué tipo de maquinaria desea?";
+  else (Otro: refacciones / crédito / consulta)
+    :Responder "Claro, en un momento te comparto la información";
+    :Informar a Alex Benhur para que continue la conversación;
+    stop
+  endif
+else (Sí)
+  :Continuar;
+endif
+
+:Preguntar característica específica requerida
+de acuerdo a la maquinaria que requiere (varias preguntas);
+
+:Responder "Muy bien, contamos con las siguientes maquinarias que pueden satisfacer tus necesidades:
+- Maquinaria 1
+- Maquinaria 2
+- Maquinaria 3
+¿Quieres que te cotice alguna de estas?";
+
+if (¿El lead quiere una cotización?) then (Sí)
+  :Preguntar "Me podrías decir si te dedicas a la venta/renta de maquinaria. También me podrías compartir tu correo electrónico y ubicación (estado de la República Mexicana)";
+  
+  if (¿Se dedica a la venta/renta de maquinaria?) then (Sí)
+    :Pedir al cliente que comparta su Constancia de Situación Fiscal
+    para verificar su información y brindarle un precio especial;
+    
+    if (¿El cliente comparte la constancia?) then (Sí)
+      :Informar "En un momento te contactará el asesor de la zona para darle el precio preferencial.";
+      :Mandar al asesor la constancia, correo, ubicación, teléfono y nombre del lead;
+      stop
+    else (No tiene constancia)
+      :Preguntar por el giro de su empresa;
+      
+      if (¿Cuál es el giro de la empresa?) then (Distribuidor)
+        :Informar "En un momento te contactará el asesor de la zona para darle el precio preferencial.";
+        :Mandar al asesor el giro, correo, ubicación, teléfono y nombre del lead;
+        stop
+      else (Cliente final)
+        :Mandar siguiente solicitud:
+        "Muy bien, para poder generar la cotización, 
+        necesito que me compartas el siguiente dato:
+        - Nombre de la empresa";
+        
+        :Mandar cotización en PDF;
+        :Informar "Te compartí la cotización, nos pondremos en contacto con usted pronto.";
+      endif
+    endif
+    
+  else (No / Uso propio)
+    :Mandar siguiente solicitud:
+    "Muy bien, para poder generar la cotización, 
+    necesito que me compartas los siguientes datos:
+    - Nombre de la empresa
+    - Giro de la empresa";
+    
+    :Mandar cotización en PDF;
+    :Informar "Te compartí la cotización, nos pondremos en contacto con usted pronto.";
+  endif
+  
+else (No)
+  :Por definir;
+endif
+
+stop
+@enduml

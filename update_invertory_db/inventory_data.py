@@ -51,13 +51,11 @@ inventario = [
     {"modelo": "AIRMAN PDS830S",        "categoria": "compresor", "tipo_compresor": "portátil", "caudal_cfm_max": 830, "presion_psi_max": 150},
     {"modelo": "AIRMAN PDSG750VRS-4C5", "categoria": "compresor", "tipo_compresor": "portátil", "caudal_cfm_max": 900, "presion_psi_max": 100},
     {"modelo": "AIRMAN PDS750S-4B1",    "categoria": "compresor", "tipo_compresor": "portátil", "caudal_cfm_max": 750, "presion_psi_max": 100},
-    {"modelo": "AIRMAN PDS400S",        "categoria": "compresor", "tipo_compresor": "portátil", "caudal_cfm_max": 400, "presion_psi_max": 100},
     {"modelo": "AIRMAN PDSF375S-DP",    "categoria": "compresor", "tipo_compresor": "portátil", "caudal_cfm_max": 375, "presion_psi_max": 100},
     {"modelo": "AIRMAN PDS185S-6C2",    "categoria": "compresor", "tipo_compresor": "portátil", "caudal_cfm_max": 185, "presion_psi_max": 100},
 
-    # ROMPEDOR
+    # ROMPEDOR, AKA Martillo
     {"modelo": "Toku TCB-300", "categoria": "rompedor", "tipo_alimentacion": "neumatico", "peso_kg": 30},
-    {"modelo": "Toku TPB-60",  "categoria": "rompedor", "tipo_alimentacion": "neumatico", "peso_kg": 30},
     {"modelo": "Toku TPB-90",  "categoria": "rompedor", "tipo_alimentacion": "neumatico", "peso_kg": 42},
 
     # MOTOBOMBAS
@@ -99,7 +97,9 @@ inventario = [
     },
 
     # MONTACARCAS
-    
+    {"modelo": "Noblelift CPQYD30", "categoria": "montacargas", "tipo_combustible": "Gas o Gasolina", "capacidad_toneladas": 3},
+    {"modelo": "Noblelift CPCD30", "categoria": "montacargas", "tipo_combustible": "Diésel", "capacidad_toneladas": 3},
+    {"modelo": "Noblelift FE4P25Q", "categoria": "montacargas", "tipo_combustible": "Eléctrico", "capacidad_toneladas": 2.5},
 
     # PLATAFORMAS
     {"modelo": "LGMG AR60JE-2", "categoria": "plataforma", "tipo_plataforma": "articulada", "altura_trabajo_m": 20.12, "altura_plataforma_m": 18.12, "tipo_alimentacion": "electrica"},
@@ -118,5 +118,5 @@ inventario = [
     {"modelo": "LGMG M2640JE", "categoria": "plataforma", "tipo_plataforma": "mástil", "altura_trabajo_m": 10, "altura_plataforma_m": 8, "tipo_alimentacion": "electrica"},
 
     # MANIPULADORES
-    {"modelo": "LGMG H1840", "categoria": "manipulador", "altura_maxima_m": 17.5, "capacidad_carga_kg": 4000},
+    {"modelo": "LGMG H1840", "categoria": "manipulador", "altura_maxima_m": 17.5, "capacidad_toneladas": 4},
 ]

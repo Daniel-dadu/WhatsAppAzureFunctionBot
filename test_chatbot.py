@@ -79,20 +79,33 @@ def _sanitize_filename(name: str) -> str:
     return s
 
 def run_conversation_test(
-    test_name: str, 
-    chatbot: IntelligentLeadQualificationChatbot, 
-    conversation_flow: List[str], 
-    expected_data: Dict[str, Any]
+    test_name: str,
+    chatbot: IntelligentLeadQualificationChatbot,
+    conversation_flow: List[str],
+    expected_data: Dict[str, Any],
+    expected_substrings: List[str] = None,
+    forbidden_substrings: List[str] = None,
+    simulate_pdf_send: bool = False
 ):
     """
     Ejecuta un flujo de conversación de prueba y compara los resultados.
     Guarda todo el output de la prueba en un archivo .txt y solo imprime
     en consola cuando inicia y cuando termina la prueba.
+
+    Parámetros opcionales para verificar el TEXTO del bot (no solo el estado):
+    - expected_substrings: subcadenas que DEBEN aparecer en alguna respuesta del bot.
+    - forbidden_substrings: subcadenas que NO deben aparecer en ninguna respuesta
+      (ej: "$" para confirmar que no se filtró un precio).
+    - simulate_pdf_send: si True, instala un callback stub de envío de PDF y un
+      current_user_id temporal para que `_try_send_pdf_quotation` pueda completarse
+      (en modo prueba normal no hay callback, así que siempre devolvería False).
+      El estado sigue guardándose SOLO en memoria (InMemoryStateStore). Se restaura
+      el estado original del chatbot al terminar.
     """
     import os
     if os.environ.get("RUN_ONLY") and os.environ.get("RUN_ONLY") not in test_name:
         return
-        
+
     # Solo informar inicio en consola
     print(f"INICIANDO PRUEBA: {test_name}")
 
@@ -101,82 +114,111 @@ def run_conversation_test(
     output_lines.append(f"✨ Resultado de la prueba: {test_name}")
     output_lines.append("==================================================\n")
     output_lines.append(f"--- INICIANDO PRUEBA: {test_name} ---\n")
-    
+
     # Reinicia el estado del chatbot para una prueba limpia
     chatbot.reset_conversation()
 
-    # Una sola instancia del guardrails
-    guardrails = ContentSafetyGuardrails()
-    
-    # Simula la conversación
-    for i, user_message in enumerate(conversation_flow):
-        time.sleep(2) # Evitar rate limits
-        timestamp = _get_timestamp()
-        output_lines.append(f"[{timestamp}] 👤 Usuario: {user_message}")
+    # Opcional: simular contexto de WhatsApp para poder verificar el envío/re-envío
+    # del PDF de cotización. Se restaura en el finally para no contaminar otras pruebas.
+    _saved_user_id = chatbot.current_user_id
+    _saved_pdf_cb = chatbot.send_pdf_callback
+    if simulate_pdf_send:
+        chatbot.current_user_id = "test_pdf_user"
+        chatbot.send_pdf_callback = lambda *args, **kwargs: "stub_pdf_msg_id"
 
-        # safety_result = guardrails.check_message_safety(user_message)
-        # if safety_result:
-        #     timestamp = _get_timestamp()
-        #     output_lines.append(f"[{timestamp}] ❌ Bot: {safety_result['message']}")
-        #     continue
-        
-        bot_response = chatbot.send_message(user_message)
-        timestamp = _get_timestamp()
-        output_lines.append(f"[{timestamp}] 🤖 Bot: {bot_response}\n")
-    
-    # Al final del flujo, obtenemos el estado final
-    final_state = chatbot.state
-    
-    # Comparar los resultados
-    output_lines.append(f"--- FINALIZANDO PRUEBA: {test_name} ---")
-    output_lines.append("📊 Comparando resultados extraídos vs. esperados...\n")
-    
-    has_errors = False
-    for key, expected_value in expected_data.items():
-        extracted_value = final_state.get(key)
-        
-        # Manejo especial para comparar enums y diccionarios
-        if isinstance(expected_value, dict):
-            try:
-                ev = json.dumps(expected_value, sort_keys=True)
-                xv = json.dumps(extracted_value, sort_keys=True)
-            except TypeError:
-                ev = str(expected_value)
-                xv = str(extracted_value)
-            if ev != xv:
-                has_errors = True
-                output_lines.append(f"❌ ERROR en '{key}':")
-                output_lines.append(f"   -> Esperado: {ev}")
-                output_lines.append(f"   -> Extraído: {xv}")
+    try:
+        # Una sola instancia del guardrails
+        guardrails = ContentSafetyGuardrails()
+
+        # Simula la conversación
+        bot_responses: List[str] = []
+        for i, user_message in enumerate(conversation_flow):
+            time.sleep(2) # Evitar rate limits
+            timestamp = _get_timestamp()
+            output_lines.append(f"[{timestamp}] 👤 Usuario: {user_message}")
+
+            # safety_result = guardrails.check_message_safety(user_message)
+            # if safety_result:
+            #     timestamp = _get_timestamp()
+            #     output_lines.append(f"[{timestamp}] ❌ Bot: {safety_result['message']}")
+            #     continue
+
+            bot_response = chatbot.send_message(user_message)
+            bot_responses.append(bot_response or "")
+            timestamp = _get_timestamp()
+            output_lines.append(f"[{timestamp}] 🤖 Bot: {bot_response}\n")
+
+        # Al final del flujo, obtenemos el estado final
+        final_state = chatbot.state
+
+        # Comparar los resultados
+        output_lines.append(f"--- FINALIZANDO PRUEBA: {test_name} ---")
+        output_lines.append("📊 Comparando resultados extraídos vs. esperados...\n")
+
+        has_errors = False
+        for key, expected_value in expected_data.items():
+            extracted_value = final_state.get(key)
+
+            # Manejo especial para comparar enums y diccionarios
+            if isinstance(expected_value, dict):
+                try:
+                    ev = json.dumps(expected_value, sort_keys=True)
+                    xv = json.dumps(extracted_value, sort_keys=True)
+                except TypeError:
+                    ev = str(expected_value)
+                    xv = str(extracted_value)
+                if ev != xv:
+                    has_errors = True
+                    output_lines.append(f"❌ ERROR en '{key}':")
+                    output_lines.append(f"   -> Esperado: {ev}")
+                    output_lines.append(f"   -> Extraído: {xv}")
+            else:
+                if extracted_value != expected_value:
+                    has_errors = True
+                    output_lines.append(f"❌ ERROR en '{key}':")
+                    output_lines.append(f"   -> Esperado: '{expected_value}'")
+                    output_lines.append(f"   -> Extraído: '{extracted_value}'")
+
+        # Verificación opcional del TEXTO de las respuestas del bot
+        all_bot_text = "\n".join(bot_responses)
+        if expected_substrings:
+            for needle in expected_substrings:
+                if needle.lower() not in all_bot_text.lower():
+                    has_errors = True
+                    output_lines.append(f"❌ ERROR de mensaje: se esperaba que el bot dijera algo con '{needle}', pero no apareció.")
+        if forbidden_substrings:
+            for needle in forbidden_substrings:
+                if needle.lower() in all_bot_text.lower():
+                    has_errors = True
+                    output_lines.append(f"❌ ERROR de mensaje: el bot NO debía decir '{needle}', pero apareció.")
+
+        if not has_errors:
+            output_lines.append("✅ ¡ÉXITO! Toda la información fue extraída correctamente.")
         else:
-            if extracted_value != expected_value:
-                has_errors = True
-                output_lines.append(f"❌ ERROR en '{key}':")
-                output_lines.append(f"   -> Esperado: '{expected_value}'")
-                output_lines.append(f"   -> Extraído: '{extracted_value}'")
+            output_lines.append("\n⚠️ PRUEBA FALLIDA. Se encontraron discrepancias.")
 
-    if not has_errors:
-        output_lines.append("✅ ¡ÉXITO! Toda la información fue extraída correctamente.")
-    else:
-        output_lines.append("\n⚠️ PRUEBA FALLIDA. Se encontraron discrepancias.")
-        
-    output_lines.append(f"\n--- RESUMEN FINAL DEL ESTADO PARA '{test_name}' ---")
-    output_lines.append(json.dumps(final_state, default=str, indent=2, ensure_ascii=False))
-    output_lines.append("--------------------------------------------------\n")
+        output_lines.append(f"\n--- RESUMEN FINAL DEL ESTADO PARA '{test_name}' ---")
+        output_lines.append(json.dumps(final_state, default=str, indent=2, ensure_ascii=False))
+        output_lines.append("--------------------------------------------------\n")
 
-    # Preparar carpeta y archivo de salida
-    out_dir = os.path.join(os.path.dirname(__file__), "test_results")
-    os.makedirs(out_dir, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_name = _sanitize_filename(test_name)
-    filename = f"test_{safe_name}_{timestamp}.txt"
-    filepath = os.path.join(out_dir, filename)
+        # Preparar carpeta y archivo de salida
+        out_dir = os.path.join(os.path.dirname(__file__), "test_results")
+        os.makedirs(out_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_name = _sanitize_filename(test_name)
+        filename = f"test_{safe_name}_{timestamp}.txt"
+        filepath = os.path.join(out_dir, filename)
 
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write("\n".join(output_lines))
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(output_lines))
 
-    # Solo informar finalización en consola
-    print(f"TERMINADA PRUEBA: {test_name} -> {filepath}\n")
+        # Solo informar finalización en consola
+        print(f"TERMINADA PRUEBA: {test_name} -> {filepath}\n")
+    finally:
+        # Restaurar el contexto original del chatbot
+        if simulate_pdf_send:
+            chatbot.current_user_id = _saved_user_id
+            chatbot.send_pdf_callback = _saved_pdf_cb
 
 # ============================================================================
 # DEFINICIÓN DE LOS FLUJOS DE CONVERSACIÓN
@@ -196,7 +238,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "Me llamo Ana",
         "Mi apellido es Gómez",
         "Busco una torre de iluminación.",
-        "Sí, la prefiero de LED por favor.",
         "Sí, quiero la maquina 1",
         "No nos dedicamos a la venta de maquinaria, es para uso de nuestra empresa. Mi correo es ana.gomez@constresol.com y estamos ubicados en Puebla",
         "Claro. La empresa se llama 'Construcciones del Sol' y nos dedicamos a la construcción de carreteras."
@@ -206,7 +247,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "nombre": "Ana Gómez",
         "apellido": "Gómez",
         "tipo_maquinaria": "torre_iluminacion",
-        "detalles_maquinaria": {"tipo_reflector": "LED"},
         "quiere_cotizacion": True,
         "maquina_seleccionada": "Shindaiwa SL433IDG-B/S1W",
         "tipo_cliente": "cliente_final",
@@ -318,8 +358,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     flujo_5 = [
         "Hola, quiero una torre de luz",
         "Soy Juan Perez",
-        "Si, LED",
-        "quiero la 1",
+        "quiero la segunda",
         "si, me dedico a la venta de maquinaria, mi correo es juan@gmail.com y estamos en Tlaxcala",
         "no la tengo",
         "nos dedicamos a la construcción",
@@ -330,7 +369,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "nombre": "Juan Perez",
         "apellido": "Perez",
         "tipo_maquinaria": "torre_iluminacion",
-        "detalles_maquinaria": {"tipo_reflector": "LED"},
         "quiere_cotizacion": True,
         "tipo_cliente": "distribuidor",
         "correo": "juan@gmail.com",
@@ -376,11 +414,12 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     run_conversation_test("Flujo 6: Selección de máquina con nombre específico", chatbot, flujo_6, esperado_6)
 
     # ------------------------------------------------------------------------
-    # Flujo 8: Selección de máquina con código parcial (sin marca)
-    # Este flujo prueba que el bot muestre el precio incluso cuando el usuario
-    # selecciona una máquina usando solo el código del modelo (ej: "DGM250MK-D")
-    # sin el nombre completo de la marca (ej: "Shindaiwa DGM250MK-D").
-    # Valida el fuzzy matching del pricing service.
+    # Flujo 8: Selección por código parcial de una máquina SIN precio
+    # El usuario selecciona "DG100MI-400" (→ "Shindaiwa DG100MI-400"), modelo que
+    # NO tiene mapping de precio en model_code_mapping.py. Verifica que:
+    #   - La selección por nombre parcial sí resuelve el modelo completo.
+    #   - Al no haber precio, el bot deriva a un asesor y NO genera cotización/PDF.
+    # (Antes este flujo estaba mal etiquetado como validación de precio.)
     # ------------------------------------------------------------------------
     flujo_8 = [
         "Hola, soy María López",
@@ -399,7 +438,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
             "potencia_kw": 25
         },
         "quiere_cotizacion": True,
-        "maquina_seleccionada": "DG100MI-400",
+        "maquina_seleccionada": "Shindaiwa DG100MI-400",
         "tipo_cliente": "cliente_final",
         "nombre_empresa": "IndustrialMex",
         "giro_empresa": "manufactura",
@@ -408,7 +447,11 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "telefono": "442 111 2233"
     }
 
-    run_conversation_test("Flujo 8: Selección de máquina con código parcial", chatbot, flujo_8, esperado_8)
+    run_conversation_test(
+        "Flujo 8: Selección por código parcial (máquina sin precio)", chatbot, flujo_8, esperado_8,
+        expected_substrings=["asesor"],
+        forbidden_substrings=["Procederé a generar su cotización", "$"]
+    )
 
     # ------------------------------------------------------------------------
     # Flujo 9: Selección de máquina con código parcial (sin marca)
@@ -461,7 +504,8 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "dadu@gmail.com",
         "ah sí, nos dedicamos a la renta de maquinaria",
         "estamos ubicados en Querétaro, pero no tengo la constancia",
-        "mi empresa es MachinesTop"
+        "bueno, en realidad nos dedicamos a la construcción",
+        "trabajo en MachinesTop"
     ]
 
     esperado_10 = {
@@ -473,11 +517,11 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
             "altura_trabajo_m": 8,
         },
         "quiere_cotizacion": True,
-        "tipo_cliente": "distribuidor",
+        "tipo_cliente": "cliente_final",
         "lugar_requerimiento": "Querétaro",
         "correo": "dadu@gmail.com",
         "constancia_fiscal_entregada": "No tiene",
-        "giro_empresa": "renta de maquinaria",
+        "giro_empresa": "construcción",
         "nombre_empresa": "MachinesTop",
         "maquina_seleccionada": "LGMG MP0607SE"
     }
@@ -495,8 +539,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "plataforma de elevacion",
         "mástil",
         "10 metros",
-        "eléctrica",
-        "Me interesa la LGMG M2640JE",
+        "Si",
         "cliente_final",
         "Empresa Silva Construcciones, construcción, Estado de Mexico, rs@silvacons.com"
     ]
@@ -507,8 +550,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "tipo_maquinaria": "plataforma",
         "detalles_maquinaria": {
             "tipo_plataforma": "mástil",
-            "altura_trabajo_m": 10,
-            "tipo_alimentacion": "electrica"
+            "altura_trabajo_m": 10
         },
         "quiere_cotizacion": True,
         "maquina_seleccionada": "LGMG M2640JE",
@@ -520,41 +562,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     }
 
     run_conversation_test("Flujo 11: Plataforma Mástil", chatbot, flujo_11, esperado_11)
-
-    # ------------------------------------------------------------------------
-    # Flujo 12: Compresor
-    # Este flujo prueba que el sistema solicite tipo_compresor y caudal_cfm_max
-    # ------------------------------------------------------------------------
-    flujo_12 = [
-        "Hola, me llamo Luis Torres",
-        "Busco un compresor",
-        "portátil",
-        "necesito 400 cfm",
-        "Me interesa esa opción",
-        "para uso de la empresa",
-        "trabajo en MachinesCorp, nos dedicamos a la construcción, y Ciudad de Mexico"
-        "correo carlos@connorte.com y tel 81 1234 5678"
-    ]
-
-    esperado_12 = {
-        "nombre": "Luis Torres",
-        "apellido": "Torres",
-        "tipo_maquinaria": "compresor",
-        "detalles_maquinaria": {
-            "tipo_compresor": "portátil",
-            "caudal_cfm_max": 400
-        },
-        "quiere_cotizacion": True,
-        "maquina_seleccionada": "AIRMAN PDS400S",
-        "tipo_cliente": "cliente_final",
-        "nombre_empresa": "MachinesCorp",   
-        "giro_empresa": "construcción",
-        "lugar_requerimiento": "Ciudad de Mexico",
-        "correo": "carlos@connorte.com",
-        "telefono": "81 1234 5678"
-    }
-
-    run_conversation_test("Flujo 12: Compresor", chatbot, flujo_12, esperado_12)
 
     # ------------------------------------------------------------------------
     # Flujo 13: Selección de máquina implícita por contexto único
@@ -575,7 +582,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "tipo_maquinaria": "rompedor",
         "detalles_maquinaria": {},
         "quiere_cotizacion": True,
-        "maquina_seleccionada": "Toku TPB-60",
+        "maquina_seleccionada": "Toku TPB-90",
         "tipo_cliente": "cliente_final",
         "nombre_empresa": "Alfa Construcciones",
         "giro_empresa": "construcción",
@@ -587,43 +594,10 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     run_conversation_test("Flujo 13: Selección de máquina implícita", chatbot, flujo_13, esperado_13)
 
     # ------------------------------------------------------------------------
-    # Flujo 14: Atributos desde el inicio (Ejemplo de soldadora)
-    # ------------------------------------------------------------------------
-    flujo_14 = [
-        "me cotizas una soldadora shindaiwa de 185 amperes",
-        "mi correo es j.perez@gmail.com y me llamo Juan Perez",
-        "la necesito de diesel",
-        "quiero la 340",
-        "uso propio",
-        "trabajo en MachinesCorp, nos dedicamos a la construcción, y estamos en Ciudad de México"
-    ]
-
-    esperado_14 = {
-        "nombre": "Juan Perez",
-        "apellido": "Perez",
-        "tipo_maquinaria": "soldadora",
-        "detalles_maquinaria": {
-            "amperaje_amps_max": 185,
-            "tipo_alimentacion": "diésel"
-        },
-        "quiere_cotizacion": True,
-        "maquina_seleccionada": "Shindaiwa DGW340DM",
-        "tipo_cliente": "cliente_final",
-        "nombre_empresa": "MachinesCorp",
-        "giro_empresa": "construcción",
-        "lugar_requerimiento": "Ciudad de México",
-        "correo": "j.perez@gmail.com",
-        "telefono": None
-    }
-
-    run_conversation_test("Flujo 14: Atributos desde el inicio", chatbot, flujo_14, esperado_14)
-
-    # ------------------------------------------------------------------------
     # Flujo 15: Soldadora <= 200A 
     # ------------------------------------------------------------------------
     flujo_15 = [
         "Hola, soy Daniel Perez, quiero una soldadora de 200 amperes",
-        "gasolina",
         "quiero esa opción",
         "cliente_final",
         "trabajo en X, giro industrial, Ciudad de Mexico, correo d@mail.com tel 555"
@@ -634,8 +608,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "apellido": "Perez",
         "tipo_maquinaria": "soldadora",
         "detalles_maquinaria": {
-            "amperaje_amps_max": 200,
-            "tipo_alimentacion": "gasolina"
+            "amperaje_amps_max": 200
         },
         "quiere_cotizacion": True,
         "maquina_seleccionada": "Shindaiwa EGW185MS",
@@ -686,7 +659,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "la quiero de tijera",
         "no, prefiero que me coticemos una soldadora",
         "200 amperes",
-        "diesel",
         "cotizame la primera",
         "me dedico a la venta de maquinaria, mi correo es dan@gmail.com y estamos en Guanajuato",
         "ya mandé la constancia"
@@ -697,11 +669,10 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         "apellido": "Maldonado",
         "tipo_maquinaria": "soldadora",
         "detalles_maquinaria": {
-            "amperaje_amps_max": 200,
-            "tipo_alimentacion": "diésel"
+            "amperaje_amps_max": 200
         },
         "quiere_cotizacion": True,
-        "maquina_seleccionada": "Shindaiwa DGW340DM",
+        "maquina_seleccionada": "Shindaiwa EGW185MS",
         "tipo_cliente": "distribuidor",
         "lugar_requerimiento": "Guanajuato",
         "correo": "dan@gmail.com",
@@ -739,36 +710,6 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     }
 
     run_conversation_test("Flujo 18: Generador Portátil", chatbot, flujo_18, esperado_18)
-
-    # ------------------------------------------------------------------------
-    # Flujo 19: Generador Portátil 5-8 kW → Ofrecer modelo de 8 kW (GV-8000S)
-    # ------------------------------------------------------------------------
-    flujo_19 = [
-        "Hola, soy Ana Torres y necesito un generador",
-        "7 kw",
-        "quiero esa opción",
-        "cliente_final",
-        "trabajo en MaquiNorte, giro industrial, Guadalajara, correo ana@maquinorte.com tel 3312345678"
-    ]
-
-    esperado_19 = {
-        "nombre": "Ana Torres",
-        "apellido": "Torres",
-        "tipo_maquinaria": "generador",
-        "detalles_maquinaria": {
-            "potencia_kw": 7
-        },
-        "quiere_cotizacion": True,
-        "maquina_seleccionada": "Koshin GV-8000S",
-        "tipo_cliente": "cliente_final",
-        "nombre_empresa": "MaquiNorte",
-        "giro_empresa": "industrial",
-        "lugar_requerimiento": "Guadalajara",
-        "correo": "ana@maquinorte.com",
-        "telefono": "3312345678"
-    }
-
-    run_conversation_test("Flujo 19: Generador Portátil", chatbot, flujo_19, esperado_19)
 
     # ------------------------------------------------------------------------
     # Flujo 20: Generador Portátil > 8 kW → Saltar a modelo de 25 kW (DGM250MK-D)
@@ -885,7 +826,7 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
             "caudal_cfm_max": 400
         },
         "quiere_cotizacion": True,
-        "maquina_seleccionada": "AIRMAN PDS400S",
+        "maquina_seleccionada": "AIRMAN PDS750S-4B1",
         "tipo_cliente": "cliente_final",
         "nombre_empresa": "IndustrialNorte",
         "giro_empresa": "manufactura",
@@ -897,33 +838,503 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
     run_conversation_test("Flujo 23: Compresor Portátil", chatbot, flujo_23, esperado_23)
 
     # ------------------------------------------------------------------------
-    # Flujo 24: Compresor Portátil > 375 CFM → Recomendaciones normales
+    # Flujo 25: Montacargas
     # ------------------------------------------------------------------------
-    flujo_24 = [
-        "quiero una soldadora de 300 amperes, soy Luis Torres",
-        "quiero la segunda opción",
-        "no, nos dedicamos al mantenimiento",
-        "trabajo en Edifica, Saltillo, correo miguel@industrialnorte.com tel 8441234567"
+    flujo_25 = [
+        "Hola, soy Roberto García y necesito un montacargas",
+        "2.5 toneladas",
+        "si",
+        "me dedico al mantenimiento",
+        "trabajo en LogísticaMX, giro mantenimiento industrial, Monterrey, correo roberto@logisticamx.com tel 8112345678"
     ]
 
-    esperado_24 = {
-        "nombre": "Luis Torres",
-        "apellido": "Torres",
-        "tipo_maquinaria": "soldadora",
+    esperado_25 = {
+        "nombre": "Roberto García",
+        "apellido": "García",
+        "tipo_maquinaria": "montacargas",
         "detalles_maquinaria": {
-            "amperaje_amps_max": 300
+            "capacidad_toneladas": 2.5
         },
         "quiere_cotizacion": True,
-        "maquina_seleccionada": "Shindaiwa DGW400DMK",
+        "maquina_seleccionada": "Noblelift FE4P25Q",
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "LogísticaMX",
+        "giro_empresa": "mantenimiento industrial",
+        "lugar_requerimiento": "Monterrey",
+        "correo": "roberto@logisticamx.com",
+        "telefono": "8112345678"
+    }
+
+    run_conversation_test("Flujo 25: Montacargas", chatbot, flujo_25, esperado_25)
+
+    # ------------------------------------------------------------------------
+    # Flujo 27: Torre de Luz - Selección tardía (usuario dice "sí" sin elegir)
+    # ------------------------------------------------------------------------
+    flujo_27 = [
+        "Hola, soy Daniel Maldonado y quiero una torre de luz",
+        "si",
+        "la segunda",
+        "me dedico al mantenimiento",
+        "trabajo en ConstruNorte, giro mantenimiento industrial, Chihuahua, correo fernando@construnorte.com tel 6141234567"
+    ]
+
+    esperado_27 = {
+        "nombre": "Daniel Maldonado",
+        "apellido": "Maldonado",
+        "tipo_maquinaria": "torre_iluminacion",
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Trime X-START",
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "ConstruNorte",
+        "giro_empresa": "mantenimiento industrial",
+        "lugar_requerimiento": "Chihuahua",
+        "correo": "fernando@construnorte.com",
+        "telefono": "6141234567"
+    }
+
+    run_conversation_test("Flujo 27: Torre de Luz (selección tardía)", chatbot, flujo_27, esperado_27)
+
+    # ------------------------------------------------------------------------
+    # Flujo 28: Re-cotización post-completada (soldadora → generador)
+    # ------------------------------------------------------------------------
+    flujo_28 = [
+        "Hola, soy Carlos Mendoza y quiero una soldadora de 300 amperes",
+        "quiero la segunda opción",
+        "no, es para uso propio",
+        "trabajo en Edifica, giro mantenimiento, Saltillo, correo carlos@edifica.com tel 8441234567",
+        "Muy bien, también quiero un generador",
+        "7.2 kw",
+        "si",
+    ]
+
+    esperado_28 = {
+        "nombre": "Carlos Mendoza",
+        "apellido": "Mendoza",
+        "tipo_maquinaria": "generador",
+        "detalles_maquinaria": {
+            "potencia_kw": 7.2
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Koshin GV-8000S",
         "tipo_cliente": "cliente_final",
         "nombre_empresa": "Edifica",
         "giro_empresa": "mantenimiento",
         "lugar_requerimiento": "Saltillo",
-        "correo": "miguel@industrialnorte.com",
+        "correo": "carlos@edifica.com",
         "telefono": "8441234567"
     }
 
-    run_conversation_test("Flujo 24: Compresor Portátil", chatbot, flujo_24, esperado_24)
+    run_conversation_test("Flujo 28: Re-cotización post-completada", chatbot, flujo_28, esperado_28)
+
+    # ------------------------------------------------------------------------
+    # Flujo 30: Re-cotización explícita post-completada (generador 20kW → generador 35kW)
+    # Verifica que el bot NO cicle repitiendo la cotización anterior
+    # ------------------------------------------------------------------------
+    flujo_30 = [
+        "Hola, soy Daniel Maldonado y quiero un generador de 20 kw",
+        "si",
+        "no, es para uso propio",
+        "trabajo en ConstruNorte, giro mantenimiento industrial, Chihuahua, correo fernando@construnorte.com tel 6141234567",
+        "Oye, también cotízame un generador de 35 kw de potencia",
+        "si, quiero esa",
+    ]
+
+    esperado_30 = {
+        "nombre": "Daniel Maldonado",
+        "apellido": "Maldonado",
+        "tipo_maquinaria": "generador",
+        "detalles_maquinaria": {
+            "potencia_kw": 35
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Shindaiwa DGM450MK-D",
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "ConstruNorte",
+        "giro_empresa": "mantenimiento industrial",
+        "lugar_requerimiento": "Chihuahua",
+        "correo": "fernando@construnorte.com",
+        "telefono": "6141234567"
+    }
+
+    run_conversation_test("Flujo 30: Re-cotización explícita (sin ciclo)", chatbot, flujo_30, esperado_30)
+
+    # ------------------------------------------------------------------------
+    # Flujo 31: Distribuidor sin constancia con giro distribuidor (no re-pedir constancia)
+    # Verifica que cuando un distribuidor dice que NO tiene la constancia
+    # y luego proporciona un giro que confirma que es distribuidor (ej: renta de
+    # maquinaria), el bot NO vuelve a pedir la constancia sino que responde
+    # con el mensaje de asesor: "En un momento te contactará el asesor de la
+    # zona para darle el precio preferencial."
+    # ------------------------------------------------------------------------
+    flujo_31 = [
+        "Hola, soy Carlos Herrera y quiero un compresor",
+        "portátil",
+        "700 cfm",
+        "okay, quiero la 750",
+        "sí me dedico, mi correo es dan@gmail.com y estoy en Jalisco",
+        "no la tengo",
+        "renta de maquinaria",
+    ]
+
+    esperado_31 = {
+        "nombre": "Carlos Herrera",
+        "apellido": "Herrera",
+        "tipo_maquinaria": "compresor",
+        "detalles_maquinaria": {
+            "tipo_compresor": "portátil",
+            "caudal_cfm_max": 700
+        },
+        "maquina_seleccionada": "AIRMAN PDS750S-4B1",
+        "quiere_cotizacion": True,
+        "tipo_cliente": "distribuidor",
+        "correo": "dan@gmail.com",
+        "lugar_requerimiento": "Jalisco",
+        "constancia_fiscal_entregada": "No tiene",
+        "giro_empresa": "renta de maquinaria",
+        "completed": True,
+    }
+
+    run_conversation_test("Flujo 31: Distribuidor sin constancia con giro distribuidor", chatbot, flujo_31, esperado_31)
+
+    # ------------------------------------------------------------------------
+    # Flujo 32: Distribuidor sin constancia con giro distribuidor (no re-pedir constancia)
+    # Verifica que cuando un distribuidor dice que NO tiene la constancia
+    # y luego proporciona un giro que confirma que es distribuidor (ej: renta de
+    # maquinaria), el bot NO vuelve a pedir la constancia sino que responde
+    # con el mensaje de asesor: "En un momento te contactará el asesor de la
+    # zona para darle el precio preferencial."
+    # ------------------------------------------------------------------------
+    flujo_32 = [
+        "Hola, tienen generadores?",
+        "soy Carlos Herrera",
+        "7",
+        "si",
+        "Cuánto cuesta la máquina que me recomendaste?",
+        "Okay, me dedico a la construcción, 2 dadu@gmail.com, 3 Puebla",
+        "Mi empresa se llama Constructora Top y el giro es construcción",
+    ]
+
+    esperado_32 = {
+        "nombre": "Carlos Herrera",
+        "apellido": "Herrera",
+        "tipo_maquinaria": "generador",
+        "detalles_maquinaria": {
+            "potencia_kw": 7
+        },
+        "maquina_seleccionada": "Koshin GV-8000S",
+        "quiere_cotizacion": True,
+        "tipo_cliente": "cliente_final",
+        "correo": "dadu@gmail.com",
+        "lugar_requerimiento": "Puebla",
+        "giro_empresa": "construcción",
+        "completed": True,
+    }
+
+    run_conversation_test("Flujo 32: Distribuidor sin constancia con giro distribuidor", chatbot, flujo_32, esperado_32)
+
+    # ------------------------------------------------------------------------
+    # Flujo 33: Cliente final cotiza un montacargas Noblelift CPCD30
+    # Verifica el mapping de precio recién agregado para "Noblelift CPCD30"
+    # ("Noblelift CPCD30" -> "CPCD30" en model_code_mapping.py).
+    #
+    # Hay dos montacargas de 3 toneladas (CPQYD30 a gasolina y CPCD30 a diésel),
+    # por lo que el usuario debe elegir explícitamente el diésel para que
+    # maquina_seleccionada quede en "Noblelift CPCD30".
+    #
+    # CÓMO VERIFICAR EL PRECIO (al ejecutar): en el archivo .txt de resultados,
+    # la cotización final (y el PDF) deben incluir el precio del CPCD30
+    # (~$20,371 USD). Antes de agregar el mapping, ese precio NO se resolvía.
+    # El flujo también ejerce la regla de "no revelar precio antes de la
+    # cotización": en el turno de "¿Cuánto cuesta?" el bot NO debe dar una cifra.
+    # ------------------------------------------------------------------------
+    flujo_33 = [
+        "Hola, necesito un montacargas",
+        "Soy Laura Mendoza",
+        "3 toneladas",
+        "Quiero el de diésel, el Noblelift CPCD30",
+        "¿Cuánto cuesta?",
+        "Es para uso propio, mi correo es laura.mendoza@constructora.com y estamos en Nuevo León",
+        "Mi empresa se llama Edificaciones del Norte y nos dedicamos a la construcción",
+    ]
+
+    esperado_33 = {
+        "nombre": "Laura Mendoza",
+        "apellido": "Mendoza",
+        "tipo_maquinaria": "montacargas",
+        "detalles_maquinaria": {
+            "capacidad_toneladas": 3
+        },
+        "maquina_seleccionada": "Noblelift CPCD30",
+        "quiere_cotizacion": True,
+        "tipo_cliente": "cliente_final",
+        "correo": "laura.mendoza@constructora.com",
+        "lugar_requerimiento": "Nuevo León",
+        "giro_empresa": "construcción",
+        "completed": True,
+    }
+
+    run_conversation_test("Flujo 33: Cliente final cotiza montacargas Noblelift CPCD30", chatbot, flujo_33, esperado_33)
+
+    # ------------------------------------------------------------------------
+    # Flujo 34: Seguimiento tras handoff a asesor por máquina SIN precio
+    # cliente_final selecciona un manipulador (LGMG H1840), que NO tiene precio.
+    # Al completar, el bot deriva a un asesor (no cotiza ni manda PDF). Luego:
+    #   - El lead pide "¿me mandas la cotización?": como no hay PDF que reenviar,
+    #     el bot debe reiterar la derivación a asesor, NO decir "Te reenvío la cotización".
+    #   - El lead hace una pregunta libre sobre la máquina: el bot debe responder
+    #     con normalidad (sin ciclarse en el mensaje de cierre ni revelar precio).
+    # Verificaciones automáticas: aparece "asesor"; NUNCA aparece "Te reenvío la
+    # cotización", ni "Procederé a generar su cotización", ni "$".
+    # (Revisar en el .txt que la última respuesta conteste la pregunta de altura.)
+    # ------------------------------------------------------------------------
+    flujo_34 = [
+        "Hola, soy Fernando López y busco un manipulador telescópico",
+        "4 toneladas",
+        "si, quiero cotización",
+        "uso propio",
+        "trabajo en ConstruNorte, giro construcción, Chihuahua, correo fernando@construnorte.com tel 6141234567",
+        "oye, ¿me mandas la cotización?",
+        "y ¿qué altura máxima alcanza ese manipulador?",
+    ]
+
+    esperado_34 = {
+        "nombre": "Fernando López",
+        "apellido": "López",
+        "tipo_maquinaria": "manipulador",
+        "detalles_maquinaria": {
+            "capacidad_toneladas": 4
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "LGMG H1840",
+        "tipo_cliente": "cliente_final",
+        "giro_empresa": "construcción",
+        "lugar_requerimiento": "Chihuahua",
+        "correo": "fernando@construnorte.com",
+        "telefono": "6141234567",
+        "completed": True,
+    }
+
+    run_conversation_test(
+        "Flujo 34: Seguimiento tras handoff sin precio", chatbot, flujo_34, esperado_34,
+        expected_substrings=["asesor"],
+        forbidden_substrings=["Te reenvío la cotización", "Procederé a generar su cotización", "$"]
+    )
+
+    # ------------------------------------------------------------------------
+    # Flujo 35: Re-envío del PDF de cotización cuando SÍ hay precio
+    # cliente_final cotiza un generador de 7 kW (→ Koshin GV-8000S, que SÍ tiene
+    # precio). Al completar, se genera y "envía" la cotización (callback stub).
+    # Luego el lead pide reenviarla: como el PDF sí se envió, el bot debe responder
+    # "¡Claro! Te reenvío la cotización." (rama pdf_sent=True).
+    # Usa simulate_pdf_send=True para instalar el callback stub (sin esto, en modo
+    # prueba no hay callback y _try_send_pdf_quotation siempre devolvería False).
+    # ------------------------------------------------------------------------
+    flujo_35 = [
+        "Hola, soy Ana Torres y necesito un generador",
+        "7 kw",
+        "quiero esa opción",
+        "cliente_final",
+        "trabajo en MaquiNorte, giro industrial, Guadalajara, correo ana@maquinorte.com tel 3312345678",
+        "¿me reenvías la cotización por favor?",
+    ]
+
+    esperado_35 = {
+        "nombre": "Ana Torres",
+        "apellido": "Torres",
+        "tipo_maquinaria": "generador",
+        "detalles_maquinaria": {
+            "potencia_kw": 7
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Koshin GV-8000S",
+        "tipo_cliente": "cliente_final",
+        "giro_empresa": "industrial",
+        "lugar_requerimiento": "Guadalajara",
+        "correo": "ana@maquinorte.com",
+        "telefono": "3312345678",
+        "completed": True,
+    }
+
+    run_conversation_test(
+        "Flujo 35: Re-envío de PDF con precio", chatbot, flujo_35, esperado_35,
+        expected_substrings=["Te reenvío la cotización", "$"],
+        simulate_pdf_send=True
+    )
+
+    # ------------------------------------------------------------------------
+    # Flujo 36: Lead insistente con el precio (anti-fuga, regla 8)
+    # El lead se niega a dar sus datos hasta que le digan el precio. El bot NO debe
+    # ceder: no revela ninguna cifra ("$") y la conversación NO se completa (faltan
+    # los datos de empresa). Verifica que el bot difiere el precio a la cotización.
+    # ------------------------------------------------------------------------
+    flujo_36 = [
+        "Hola, soy Mario Vega y necesito un generador",
+        "7 kw",
+        "quiero esa opción",
+        "No te voy a dar mis datos hasta que me digas el precio exacto de esa máquina",
+    ]
+
+    esperado_36 = {
+        "nombre": "Mario Vega",
+        "apellido": "Vega",
+        "tipo_maquinaria": "generador",
+        "detalles_maquinaria": {
+            "potencia_kw": 7
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Koshin GV-8000S",
+        "tipo_cliente": None,
+        "completed": False,
+    }
+
+    run_conversation_test(
+        "Flujo 36: Lead insistente con el precio (anti-fuga)", chatbot, flujo_36, esperado_36,
+        forbidden_substrings=["$"]
+    )
+
+    # ------------------------------------------------------------------------
+    # Flujo 37: Cambio de detalle DESPUÉS de recomendar (re-recomendar, no completar)
+    # Reproduce un bug real: tras completar una primera cotización (generador) y
+    # arrancar una segunda (soldadora 300A → 2 opciones), el usuario CAMBIA el
+    # amperaje a 185A. El bot NO debe completar con una selección obsoleta/nula;
+    # debe recalcular y re-presentar la opción correcta para 185A (EGW185MS) y
+    # dejar que el usuario la elija.
+    # Verificación: la respuesta vuelve a recomendar "EGW185MS"; al final la
+    # máquina seleccionada es la Shindaiwa EGW185MS y la conversación se completa.
+    # ------------------------------------------------------------------------
+    flujo_37 = [
+        "Hola, soy Daniel Maldonado y quiero un generador de 7 kw",
+        "si",
+        "es para uso propio",
+        "trabajo en Constructora Top, giro construcción, Puebla, correo dadu@gmail.com tel 5551234567",
+        "También quiero una soldadora",
+        "300 amperios",
+        "sabes qué, mejor que sea de 185 amperios",
+        "si, esa quiero",
+    ]
+
+    esperado_37 = {
+        "nombre": "Daniel Maldonado",
+        "apellido": "Maldonado",
+        "tipo_maquinaria": "soldadora",
+        "detalles_maquinaria": {
+            "amperaje_amps_max": 185
+        },
+        "quiere_cotizacion": True,
+        "maquina_seleccionada": "Shindaiwa EGW185MS",
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "Constructora Top",
+        "giro_empresa": "construcción",
+        "lugar_requerimiento": "Puebla",
+        "correo": "dadu@gmail.com",
+        "telefono": "5551234567",
+        "completed": True,
+    }
+
+    run_conversation_test(
+        "Flujo 37: Cambio de detalle tras recomendar (re-recomendar)", chatbot, flujo_37, esperado_37,
+        expected_substrings=["EGW185MS"]
+    )
+
+    # ------------------------------------------------------------------------
+    # Flujo 38: "¿Qué máquinas manejan?" — el bot NO debe inventar tipos
+    # Verifica que al preguntar por los tipos de maquinaria, el bot se apegue a la
+    # lista real del inventario y NO alucine tipos inexistentes (ej: taladros,
+    # retroexcavadoras) ni use "entre otros".
+    # ------------------------------------------------------------------------
+    flujo_38 = [
+        "Hola, soy Daniel Maldonado",
+        "¿qué tipos de máquinas manejan?",
+    ]
+
+    esperado_38 = {
+        "nombre": "Daniel Maldonado",
+        "apellido": "Maldonado",
+    }
+
+    run_conversation_test(
+        "Flujo 38: Tipos de maquinaria (sin inventar)", chatbot, flujo_38, esperado_38,
+        expected_substrings=["generadores"],
+        forbidden_substrings=["taladro", "retroexcavadora", "excavadora", "entre otros"]
+    )
+
+    # ------------------------------------------------------------------------
+    # Flujo 39: Petición POR PRECIO ("la más barata") — no rankear ni revelar precio
+    # El usuario pide "la más barata" antes de dar el tipo. El bot NO debe revelar
+    # ni inventar un precio ("$"), ni presentar una máquina como la más barata;
+    # debe diferir el precio a la cotización y seguir pidiendo el tipo.
+    # ------------------------------------------------------------------------
+    flujo_39 = [
+        "Hola, soy Augusto Ramponi y quiero una plataforma de 6 metros",
+        "la más barata que tengan",
+    ]
+
+    esperado_39 = {
+        "nombre": "Augusto Ramponi",
+        "apellido": "Ramponi",
+        "tipo_maquinaria": "plataforma",
+        "completed": False,
+    }
+
+    run_conversation_test(
+        "Flujo 39: Petición por precio (la más barata)", chatbot, flujo_39, esperado_39,
+        forbidden_substrings=["$"]
+    )
+
+    # ------------------------------------------------------------------------
+    # Flujo 40: Cambio de tipo de plataforma DESPUÉS de recomendar (re-recomendar)
+    # Tras recomendar plataformas de tijera, el usuario cambia a unipersonal. El bot
+    # debe invalidar las opciones de tijera y re-recomendar una unipersonal
+    # (LGMG MP0607SE), no quedarse con las opciones obsoletas.
+    # ------------------------------------------------------------------------
+    flujo_40 = [
+        "Hola, soy Laura Fuentes y quiero una plataforma",
+        "de tijera",
+        "6 metros",
+        "mejor unipersonal",
+    ]
+
+    esperado_40 = {
+        "nombre": "Laura Fuentes",
+        "apellido": "Fuentes",
+        "tipo_maquinaria": "plataforma",
+        "detalles_maquinaria": {
+            "tipo_plataforma": "unipersonal",
+            "altura_trabajo_m": 6
+        },
+    }
+
+    run_conversation_test(
+        "Flujo 40: Cambio de tipo de plataforma tras recomendar", chatbot, flujo_40, esperado_40,
+        expected_substrings=["MP0607SE"]
+    )
+
+    # ------------------------------------------------------------------------
+    # Flujo 41: Altura dada en el primer mensaje (no re-preguntar la altura)
+    # "plataforma de 6 metros" debe quedar en altura_trabajo_m (NO en
+    # altura_plataforma_m). Al dar el tipo, el bot debe recomendar de inmediato,
+    # sin volver a preguntar la altura. Verifica la normalización de detalles.
+    # ------------------------------------------------------------------------
+    flujo_41 = [
+        "quiero una plataforma de 6 metros",
+        "soy Augusto Diaz",
+        "unipersonal",
+    ]
+
+    esperado_41 = {
+        "nombre": "Augusto Diaz",
+        "apellido": "Diaz",
+        "tipo_maquinaria": "plataforma",
+        "detalles_maquinaria": {
+            "tipo_plataforma": "unipersonal",
+            "altura_trabajo_m": 6
+        },
+    }
+
+    run_conversation_test(
+        "Flujo 41: Altura en el primer mensaje (sin re-preguntar)", chatbot, flujo_41, esperado_41,
+        expected_substrings=["MP0607SE"]
+    )
 
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:
@@ -945,8 +1356,7 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
                     break
 
                 if user_input.lower() == "status":
-                    estado = chatbot.get_lead_data_json()
-                    print(f"🤖 Estado actual de la conversación:\n{estado}")
+                    print(chatbot.get_status_message())
                     continue
 
                 if user_input:
@@ -968,7 +1378,7 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
                         print("\n" + "="*60)
                         print("📊 RESUMEN DEL LEAD CALIFICADO:")
                         print("="*60)
-                        print(chatbot.get_lead_data_json())
+                        print(chatbot.get_status_message())
                         print("="*60)
                         
                         respuesta = input("\n🔄 ¿Desea iniciar una nueva conversación? (s/n): ").strip().lower()
@@ -1001,5 +1411,5 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
 if __name__ == "__main__":
     chatbot_instance = setup_chatbot()
     define_test_flows(chatbot_instance)
-    # test_manually(chatbot_instance)  # modo interactivo; descomentar solo para pruebas manuales
+    # test_manually(chatbot_instance) # modo interactivo; descomentar solo para pruebas manuales
     print("\n🎉 Todas las pruebas han finalizado.")

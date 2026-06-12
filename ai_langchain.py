@@ -128,7 +128,7 @@ class AzureOpenAIConfig:
         return self.create_llm(
             temperature=0.7,  # Temperatura alta para respuestas más creativas y variadas
             top_p=0.95,       # Top-p alto para mayor diversidad
-            max_tokens=75
+            max_tokens=300
         )
     
     def create_inventory_llm(self):
@@ -201,7 +201,7 @@ def get_pending_empresa_fields(current_state: ConversationState) -> List[str]:
         
     if uso == "distribuidor":
         constancia = current_state.get("constancia_fiscal_entregada")
-        if not constancia: # None
+        if constancia is None:
             return pending_basic + ["Constancia de Situación Fiscal"]
         elif constancia == "No tiene" or constancia is False:
             giro = current_state.get("giro_empresa")
@@ -502,6 +502,20 @@ class IntelligentSlotFiller:
             if quiere_cotizacion is False:
                 return None
 
+            # 5.5 SELECCIÓN DE MÁQUINA (cuando hay múltiples opciones)
+            # Si el usuario dijo "sí" pero no especificó cuál máquina, re-preguntar
+            recomendadas = current_state.get("maquinas_recomendadas", [])
+            maquina_seleccionada = current_state.get("maquina_seleccionada")
+            if quiere_cotizacion is True and len(recomendadas) > 1 and not maquina_seleccionada:
+                machines_list = ""
+                for i, modelo in enumerate(recomendadas, 1):
+                    machines_list += f"{i}. {modelo}\n"
+                return {
+                    "question": f"Perfecto, estas son las opciones disponibles:\n{machines_list}\n¿Cuál de estas opciones te interesa?",
+                    "reason": "El usuario no especificó cuál máquina desea cotizar",
+                    "question_type": "seleccion_maquina"
+                }
+
             # 6. DATOS DE EMPRESA
             # Si quiere cotización o está pendiente, pedir datos de empresa si faltan
             pending_fields = get_pending_empresa_fields(current_state)
@@ -543,16 +557,11 @@ class IntelligentSlotFiller:
             if tipo_plataforma and tipo_plataforma != "articulada":
                 required_fields = [f for f in required_fields if f != "tipo_alimentacion"]
                 
-        # Para soldadoras, tipo_alimentacion se omite si el amperaje > 200
+        # Para soldadoras, tipo_alimentacion NUNCA se pregunta:
+        # - amperaje ≤ 200: solo se recomienda la EGW185MS (gasolina) → no preguntar
+        # - amperaje > 200: todas las opciones son diésel → no preguntar
         if tipo == "soldadora":
-            detalles = current_state.get("detalles_maquinaria", {})
-            amperaje = detalles.get("amperaje_amps_max")
-            if amperaje is not None:
-                try:
-                    if float(amperaje) > 200:
-                        required_fields = [f for f in required_fields if f != "tipo_alimentacion"]
-                except ValueError:
-                    pass
+            required_fields = [f for f in required_fields if f != "tipo_alimentacion"]
         
         # Para compresores estacionarios, saltar CFM (asesor se encarga)
         if _is_compresor_estacionario(current_state):
@@ -675,6 +684,9 @@ class IntelligentSlotFiller:
             # Reutilizamos get_pending_empresa_fields para validar
             if len(get_pending_empresa_fields(current_state)) > 0:
                 return False
+            # Para cotización (excepto compresor estacionario), se requiere máquina seleccionada
+            if not _is_compresor_estacionario(current_state) and not current_state.get("maquina_seleccionada"):
+                return False
 
         return True
 
@@ -750,16 +762,18 @@ class IntelligentResponseGenerator:
                 else:
                     extracted_name_instruction = "No menciones el nombre ni apellido del usuario."
 
-            if is_inventory_question:
-                # Nombres de tipos de maquinaria
-                # OBTENER DINÁMICAMENTE LOS NOMBRES DESDE LA CONFIGURACIÓN (Strings)
-                maquinaria_names = ", ".join([f"\"{m.type_id}\"" for m in machinery_config_service.get_all_types()])
-                
-                # Cambiar torre_iluminacion por torre de iluminación y plataforma por plataforma de elevación
-                maquinaria_names = maquinaria_names.replace("torre_iluminacion", "torre de iluminación")
-                maquinaria_names = maquinaria_names.replace("plataforma", "plataforma de elevación")
+            # Lista autorizada de tipos de maquinaria (nombres amigables). Fuente de
+            # verdad única; se inyecta SIEMPRE en el prompt para que el bot nunca
+            # invente tipos que no existen en el inventario.
+            tipos_maquinaria_validos = ", ".join(machinery_config_service.get_type_display_list())
 
-                inventory_instruction = "Este mensaje del usuario incluye una pregunta sobre inventario, por lo tanto, a continuación te comparto los tipos de maquinaria que tenemos:" + maquinaria_names
+            if is_inventory_question:
+                inventory_instruction = (
+                    "El mensaje del usuario incluye una pregunta sobre inventario. "
+                    "Enumérale los tipos de maquinaria que manejamos usando EXCLUSIVAMENTE la lista "
+                    "'TIPOS DE MAQUINARIA VÁLIDOS'. No agregues, parafrasees a otro producto ni inventes "
+                    "tipos que no estén en esa lista, y no uses 'entre otros'."
+                )
             else:
                 inventory_instruction = "Sigue las instrucciones dadas."
 
@@ -828,6 +842,11 @@ class IntelligentResponseGenerator:
  
 ¿Te gustaría que un asesor te contacte para ofrecerte una solución personalizada?"""
                 # END MODIFICATION
+
+            # Si la pregunta es de selección de máquina (re-preguntar cuál opción quiere),
+            # devolver directamente el texto con la lista numerada sin pasar por el LLM
+            if question_type == "seleccion_maquina":
+                return next_question
             
             # Instrucción especial para datos_empresa
             datos_empresa_instruction = ""
@@ -841,8 +860,8 @@ class IntelligentResponseGenerator:
                 datos_empresa_instruction = """
                 
                 INSTRUCCIÓN ESPECIAL PARA RECOPILAR DATOS:
-                - Responde inteligentemente pero de forma BREVE al mensaje del usuario
-                - Si el usuario pregunta algo, responde de manera natural y útil
+                PASO 1 (OBLIGATORIO): Si el usuario hace una pregunta o comentario, PRIMERO respóndele de forma breve y natural. Por ejemplo, si pregunta sobre estados de entrega, ubicaciones, características, etc., responde a su duda con la información que tengas. EXCEPCIÓN: si pregunta por el precio o costo, NO se lo digas ni inventes una cifra; explícale de forma amable que el precio se incluye en la cotización formal y que para generarla necesitas los datos que le estás solicitando.
+                PASO 2: Después de responder, haz una transición natural para pedir los datos pendientes. La transición NO debe empezar con una expresión de confirmación ("Claro", "Perfecto", "Por supuesto", etc.); enlaza directamente con la petición.
                 - Usa un mensaje como: """
                 should_list_pending_fields = False
                 uso = current_state.get("tipo_cliente")
@@ -856,7 +875,7 @@ class IntelligentResponseGenerator:
                     if "ubicación (estado de la República Mexicana)" in pending_fields:
                         numbered_items.append("Estado de la República Mexicana")
                     numbered_list = "\n".join([f"{i+1}. {item}" for i, item in enumerate(numbered_items)])
-                    datos_empresa_instruction += f"""Claro, para avanzar con la cotización necesito algunos datos de tu empresa.
+                    datos_empresa_instruction += f"""Para avanzar con la cotización necesito algunos datos de tu empresa.
 {numbered_list}"""
                 
                 elif "Constancia de Situación Fiscal" in pending_fields and len(pending_fields) == 1:
@@ -908,7 +927,8 @@ class IntelligentResponseGenerator:
                 presentation_instruction=presentation_instruction,
                 extracted_name_instruction=extracted_name_instruction,
                 datos_empresa_instruction=datos_empresa_instruction,
-                tipo_ayuda_instruction=tipo_ayuda_instruction
+                tipo_ayuda_instruction=tipo_ayuda_instruction,
+                tipos_maquinaria_validos=tipos_maquinaria_validos
             )
 
             debug_print(f"DEBUG: Prompt conversacional: {formatedPrompt}")
@@ -974,17 +994,32 @@ class IntelligentResponseGenerator:
                     pricing_str = f"\n\nMáquina seleccionada:\n- {maquina_seleccionada}: ${precio:,.0f} {moneda}"
                     logging.info(f"[PRICING_DEBUG] generate_final_response: Price FOUND - ${precio:,.0f} {moneda}")
                 else:
-                    pricing_str = f"\n\nMáquina seleccionada:\n- {maquina_seleccionada}: Precio a consultar"
-                    logging.warning(f"[PRICING_DEBUG] generate_final_response: No price found for '{maquina_seleccionada}'")
+                    # Sin precio en la base: NO se cotiza ni se envía PDF; se deriva a un asesor.
+                    logging.warning(f"[PRICING_DEBUG] generate_final_response: No price found for '{maquina_seleccionada}'. Deriving to advisor (no quotation/PDF).")
+                    return self._no_price_handoff_message(current_state)
             except Exception as e:
                 logging.error(f"[PRICING_DEBUG] generate_final_response: EXCEPTION fetching price: {type(e).__name__}: {e}")
                 import traceback
                 logging.error(f"[PRICING_DEBUG] generate_final_response: Traceback: {traceback.format_exc()}")
-                pricing_str = f"\n\nMáquina seleccionada:\n- {maquina_seleccionada}"
+                # Ante un error obteniendo el precio tampoco arriesgamos enviar una
+                # cotización sin precio: derivamos a un asesor.
+                return self._no_price_handoff_message(current_state)
         
         return f"""¡Perfecto, {current_state.get('nombre', 'Usuario')}!{pricing_str}
 
 Procederé a generar su cotización."""
+
+    def _no_price_handoff_message(self, current_state: ConversationState) -> str:
+        """
+        Mensaje final cuando la máquina seleccionada NO tiene precio en la base.
+        En este caso NO se genera cotización ni se envía el PDF: un asesor
+        contactará al cliente para darle la cotización.
+        """
+        nombre = current_state.get("nombre", "Usuario")
+        return (
+            f"Gracias por tu información, {nombre}. "
+            "Un asesor se pondrá en contacto contigo para brindarte la cotización."
+        )
 
 # ============================================================================
 # RESPONDEDOR DE INVENTARIO
@@ -1050,6 +1085,7 @@ class IntelligentLeadQualificationChatbot:
         state = {
             # Campos que no se preguntan al usuario
             "completed": False,
+            "cotizacion_enviada": False,  # True cuando ya se envió la respuesta final (evita ciclo)
             "messages": [],
             "conversation_mode": "bot", # agente o bot
             "asignado_asesor": None,
@@ -1160,12 +1196,54 @@ class IntelligentLeadQualificationChatbot:
             logging.error(f"Error procesando mensaje: {e}")
             return "Disculpe, hubo un error técnico. ¿Podría intentar de nuevo?"
 
+    def _wants_pdf_resend(self, message: str) -> bool:
+        """Detecta si el usuario pide explícitamente re-enviar la cotización PDF."""
+        if self.state.get("tipo_cliente") == "distribuidor":
+            return False  # Distribuidores no reciben PDF, se les asigna asesor
+        keywords = ["cotización", "cotizacion", "pdf", "mándame", "mandame",
+                    "envíame", "enviame", "reenvía", "reenvia", "otra vez",
+                    "de nuevo", "vuelve a enviar", "manda otra"]
+        msg_lower = message.lower()
+        return any(kw in msg_lower for kw in keywords)
+
     def _process_and_respond(self, user_message: str, extracted_info: Dict[str, Any]) -> str:
         """
         Lógica común para procesar un mensaje y generar una respuesta.
         Detecta preguntas de inventario, verifica si la conversación está completa,
         obtiene la siguiente pregunta y genera la respuesta con LLM.
         """
+
+        # ── Manejo de mensajes de seguimiento en conversaciones ya completadas ──
+        # Si la respuesta final (cotización/asesor) ya fue enviada, no repetirla.
+        # En su lugar, responder de forma natural con el LLM.
+        if self.state.get("cotizacion_enviada"):
+            debug_print("DEBUG: Conversación ya completada y cotización ya enviada. Respondiendo naturalmente.")
+            history_messages = [{"role": msg["role"], "content": msg["content"]} for msg in self.state["messages"]]
+
+            # Permitir re-envío de PDF si el cliente_final lo pide explícitamente
+            if self._wants_pdf_resend(user_message):
+                debug_print("DEBUG: El usuario pidió re-enviar la cotización PDF.")
+                pdf_sent = self._try_send_pdf_quotation()
+                if pdf_sent:
+                    response = "¡Claro! Te reenvío la cotización."
+                else:
+                    # No hay PDF que reenviar (p. ej. la máquina no tiene precio):
+                    # no prometemos una cotización; reiteramos la derivación a asesor.
+                    response = "Tu cotización la está gestionando un asesor, quien se pondrá en contacto contigo para brindártela."
+                return self._add_message_and_return_response(response, "")
+
+            generated_response = self.response_generator.generate_response(
+                user_message,
+                history_messages,
+                extracted_info,
+                self.state,
+                next_question=None,
+                is_inventory_question=False,
+                question_type="conversation_complete"
+            )
+            return self._add_message_and_return_response(generated_response, "")
+
+        # ── Flujo normal ──
         is_inventory_question = False
 
         # Verificar si es una pregunta sobre inventario
@@ -1220,12 +1298,23 @@ class IntelligentLeadQualificationChatbot:
 
         # If conversation is complete, use the final response with prices
         if self.state.get("completed") and next_question_str is None:
+            # Caso "otro" (refacciones, créditos, consultas): NO se cotiza ni se envía PDF.
+            # Según el flujo, se confirma y se deriva a un asesor que continúa la conversación.
+            if self.state.get("tipo_ayuda") == "otro":
+                final_response = self._get_final_response_message()
+                self.state["cotizacion_enviada"] = True  # Marcar que la respuesta final ya fue enviada
+                return self._add_message_and_return_response(final_response, storage_question_type)
+
             final_response = self.response_generator.generate_final_response(self.state)
+            self.state["cotizacion_enviada"] = True  # Marcar que la respuesta final ya fue enviada
             result = self._add_message_and_return_response(final_response, storage_question_type)
-            
+
             # Generate and send PDF quotation if applicable
             self._try_send_pdf_quotation()
-            
+
+            # Send ficha técnica (technical datasheet) if available
+            self._try_send_ficha_tecnica()
+
             return result
 
         # Generar respuesta con LLM (Llamada unificada)
@@ -1271,36 +1360,47 @@ class IntelligentLeadQualificationChatbot:
 
         return response
 
-    def _try_send_pdf_quotation(self):
+    def _try_send_pdf_quotation(self) -> bool:
         """
         Attempts to generate and send a PDF quotation via WhatsApp.
         Only triggers when:
+        - conversation is completed
         - quiere_cotizacion is True
-        - maquina_seleccionada is set
+        - maquina_seleccionada is set (and has a price)
         - send_pdf_callback is available (running in WhatsApp context)
+
+        Returns True only if the PDF was actually sent; False otherwise
+        (skipped conditions, no price for the machine, or send failure).
         """
         try:
             # Check conditions
+            # Guardia de negocio: el precio (que va dentro del PDF) NUNCA debe salir
+            # antes de que el lead haya proporcionado todos sus datos. Defensa en
+            # profundidad por si este método se invoca fuera del bloque `completed`.
+            if not self.state.get("completed"):
+                logging.info("[PDF] Skipping PDF: conversation not completed (price must not leak before all data is collected)")
+                return False
+
             if not self.state.get("quiere_cotizacion"):
                 logging.info("[PDF] Skipping PDF: quiere_cotizacion is not True")
-                return
+                return False
 
             if self.state.get("tipo_cliente") == "distribuidor":
                 logging.info("[PDF] Skipping PDF: uso is 'distribuidor', handoff triggered instead.")
-                return
+                return False
             
             maquina = self.state.get("maquina_seleccionada")
             if not maquina:
                 logging.info("[PDF] Skipping PDF: no maquina_seleccionada in state")
-                return
+                return False
             
             if not self.send_pdf_callback:
                 logging.info("[PDF] Skipping PDF: no send_pdf_callback (test mode)")
-                return
+                return False
             
             if not self.current_user_id:
                 logging.warning("[PDF] Skipping PDF: no current_user_id set")
-                return
+                return False
             
             logging.info(f"[PDF] Starting PDF generation for machine: {maquina}, user: {self.current_user_id}")
             
@@ -1313,7 +1413,12 @@ class IntelligentLeadQualificationChatbot:
                 logging.info(f"[PDF] Price info retrieved: {price_info}")
             except Exception as e:
                 logging.warning(f"[PDF] Could not fetch price for PDF: {e}")
-            
+
+            # Sin precio: NO se envía la cotización en PDF; un asesor dará la cotización.
+            if not price_info:
+                logging.info(f"[PDF] Skipping PDF quotation: no price for '{maquina}' (advisor will provide the quote)")
+                return False
+
             # Generate PDF
             from pdf_service import get_pdf_generator
             generator = get_pdf_generator()
@@ -1330,20 +1435,193 @@ class IntelligentLeadQualificationChatbot:
             
             if result:
                 logging.info(f"[PDF] PDF quotation sent successfully. WhatsApp message_id: {result}")
+                return True
             else:
                 logging.error(f"[PDF] send_pdf_callback returned None/empty for {self.current_user_id}")
-            
+                return False
+
         except Exception as e:
             logging.error(f"[PDF] Error generating/sending PDF quotation: {e}")
             import traceback
             logging.error(f"[PDF] Traceback: {traceback.format_exc()}")
+            return False
+
+    def _try_send_ficha_tecnica(self):
+        """
+        Attempts to download and send the ficha técnica (technical datasheet)
+        PDF for the selected machine via WhatsApp.
+        Triggers for both regular customers AND distributors when:
+        - maquina_seleccionada is set
+        - A ficha técnica exists for that model in Blob Storage
+        - send_pdf_callback is available (running in WhatsApp context)
+        """
+        try:
+            maquina = self.state.get("maquina_seleccionada")
+            if not maquina:
+                logging.info("[FICHA] Skipping ficha técnica: no maquina_seleccionada")
+                return
+
+            if not self.send_pdf_callback:
+                logging.info("[FICHA] Skipping ficha técnica: no send_pdf_callback (test mode)")
+                return
+
+            if not self.current_user_id:
+                logging.warning("[FICHA] Skipping ficha técnica: no current_user_id")
+                return
+
+            from blob_storage_service import get_blob_storage_service
+            blob_service = get_blob_storage_service()
+
+            if not blob_service.has_ficha_tecnica(maquina):
+                logging.info(f"[FICHA] No ficha técnica available for {maquina}")
+                return
+
+            result = blob_service.get_ficha_tecnica(maquina)
+            if not result:
+                logging.error(f"[FICHA] Failed to download ficha técnica for {maquina}")
+                return
+
+            pdf_bytes, blob_filename = result
+
+            # Send introductory message
+            intro_message = "Te comparto la ficha técnica de la máquina que te interesó."
+            try:
+                wa_msg_id = self.send_message_callback(self.current_user_id, intro_message)
+                self.state["messages"].append({
+                    "role": "assistant",
+                    "whatsapp_message_id": wa_msg_id or "",
+                    "question_type": "",
+                    "content": intro_message,
+                    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "sender": "bot"
+                })
+            except Exception as e:
+                logging.error(f"[FICHA] Error sending intro message: {e}")
+
+            # Send the PDF
+            send_result = self.send_pdf_callback(self.current_user_id, pdf_bytes, blob_filename)
+
+            if send_result:
+                logging.info(f"[FICHA] Ficha técnica sent for {maquina}. WhatsApp message_id: {send_result}")
+            else:
+                logging.error(f"[FICHA] Failed to send ficha técnica for {maquina}")
+
+            # Save conversation with new messages
+            self.save_conversation()
+
+        except Exception as e:
+            logging.error(f"[FICHA] Error sending ficha técnica: {e}")
+            import traceback
+            logging.error(f"[FICHA] Traceback: {traceback.format_exc()}")
     
+    # Alias de llaves de detalle que a veces produce la extracción -> campo canónico.
+    _DETALLE_ALIASES = {
+        "plataforma": {"altura_plataforma_m": "altura_trabajo_m"},
+    }
+
+    def _normalize_detalles_maquinaria(self, detalles: Dict[str, Any], tipo: Optional[str]) -> Dict[str, Any]:
+        """
+        Normaliza un dict de detalles de maquinaria al esquema canónico del tipo:
+        1) Remapea alias conocidos (ej. altura_plataforma_m -> altura_trabajo_m).
+        2) Descarta llaves que no existan en la config del tipo.
+        Si no hay tipo o no hay config, devuelve los detalles sin filtrar (evita
+        perder datos cuando aún no se conoce el tipo).
+        """
+        if not isinstance(detalles, dict) or not detalles or not tipo:
+            return detalles if isinstance(detalles, dict) else {}
+
+        result = dict(detalles)
+
+        # 1) Remapear alias conocidos sin pisar un valor canónico ya presente.
+        for alias, canonical in self._DETALLE_ALIASES.get(tipo, {}).items():
+            if alias in result:
+                if canonical not in result:
+                    result[canonical] = result[alias]
+                del result[alias]
+
+        # 2) Descartar llaves no canónicas (solo si conocemos la config del tipo).
+        config = machinery_config_service.get_config(tipo)
+        if config:
+            valid_fields = {f.name for f in config.fields}
+            dropped = [k for k in list(result.keys()) if k not in valid_fields]
+            for k in dropped:
+                del result[k]
+            if dropped:
+                debug_print(f"DEBUG: Detalles descartados por no ser canónicos de '{tipo}': {dropped}")
+
+        return result
+
     def _update_state_with_extracted_info(self, extracted_info: Dict[str, Any]):
         """
-        Actualiza el estado con la información extraída, confiando en el 
+        Actualiza el estado con la información extraída, confiando en el
         pre-procesamiento y formato realizado por el LLM.
         """
         debug_print(f"DEBUG: Actualizando estado con información: {extracted_info}")
+
+        # Pre-check: si la conversación ya estaba completada y llega nueva info de maquinaria,
+        # reiniciar el flujo de cotización (mantiene datos de empresa).
+        # Esto permite: "también cotízame un generador de 35 kw" tras completar otra cotización.
+        if self.state.get("completed"):
+            has_new_machinery_request = (
+                "tipo_maquinaria" in extracted_info
+                or ("detalles_maquinaria" in extracted_info and isinstance(extracted_info["detalles_maquinaria"], dict) and len(extracted_info["detalles_maquinaria"]) > 0)
+            )
+            if has_new_machinery_request:
+                debug_print("DEBUG: Conversación completada recibe nueva solicitud de maquinaria. Reiniciando flujo de cotización.")
+                new_tipo = extracted_info.get("tipo_maquinaria")
+                old_tipo = self.state.get("tipo_maquinaria")
+                # Si es el mismo tipo, limpiar detalles para que se llenen con los nuevos
+                # Si es diferente tipo, la lógica de tipo_maquinaria más abajo también limpia
+                if not new_tipo or new_tipo == old_tipo:
+                    self.state["detalles_maquinaria"] = {}
+                self.state["maquinas_recomendadas"] = []
+                self.state["maquina_seleccionada"] = None
+                self.state["quiere_cotizacion"] = None
+                self.state["completed"] = False
+                self.state["cotizacion_enviada"] = False
+
+        # Si el usuario CAMBIA un detalle de la maquinaria DESPUÉS de que ya se
+        # recomendaron opciones (ej: pasa de 300A a 185A), los requerimientos
+        # cambiaron y la recomendación previa quedó obsoleta. Invalida la
+        # recomendación/selección y vuelve a pedir cotización para recalcular las
+        # NUEVAS opciones. Sin esto, el flujo podría completarse con una selección
+        # obsoleta/nula y nunca re-presentar la opción correcta.
+        if not self.state.get("completed") and self.state.get("maquinas_recomendadas"):
+            new_detalles = extracted_info.get("detalles_maquinaria")
+            if isinstance(new_detalles, dict) and new_detalles:
+                current_detalles = self.state.get("detalles_maquinaria", {}) or {}
+                # Detectar si CAMBIA un detalle existente (ej. 300A -> 185A) o si se
+                # AGREGA uno nuevo que afina la búsqueda (ej. el usuario por fin
+                # especifica el tipo de plataforma). En ambos casos los requerimientos
+                # cambiaron y la recomendación previa quedó obsoleta.
+                details_changed = any(
+                    current_detalles.get(k) != v
+                    for k, v in new_detalles.items()
+                )
+                if details_changed:
+                    debug_print("DEBUG: Detalles de maquinaria cambiaron tras recomendar. Recalculando recomendación y re-pidiendo cotización.")
+                    self.state["maquinas_recomendadas"] = []
+                    self.state["maquina_seleccionada"] = None
+                    self.state["quiere_cotizacion"] = None
+                    self.state["completed"] = False
+                    # Evitar que un quiere_cotizacion mal interpretado en ESTE mismo
+                    # mensaje (ej: "sabes qué, mejor de 185A" leído como "no") termine
+                    # el flujo antes de re-presentar las nuevas opciones.
+                    extracted_info.pop("quiere_cotizacion", None)
+
+        # Guardia determinista: si el LLM extrajo tipo_cliente="distribuidor" y giro_empresa
+        # en la misma extracción, eliminar giro_empresa. Según el flujo de conversación,
+        # el giro solo se pregunta DESPUÉS de que el distribuidor dice que no tiene la constancia.
+        # Cuando el usuario dice "nos dedicamos a la renta de maquinaria" para responder si se
+        # dedica a la venta/renta, eso solo debe setear tipo_cliente, no giro_empresa.
+        if (extracted_info.get("tipo_cliente") == "distribuidor" 
+            and "giro_empresa" in extracted_info
+            and not self.state.get("tipo_cliente")):
+            giro_value = extracted_info["giro_empresa"]
+            if _is_distribuidor(giro_value):
+                del extracted_info["giro_empresa"]
+                debug_print(f"DEBUG: Eliminado giro_empresa='{giro_value}' de extracción simultánea con tipo_cliente='distribuidor'. El giro se preguntará por separado.")
+
         for key, value in extracted_info.items():
             # 1. Ignorar valores nulos o vacíos para no insertar datos inútiles.
             if value is None or value == "":
@@ -1354,15 +1632,24 @@ class IntelligentLeadQualificationChatbot:
             # - quiere_cotizacion: puede cambiar si el usuario corrige su respuesta.
             # - maquina_seleccionada: puede cambiar si el usuario elige otra máquina.
             # - tipo_maquinaria: puede cambiar si el usuario cambia de opinión.
+            # - giro_empresa: el usuario puede corregirlo (ej: "en realidad nos dedicamos a la construcción").
+            # - tipo_cliente: puede cambiar por reclasificación (distribuidor → cliente_final).
             # Esto es clave para evitar que una respuesta ambigua posterior
             # borre un dato que ya se había confirmado.
             current_value = self.state.get(key)
-            if key not in ["detalles_maquinaria", "quiere_cotizacion", "maquina_seleccionada", "tipo_maquinaria"] and current_value:
+            if key not in ["detalles_maquinaria", "quiere_cotizacion", "maquina_seleccionada", "tipo_maquinaria", "giro_empresa", "tipo_cliente"] and current_value:
                 debug_print(f"DEBUG: Campo '{key}' ya tiene valor válido '{current_value}', no se sobrescribe.")
                 continue
 
             # 3. Manejo de casos especiales
             if key == "detalles_maquinaria" and isinstance(value, dict):
+                # Normalizar a los campos canónicos del tipo actual: remapear alias
+                # conocidos (ej. altura_plataforma_m -> altura_trabajo_m) y descartar
+                # llaves que no estén en la config del tipo. Evita que una llave mal
+                # extraída bloquee el flujo (el campo requerido quedaría vacío y el
+                # bot re-preguntaría indefinidamente).
+                tipo_actual = extracted_info.get("tipo_maquinaria") or self.state.get("tipo_maquinaria")
+                value = self._normalize_detalles_maquinaria(value, tipo_actual)
                 current_detalles = self.state.get("detalles_maquinaria", {})
                 current_detalles.update(value)
                 self.state["detalles_maquinaria"] = current_detalles
@@ -1383,6 +1670,7 @@ class IntelligentLeadQualificationChatbot:
                         self.state["maquinas_recomendadas"] = []
                         self.state["maquina_seleccionada"] = None
                         self.state["quiere_cotizacion"] = None
+                        self.state["completed"] = False
                 else:
                     logging.error(f"ADVERTENCIA: Tipo de maquinaria inválido '{value}' extraído por el LLM.")
             
@@ -1415,17 +1703,97 @@ class IntelligentLeadQualificationChatbot:
             self.state["quiere_cotizacion"] = True
             debug_print("DEBUG: Inferido quiere_cotizacion=True por selección de máquina")
         
+        # Inferencia determinista de tipo_cliente basada en palabras clave.
+        # El LLM a veces no extrae tipo_cliente de frases claras como "es para uso propio".
+        # Este fallback garantiza que frases inequívocas se clasifiquen correctamente.
+        if not self.state.get("tipo_cliente") and not extracted_info.get("tipo_cliente"):
+            # Obtener el último mensaje del usuario para analizar
+            user_messages = [m for m in self.state.get("messages", []) if m.get("role") == "user"]
+            if user_messages:
+                last_user_msg = user_messages[-1].get("content", "").lower().strip()
+                
+                # Palabras clave para cliente_final
+                cliente_final_keywords = [
+                    "uso propio", "uso de la empresa", "uso interno", "para mi empresa",
+                    "para nuestra empresa", "para la empresa", "no me dedico",
+                    "no nos dedicamos", "no, es para", "cliente final", "cliente_final"
+                ]
+                # Palabras clave para distribuidor
+                distribuidor_keywords = [
+                    "sí me dedico", "si me dedico", "me dedico a la venta",
+                    "me dedico a la renta", "para venta", "para reventa",
+                    "para distribución", "para distribucion", "soy distribuidor"
+                ]
+                
+                for kw in cliente_final_keywords:
+                    if kw in last_user_msg:
+                        self.state["tipo_cliente"] = "cliente_final"
+                        debug_print(f"DEBUG: Inferido tipo_cliente='cliente_final' por palabra clave '{kw}' en mensaje: '{last_user_msg}'")
+                        break
+                
+                if not self.state.get("tipo_cliente"):
+                    for kw in distribuidor_keywords:
+                        if kw in last_user_msg:
+                            self.state["tipo_cliente"] = "distribuidor"
+                            debug_print(f"DEBUG: Inferido tipo_cliente='distribuidor' por palabra clave '{kw}' en mensaje: '{last_user_msg}'")
+                            break
+        
+        # Inferencia determinista de giro_empresa basada en contexto de la pregunta.
+        # Cuando el bot preguntó "¿cuál es el giro de tu empresa?" y el usuario respondió,
+        # pero el LLM no extrajo giro_empresa (a veces lo confunde con tipo_cliente),
+        # seteamos giro_empresa directamente del mensaje del usuario.
+        if not self.state.get("giro_empresa") and not extracted_info.get("giro_empresa"):
+            last_bot_question, last_question_type = self._get_last_bot_question()
+            if last_bot_question and "giro" in last_bot_question.lower():
+                user_messages = [m for m in self.state.get("messages", []) if m.get("role") == "user"]
+                if user_messages:
+                    last_user_msg = user_messages[-1].get("content", "").strip()
+                    if last_user_msg and len(last_user_msg) < 100:  # Respuesta razonable, no un párrafo largo
+                        self.state["giro_empresa"] = last_user_msg
+                        debug_print(f"DEBUG: Inferido giro_empresa='{last_user_msg}' por contexto de pregunta sobre giro.")
+
+        # Reclasificar distribuidor → cliente_final cuando:
+        # - El usuario dijo que se dedica a la venta/renta (tipo_cliente="distribuidor")
+        # - Pero NO tiene la Constancia de Situación Fiscal
+        # - Y su giro de empresa NO es de distribución/venta/renta de maquinaria
+        # En este caso, el usuario realmente es un cliente final que usa la maquinaria
+        # para su propio negocio (ej: construcción), así que se le cotiza directamente.
+        if (self.state.get("tipo_cliente") == "distribuidor"
+            and (self.state.get("constancia_fiscal_entregada") == "No tiene" or self.state.get("constancia_fiscal_entregada") is False)
+            and self.state.get("giro_empresa")
+            and not _is_distribuidor(self.state.get("giro_empresa"))):
+            self.state["tipo_cliente"] = "cliente_final"
+            debug_print(f"DEBUG: Reclasificado de distribuidor a cliente_final. Giro '{self.state.get('giro_empresa')}' no es de distribución y no tiene constancia fiscal.")
+        
         # Resolve partial model names against recommended machines
         # e.g. "X-START" → "Trime X-START", "DGM250MK-D" → "Shindaiwa DGM250MK-D"
         maquina_sel = self.state.get("maquina_seleccionada")
         maquinas_recomendadas = self.state.get("maquinas_recomendadas", [])
-        if maquina_sel and maquinas_recomendadas:
+        if maquina_sel:
             partial_lower = maquina_sel.lower().strip()
-            for full_model in maquinas_recomendadas:
-                if partial_lower in full_model.lower() and partial_lower != full_model.lower():
-                    debug_print(f"DEBUG: maquina_seleccionada resolved: '{maquina_sel}' → '{full_model}'")
-                    self.state["maquina_seleccionada"] = full_model
-                    break
+            resolved = False
+            
+            # 1. Intentar resolver contra las máquinas recomendadas
+            if maquinas_recomendadas:
+                for full_model in maquinas_recomendadas:
+                    if partial_lower in full_model.lower() and partial_lower != full_model.lower():
+                        debug_print(f"DEBUG: maquina_seleccionada resolved (recomendadas): '{maquina_sel}' → '{full_model}'")
+                        self.state["maquina_seleccionada"] = full_model
+                        resolved = True
+                        break
+            
+            # 2. Si no se encontró en recomendadas, buscar en todo el inventario local
+            #    para el tipo de maquinaria actual (ej: "340" → "Shindaiwa DGW340DM")
+            if not resolved:
+                from update_invertory_db.inventory_data import inventario
+                tipo = self.state.get("tipo_maquinaria")
+                for machine in inventario:
+                    if machine.get("categoria") == tipo:
+                        full_model = machine.get("modelo", "")
+                        if partial_lower in full_model.lower() and partial_lower != full_model.lower():
+                            debug_print(f"DEBUG: maquina_seleccionada resolved (inventario): '{maquina_sel}' → '{full_model}'")
+                            self.state["maquina_seleccionada"] = full_model
+                            break
         
     def _get_last_bot_question(self) -> Tuple[Optional[str], Optional[str]]:
         """Obtiene la última pregunta que hizo el bot para proporcionar contexto"""
@@ -1450,6 +1818,60 @@ class IntelligentLeadQualificationChatbot:
             logging.error(f"Error obteniendo última pregunta del bot: {e}")
             return None, None
     
+    def get_status_message(self) -> str:
+        """
+        Construye un resumen LEGIBLE y agrupado del estado de la conversación
+        (comando 'status'). Usado tanto en WhatsApp como en las pruebas manuales.
+        """
+        s = self.state
+
+        def val(key, default="—"):
+            v = s.get(key)
+            if v is None or v == "" or v == []:
+                return default
+            return v
+
+        def yesno(key):
+            return "Sí" if s.get(key) else "No"
+
+        # quiere_cotizacion es tri-estado: None (sin preguntar) / True / False
+        qc = s.get("quiere_cotizacion")
+        qc_str = "—" if qc is None else ("Sí" if qc else "No")
+
+        detalles = s.get("detalles_maquinaria") or {}
+        detalles_str = ", ".join(f"{k}={v}" for k, v in detalles.items()) if detalles else "—"
+
+        recomendadas = s.get("maquinas_recomendadas") or []
+        recomendadas_str = ", ".join(recomendadas) if recomendadas else "—"
+
+        return f"""📊 ESTADO DE LA CONVERSACIÓN
+━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 Usuario: {self.current_user_id or '—'}
+🔄 Modo: {val('conversation_mode')}  |  ✅ Completada: {yesno('completed')}  |  📨 Cotización enviada: {yesno('cotizacion_enviada')}
+
+👤 LEAD
+   • Nombre: {val('nombre')}
+   • Apellido: {val('apellido')}
+   • Correo: {val('correo')}
+   • Teléfono: {val('telefono')}
+   • Estado (ubicación): {val('lugar_requerimiento')}
+
+🏢 EMPRESA
+   • Tipo de cliente: {val('tipo_cliente')}
+   • Nombre empresa: {val('nombre_empresa')}
+   • Giro: {val('giro_empresa')}
+   • Constancia fiscal: {val('constancia_fiscal_entregada')}
+
+🔧 MAQUINARIA / COTIZACIÓN
+   • Tipo de ayuda: {val('tipo_ayuda')}
+   • Tipo de maquinaria: {val('tipo_maquinaria')}
+   • Detalles: {detalles_str}
+   • Quiere cotización: {qc_str}
+   • Recomendadas: {recomendadas_str}
+   • Seleccionada: {val('maquina_seleccionada')}
+
+💬 Mensajes: {len(s.get('messages', []))}"""
+
     def get_lead_data_json(self) -> str:
         """Obtiene los datos del lead en formato JSON"""
         return json.dumps(get_current_state_str(self.state), indent=2, ensure_ascii=False)

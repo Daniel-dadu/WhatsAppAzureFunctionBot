@@ -27,3 +27,6 @@ test_pdf_service.py
 
 # Directories (without trailing slash to ensure VS Code ignores them properly)
 test_results
+
+# Flujo de conversación
+flujo_conversacion.puml

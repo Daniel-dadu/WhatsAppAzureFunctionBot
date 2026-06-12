@@ -22,7 +22,29 @@ class MachineryFieldSchema(BaseModel):
 class MachineryTypeSchema(BaseModel):
     type_id: str
     name: str
+    display_name: Optional[str] = None  # Nombre amigable (plural) para mostrar al usuario
     fields: List[MachineryFieldSchema]
+
+# ============================================================================
+# NOMBRES AMIGABLES (PLURAL) PARA MOSTRAR AL USUARIO
+# Respaldo en código por si el config (Cosmos) aún no trae 'display_name'.
+# Es la fuente de verdad para responder "¿qué máquinas manejan?".
+# ============================================================================
+
+TYPE_DISPLAY_NAMES: Dict[str, str] = {
+    "soldadora": "soldadoras",
+    "compresor": "compresores",
+    "rompedor": "rompedores (martillos neumáticos)",
+    "motobomba": "motobombas",
+    "apisonador": "apisonadores",
+    "generador": "generadores",
+    "cortadora_varillas": "cortadoras de varilla",
+    "dobladora_varillas": "dobladoras de varilla",
+    "torre_iluminacion": "torres de iluminación",
+    "montacargas": "montacargas",
+    "plataforma": "plataformas de elevación",
+    "manipulador": "manipuladores telescópicos",
+}
 
 # ============================================================================
 # SERVICIO DE CONFIGURACIÓN
@@ -87,6 +109,24 @@ class MachineryConfigService:
     def get_all_types(self) -> List[MachineryTypeSchema]:
         """Obtiene todas las configuraciones de tipos de maquinaria"""
         return list(self._configs.values())
+
+    def get_type_display_name(self, type_id: str) -> str:
+        """
+        Nombre amigable (plural) de un tipo para mostrar al usuario.
+        Prioridad: display_name del config (Cosmos) → mapa de respaldo → name → type_id.
+        """
+        config = self._configs.get(type_id)
+        if config and getattr(config, "display_name", None):
+            return config.display_name
+        if type_id in TYPE_DISPLAY_NAMES:
+            return TYPE_DISPLAY_NAMES[type_id]
+        if config and config.name:
+            return config.name
+        return type_id
+
+    def get_type_display_list(self) -> List[str]:
+        """Lista de nombres amigables de TODOS los tipos manejados (en el orden del config)."""
+        return [self.get_type_display_name(t.type_id) for t in self.get_all_types()]
 
     def get_required_fields(self, type_id: str) -> List[str]:
         """Obtiene una lista de los nombres de campos obligatorios para un tipo de maquinaria"""

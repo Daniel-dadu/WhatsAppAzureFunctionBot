@@ -363,6 +363,7 @@ class CosmosDBStateStore(ConversationStateStore):
             "correo": state.get("correo"),
             "telefono": state.get("telefono"),
             "completed": state.get("completed", False),
+            "cotizacion_enviada": state.get("cotizacion_enviada", False),
             "lugar_requerimiento": state.get("lugar_requerimiento"),
             "conversation_mode": cosmos_doc.get("conversation_mode", "bot"),
             "asignado_asesor": cosmos_doc.get("asignado_asesor"),
@@ -397,8 +398,9 @@ class CosmosDBStateStore(ConversationStateStore):
         fields_to_check = [
             "nombre", "apellido", "tipo_ayuda", "tipo_maquinaria", "detalles_maquinaria",
             "maquina_seleccionada", "maquinas_recomendadas", "tipo_cliente", "nombre_empresa", 
-            "giro_empresa", "correo", "telefono", "completed", 
-            "lugar_requerimiento", "asignado_asesor", "quiere_cotizacion"
+            "giro_empresa", "correo", "telefono", "completed", "cotizacion_enviada",
+            "lugar_requerimiento", "asignado_asesor", "quiere_cotizacion",
+            "constancia_fiscal_entregada"
         ]
         
         for field in fields_to_check:

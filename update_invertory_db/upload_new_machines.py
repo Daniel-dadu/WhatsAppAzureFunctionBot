@@ -17,7 +17,12 @@ logger = logging.getLogger(__name__)
 
 # Las nuevas máquinas a agregar
 nuevas_maquinas = [
-    {"modelo": "LGMG S3246E II", "categoria": "plataforma", "tipo_plataforma": "tijera", "altura_trabajo_m": 12, "altura_plataforma_m": 10, "tipo_alimentacion": "electrica"}
+    {"modelo": "Noblelift FE4P25Q", "categoria": "montacargas", "tipo_combustible": "Eléctrico", "capacidad_toneladas": 2.5},
+]
+
+# Máquinas a eliminar (modelo antiguo reemplazado)
+maquinas_a_eliminar = [
+    {"id": "montacargas_nobleliftcpyd25", "categoria": "montacargas"},
 ]
 
 def load_local_settings():
@@ -43,7 +48,19 @@ def main():
         container = database.get_container_client("machinery_inventory")
 
         logger.info(f"Conectado a base de datos: {db_name}")
-        logger.info(f"Intentando subir {len(nuevas_maquinas)} nuevas máquinas...\n")
+
+        # Paso 1: Eliminar máquinas obsoletas
+        eliminadas = 0
+        for item in maquinas_a_eliminar:
+            try:
+                container.delete_item(item=item["id"], partition_key=item["categoria"])
+                logger.info(f"🗑️  ELIMINADA: {item['id']}")
+                eliminadas += 1
+            except exceptions.CosmosResourceNotFoundError:
+                logger.warning(f"⚠️  NO ENCONTRADA (ya no existe): {item['id']}")
+
+        # Paso 2: Agregar nuevas máquinas
+        logger.info(f"\nIntentando subir {len(nuevas_maquinas)} nuevas máquinas...\n")
 
         agregadas = 0
         omitidas = 0
@@ -66,9 +83,9 @@ def main():
                 agregadas += 1
 
         logger.info(f"\n--- Resumen ---")
+        logger.info(f"Máquinas eliminadas: {eliminadas}")
         logger.info(f"Máquinas agregadas: {agregadas}")
         logger.info(f"Máquinas omitidas (ya existían): {omitidas}")
-        logger.info(f"Total procesadas: {agregadas + omitidas}")
 
     except Exception as e:
         logger.error(f"Error: {e}")

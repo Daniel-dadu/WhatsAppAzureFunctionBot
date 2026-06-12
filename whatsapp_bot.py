@@ -410,24 +410,7 @@ class WhatsAppBot:
         """Obtiene el estado actual de la conversación del usuario."""
         try:
             self.chatbot.load_conversation(wa_id)
-            state = self.chatbot.state
-            return f"""📊 ESTADO DE CONVERSACIÓN:
-        🤖 API: LangChain (IntelligentLeadQualificationChatbot)
-        👤 Usuario: {wa_id}
-        ✅ Completada: {'Sí' if state.get('completed', False) else 'No'}
-        📝 Nombre: {state.get('nombre', 'No especificado')}
-        👤 Apellido: {state.get('apellido', 'No especificado')}
-        🔧 Tipo maquinaria: {state.get('tipo_maquinaria', 'No especificado')}
-        🔍 Detalles maquinaria: {state.get('detalles_maquinaria', 'No especificado')}
-        💼 Nombre empresa: {state.get('nombre_empresa', 'No especificado')}
-        💼 Giro empresa: {state.get('giro_empresa', 'No especificado')}
-        💼 Tipo de uso: {state.get('tipo_cliente', 'No especificado')}
-        📧 Correo: {state.get('correo', 'No especificado')}
-        📱 Teléfono: {state.get('telefono', 'No especificado')}
-        📍 Lugar requerimiento: {state.get('lugar_requerimiento', 'No especificado')}
-        💬 Total mensajes: {len(state.get('messages', []))}
-        👤 Conversación mode: {state.get('conversation_mode', 'No especificado')}
-        """
+            return self.chatbot.get_status_message()
         except Exception as e:
             logging.error(f"Error obteniendo estado de conversación: {e}")
             return f"❌ Error obteniendo estado: {str(e)}"

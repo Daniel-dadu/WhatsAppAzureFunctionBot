@@ -46,7 +46,7 @@ machinery_configurations = [
         ]
     },
     {
-        "type_id": "rompedor", # tambi'en se llaman martillo
+        "type_id": "rompedor", # AKA Martillo
         "name": "Rompedor",
         "fields": []
     },
@@ -87,26 +87,18 @@ machinery_configurations = [
     {
         "type_id": "torre_iluminacion",
         "name": "Torre de Iluminación",
-        "fields": [
-            { # TODO: no hacer esta pregunta
-                "name": "tipo_reflector", # Changed from boolean es_led to selection vs inventory field
-                "question": "¿qué tipo de iluminación prefiere (ej. LED)?",
-                "reason": "Para determinar el tipo de iluminación necesario",
-                "type": "selection",
-                "comparison_operator": "contains"
-            }
-        ]
+        "fields": []
     },
     {
         "type_id": "montacargas",
         "name": "Montacargas",
         "fields": [
             {
-                "name": "capacidad_carga_kg",
-                "question": "¿qué peso requiere levantar?",
+                "name": "capacidad_toneladas",
+                "question": "¿qué peso requiere levantar en toneladas?",
                 "reason": "Para determinar la capacidad necesaria",
                 "type": "number",
-                "unit": "kg",
+                "unit": "toneladas",
                 "comparison_operator": "gte"
             }
         ]
@@ -145,11 +137,11 @@ machinery_configurations = [
         "name": "Manipulador Telescópico",
         "fields": [
             {
-                "name": "capacidad_carga_kg",
-                "question": "¿qué peso requiere mover?",
+                "name": "capacidad_toneladas",
+                "question": "¿qué peso requiere mover en toneladas?",
                 "reason": "Para determinar la capacidad necesaria",
                 "type": "number",
-                "unit": "kg",
+                "unit": "toneladas",
                 "comparison_operator": "gte"
             }
         ]
