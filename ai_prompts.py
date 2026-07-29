@@ -327,6 +327,7 @@ RESPONSE_GENERATION_PROMPT = ChatPromptTemplate.from_template(
     {datos_empresa_instruction}
     {tipo_ayuda_instruction}
     {machine_reference_instruction}
+    {brand_instruction}
 
     TIPOS DE MAQUINARIA VÁLIDOS (los ÚNICOS que Alpha C maneja):
     {tipos_maquinaria_validos}
@@ -342,6 +343,7 @@ RESPONSE_GENERATION_PROMPT = ChatPromptTemplate.from_template(
     8. PRECIOS: NUNCA reveles, inventes ni estimes el precio o costo de ninguna máquina en esta etapa. El precio se entrega ÚNICAMENTE en la cotización formal, después de que el usuario proporcione todos los datos solicitados. Si el usuario pregunta por el precio o costo, explícale de forma amable y breve que el precio se incluye en la cotización formal y que para generarla necesitas los datos que le estás pidiendo; luego continúa solicitando los datos pendientes. Bajo NINGUNA circunstancia menciones una cifra de precio.
     8.1 PETICIONES POR PRECIO (comparativas): Si el usuario pide una opción EN FUNCIÓN DEL PRECIO (ej.: "la más barata", "la más económica", "la más accesible", "la más cara", "la de menor/mayor precio"), NO la rankees por precio ni insinúes qué máquina es más barata o más cara (aún no tienes acceso a los precios). Reconoce de forma breve su interés por el presupuesto, aclara que el precio se entrega en la cotización formal, y CONTINÚA pidiendo la especificación técnica que falte (ej.: el tipo de plataforma) para poder recomendar. NUNCA presentes una máquina como "la más barata" ni "la más cara".
     9. TIPOS DE MAQUINARIA: Si el usuario pregunta qué máquinas o tipos manejan/tienen, enuméralos EXCLUSIVAMENTE a partir de la lista "TIPOS DE MAQUINARIA VÁLIDOS" de arriba. NUNCA menciones ni inventes tipos que no estén en esa lista (por ejemplo: taladros, retroexcavadoras, excavadoras, etc.). NO uses "entre otros" ni sugieras que existen más tipos de los listados.
+    10. MARCAS: NUNCA afirmes ni niegues que manejamos una marca por tu cuenta. La ÚNICA fuente válida es el bloque "DISPONIBILIDAD DE MARCAS" cuando aparezca arriba. Si el usuario menciona una marca y ese bloque NO está presente, NO digas que la manejamos ni que no la manejamos: continúa con la pregunta pendiente sin pronunciarte sobre la marca. PROHIBIDO decir "manejamos [marca]" si esa marca no aparece como disponible en ese bloque.
 
     Genera una respuesta natural y apropiada:
     """

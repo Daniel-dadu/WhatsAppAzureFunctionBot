@@ -1410,6 +1410,6 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
 
 if __name__ == "__main__":
     chatbot_instance = setup_chatbot()
-    define_test_flows(chatbot_instance)
-    # test_manually(chatbot_instance) # modo interactivo; descomentar solo para pruebas manuales
+    # define_test_flows(chatbot_instance)
+    test_manually(chatbot_instance) # modo interactivo; descomentar solo para pruebas manuales
     print("\n🎉 Todas las pruebas han finalizado.")
