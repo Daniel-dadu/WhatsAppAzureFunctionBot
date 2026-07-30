@@ -27,6 +27,7 @@ from brand_reference import (
     DISPONIBLE_EN_TIPO,
     NO_DISPONIBLE,
     build_brand_disclaimer,
+    build_brand_facts,
     detect_brand_mentions,
     evaluate_brand_names,
     evaluate_brands,
@@ -113,6 +114,54 @@ def test_no_detecta_falsos_positivos(mensaje):
 def test_apellido_ambiguo_si_cuenta_con_contexto_de_maquinaria():
     """'Miller' solo es marca si el mensaje habla de equipo."""
     assert detect_brand_mentions("tienen soldadoras Miller?") == ["Miller"]
+
+
+@pytest.mark.parametrize("mensaje, esperadas", [
+    # De 5.json: "marca Atlas Copco" daba tres marcas (Atlas Copco, Atlas, Copco)
+    ("el martillo es marca Atlas Copco modelo TEX12PE", ["Atlas Copco"]),
+    ("marca Ingersoll Rand", ["Ingersoll Rand"]),
+])
+def test_marca_de_dos_palabras_no_se_desdobla(mensaje, esperadas):
+    assert [ev.marca for ev in evaluate_brands(mensaje)] == esperadas
+
+
+# ============================================================================
+# TYPOS DE NUESTRAS PROPIAS MARCAS
+# ============================================================================
+
+def test_roku_se_resuelve_a_toku():
+    """
+    De 5.json: el lead pidió un "martillo neumático marca Roku" y el bot le dijo
+    que no la manejamos. Toku es nuestra única marca de rompedores.
+    """
+    ev = evaluate_brands("Ustedes tienen este Martillo neumático marca Roku??", "rompedor")[0]
+    assert ev.texto == "Roku"
+    assert ev.marca == "Toku"
+    assert ev.es_correccion is True
+    assert ev.estatus == DISPONIBLE_EN_TIPO
+
+
+def test_la_correccion_se_propone_no_se_da_por_hecha():
+    facts = build_brand_facts(evaluate_brands("marca Roku", "rompedor"))
+    assert "Casi seguro quiso decir Toku" in facts
+    assert "Pregúntale con naturalidad" in facts
+    assert 'NUNCA afirmes que manejamos la marca "Roku"' in facts
+
+
+@pytest.mark.parametrize("mensaje", [
+    "tienen Makita?",        # marca externa real: no es un typo de nada nuestro
+    "marca Zoomlion",        # marca desconocida pero legítima
+    "¿manejan Bosch?",
+])
+def test_no_corrige_marcas_que_si_existen(mensaje):
+    assert all(not ev.es_correccion for ev in evaluate_brands(mensaje, "rompedor"))
+
+
+def test_no_corrige_siglas_cortas():
+    """Con 3 letras casi todo queda a distancia 1: sería adivinar."""
+    ev = evaluate_brands("¿manejan CAT?", "rompedor")[0]
+    assert ev.es_correccion is False
+    assert ev.estatus == NO_DISPONIBLE
 
 
 # ============================================================================
