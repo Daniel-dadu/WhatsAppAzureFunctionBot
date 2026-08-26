@@ -200,7 +200,7 @@ def test_no_sobrescribe_tipo_maquinaria_ya_conocido(chatbot):
 def test_codigo_nunca_se_guarda_como_nombre(chatbot):
     """
     Guardia contra el peor caso: que el LLM tome el código como nombre del lead
-    y quede contaminado el estado y el contacto de HubSpot.
+    y quede contaminado el estado y el lead en el CRM.
     """
     chatbot._update_state_with_extracted_info({"nombre": "PDSG900VR"})
     assert chatbot.state["nombre"] is None

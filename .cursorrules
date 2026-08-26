@@ -1,0 +1,5 @@
+Antes de trabajar en este repositorio, lee AGENTS.md — ahí están las
+reglas de comportamiento no obvias del proyecto (por ejemplo: el comando
+"reset" es solo para pruebas, nunca para leads reales; el CRM está en
+migración de HubSpot a Odoo; la integración con Odoo debe ser best-effort
+y nunca bloquear la conversación con el lead).
