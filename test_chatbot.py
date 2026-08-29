@@ -1,6 +1,8 @@
 import os
 import json
-from typing import List, Dict, Any
+import argparse
+import copy
+from typing import List, Dict, Any, Optional, Set
 import re
 from datetime import datetime
 
@@ -16,6 +18,42 @@ from check_guardrails import ContentSafetyGuardrails
 
 # Agregar después de la línea 6 (from datetime import datetime)
 import time
+
+_selected_test_numbers: Optional[Set[int]] = None
+_defined_test_numbers: Set[int] = set()
+_executed_test_numbers: Set[int] = set()
+_failed_test_numbers: Set[int] = set()
+
+
+def parse_test_selection(value: str) -> Set[int]:
+    """Convierte selecciones como ``5-15,20,22`` en números de flujo."""
+    selected: Set[int] = set()
+    for raw_part in value.split(","):
+        part = raw_part.strip()
+        if not part:
+            raise argparse.ArgumentTypeError("La selección contiene un elemento vacío.")
+
+        if "-" in part:
+            bounds = [bound.strip() for bound in part.split("-", 1)]
+            if not all(bound.isdigit() for bound in bounds):
+                raise argparse.ArgumentTypeError(f"Rango inválido: '{part}'.")
+            start, end = map(int, bounds)
+            if start < 1 or end < 1 or start > end:
+                raise argparse.ArgumentTypeError(f"Rango inválido: '{part}'.")
+            selected.update(range(start, end + 1))
+        elif part.isdigit() and int(part) > 0:
+            selected.add(int(part))
+        else:
+            raise argparse.ArgumentTypeError(f"Número de prueba inválido: '{part}'.")
+
+    return selected
+
+
+def _flow_number(test_name: str) -> int:
+    match = re.match(r"Flujo\s+(\d+):", test_name)
+    if not match:
+        raise ValueError(f"El nombre de prueba no incluye un número de flujo: {test_name}")
+    return int(match.group(1))
 
 # Agregar después de la función _sanitize_filename (línea 51)
 def _get_timestamp() -> str:
@@ -85,6 +123,10 @@ def run_conversation_test(
     expected_data: Dict[str, Any],
     expected_substrings: List[str] = None,
     forbidden_substrings: List[str] = None,
+    expected_minimum_occurrences: Dict[str, int] = None,
+    expected_maximum_occurrences: Dict[str, int] = None,
+    expected_first_response_substrings: List[str] = None,
+    initial_state: Dict[str, Any] = None,
     simulate_pdf_send: bool = False
 ):
     """
@@ -96,15 +138,26 @@ def run_conversation_test(
     - expected_substrings: subcadenas que DEBEN aparecer en alguna respuesta del bot.
     - forbidden_substrings: subcadenas que NO deben aparecer en ninguna respuesta
       (ej: "$" para confirmar que no se filtró un precio).
+        - expected_minimum_occurrences: número mínimo de respuestas del bot que deben
+            contener cada texto; permite detectar mensajes repetidos o ciclos.
+        - expected_maximum_occurrences: número máximo de respuestas del bot que pueden
+            contener cada texto; permite comprobar que un aviso no se repita.
+        - expected_first_response_substrings: textos que deben aparecer en la primera
+            respuesta del bot.
+        - initial_state: estado previo opcional para probar de forma determinista un
+            tramo específico de una conversación real.
     - simulate_pdf_send: si True, instala un callback stub de envío de PDF y un
       current_user_id temporal para que `_try_send_pdf_quotation` pueda completarse
       (en modo prueba normal no hay callback, así que siempre devolvería False).
       El estado sigue guardándose SOLO en memoria (InMemoryStateStore). Se restaura
       el estado original del chatbot al terminar.
     """
-    import os
-    if os.environ.get("RUN_ONLY") and os.environ.get("RUN_ONLY") not in test_name:
+    test_number = _flow_number(test_name)
+    _defined_test_numbers.add(test_number)
+    if _selected_test_numbers is not None and test_number not in _selected_test_numbers:
         return
+
+    _executed_test_numbers.add(test_number)
 
     # Solo informar inicio en consola
     print(f"INICIANDO PRUEBA: {test_name}")
@@ -117,6 +170,8 @@ def run_conversation_test(
 
     # Reinicia el estado del chatbot para una prueba limpia
     chatbot.reset_conversation()
+    if initial_state:
+        chatbot.state.update(copy.deepcopy(initial_state))
 
     # Opcional: simular contexto de WhatsApp para poder verificar el envío/re-envío
     # del PDF de cotización. Se restaura en el finally para no contaminar otras pruebas.
@@ -191,10 +246,45 @@ def run_conversation_test(
                 if needle.lower() in all_bot_text.lower():
                     has_errors = True
                     output_lines.append(f"❌ ERROR de mensaje: el bot NO debía decir '{needle}', pero apareció.")
+        if expected_minimum_occurrences:
+            for needle, minimum in expected_minimum_occurrences.items():
+                occurrences = sum(needle.lower() in response.lower() for response in bot_responses)
+                if occurrences < minimum:
+                    has_errors = True
+                    output_lines.append(
+                        f"❌ ERROR de repetición: '{needle}' apareció en {occurrences} respuestas; "
+                        f"se esperaban al menos {minimum}."
+                    )
+                else:
+                    output_lines.append(
+                        f"🔁 REPETICIÓN DETECTADA: '{needle}' apareció en {occurrences} respuestas."
+                    )
+        if expected_maximum_occurrences:
+            for needle, maximum in expected_maximum_occurrences.items():
+                occurrences = sum(needle.lower() in response.lower() for response in bot_responses)
+                if occurrences > maximum:
+                    has_errors = True
+                    output_lines.append(
+                        f"❌ ERROR de repetición: '{needle}' apareció en {occurrences} respuestas; "
+                        f"se permitían como máximo {maximum}."
+                    )
+                else:
+                    output_lines.append(
+                        f"✅ SIN CICLO: '{needle}' apareció en {occurrences} respuestas."
+                    )
+        if expected_first_response_substrings:
+            first_response = bot_responses[0] if bot_responses else ""
+            for needle in expected_first_response_substrings:
+                if needle.lower() not in first_response.lower():
+                    has_errors = True
+                    output_lines.append(
+                        f"❌ ERROR de presentación: la primera respuesta debía incluir '{needle}'."
+                    )
 
         if not has_errors:
             output_lines.append("✅ ¡ÉXITO! Toda la información fue extraída correctamente.")
         else:
+            _failed_test_numbers.add(test_number)
             output_lines.append("\n⚠️ PRUEBA FALLIDA. Se encontraron discrepancias.")
 
         output_lines.append(f"\n--- RESUMEN FINAL DEL ESTADO PARA '{test_name}' ---")
@@ -1233,7 +1323,8 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
 
     run_conversation_test(
         "Flujo 37: Cambio de detalle tras recomendar (re-recomendar)", chatbot, flujo_37, esperado_37,
-        expected_substrings=["EGW185MS"]
+        expected_substrings=["EGW185MS"],
+        expected_first_response_substrings=["Alphi"]
     )
 
     # ------------------------------------------------------------------------
@@ -1336,6 +1427,90 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         expected_substrings=["MP0607SE"]
     )
 
+    # ------------------------------------------------------------------------
+    # Flujo 42: Reproducción exacta de una conversación real
+    # El lead nunca proporciona el giro de su empresa. La dirección y el correo
+    # no deben terminar en giro_empresa ni permitir que el flujo se complete.
+    # ------------------------------------------------------------------------
+    flujo_42 = [
+        "me gustaria cotizar Martillo rompedor Toku TPB-90",
+        "Me presento Francisco Altamirano de Grupo Impulsor Pajeme",
+        "Toku TPB-90",
+        "no me dedico a la venta o renta, solo requiero cotizacion para ese equipo, para que se pueda adquirir para uso de trabajo constructivo",
+        "faltamirano@pajeme.mx\nRío Cuautitlán 163, San Francisco Tepojaco, 54745 Cuautitlán Izcalli, Méx",
+    ]
+
+    esperado_42 = {
+        "nombre": "Francisco Altamirano",
+        "tipo_maquinaria": "rompedor",
+        "maquina_seleccionada": "Toku TPB-90",
+        "quiere_cotizacion": True,
+        "tipo_cliente": "cliente_final",
+        "nombre_empresa": "Grupo Impulsor Pajeme",
+        "correo": "faltamirano@pajeme.mx",
+        "giro_empresa": None,
+        "completed": False,
+    }
+
+    run_conversation_test(
+        "Flujo 42: Conversación real con dirección multilínea",
+        chatbot,
+        flujo_42,
+        esperado_42,
+        expected_first_response_substrings=["Alphi"],
+    )
+
+    # ------------------------------------------------------------------------
+    # Flujo 43: Tramo final de conversación real sobre pila de montacargas
+    # Parte del estado observado justo después de que el bot informó que no había
+    # coincidencias y confirmó el handoff. Así la prueba del ciclo no depende de
+    # que el LLM vuelva a extraer igual todos los mensajes previos.
+    # ------------------------------------------------------------------------
+    flujo_43 = [
+        "hablar con un asesor",
+        "Quiero hablar con un asesor",
+    ]
+
+    detalles_43 = {"capacidad_toneladas": 5}
+    contexto_sin_coincidencias_43 = json.dumps(
+        {
+            "tipo_maquinaria": "montacargas",
+            "detalles_maquinaria": detalles_43,
+        },
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    estado_inicial_43 = {
+        "nombre": "Andres Robles",
+        "apellido": "Robles",
+        "tipo_ayuda": "maquinaria",
+        "tipo_maquinaria": "montacargas",
+        "detalles_maquinaria": detalles_43,
+        "quiere_cotizacion": True,
+        "maquinas_recomendadas": [],
+        "sin_coincidencias_contexto": contexto_sin_coincidencias_43,
+        "derivacion_asesor_confirmada": True,
+        "recordatorios_derivacion_asesor": 0,
+    }
+
+    esperado_43 = {
+        "nombre": "Andres Robles",
+        "tipo_maquinaria": "montacargas",
+        "quiere_cotizacion": True,
+        "completed": False,
+    }
+
+    aviso_sin_inventario = "No manejamos una máquina en el inventario con esas características"
+    run_conversation_test(
+        "Flujo 43: Solicitud repetida de asesor sin inventario",
+        chatbot,
+        flujo_43,
+        esperado_43,
+        expected_substrings=["solicitud ya quedó registrada", "No necesitas volver a solicitarlo"],
+        expected_maximum_occurrences={aviso_sin_inventario: 0},
+        initial_state=estado_inicial_43,
+    )
+
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:
         print("🔄 Inicializando chatbot con slot-filling inteligente...")
@@ -1409,7 +1584,36 @@ def test_manually(chatbot: IntelligentLeadQualificationChatbot):
 # ============================================================================
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Ejecuta los flujos de prueba del chatbot.")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--tests",
+        type=parse_test_selection,
+        metavar="SELECCIÓN",
+        help='Flujos a ejecutar, por ejemplo: "5-15,20,22" o "4,7,14".',
+    )
+    mode.add_argument(
+        "--manual",
+        action="store_true",
+        help="Inicia una conversación interactiva en lugar de los flujos automáticos.",
+    )
+    args = parser.parse_args()
+
     chatbot_instance = setup_chatbot()
-    define_test_flows(chatbot_instance)
-    # test_manually(chatbot_instance) # modo interactivo; descomentar solo para pruebas manuales
-    print("\n🎉 Todas las pruebas han finalizado.")
+    if args.manual:
+        test_manually(chatbot_instance)
+    else:
+        _selected_test_numbers = args.tests
+        define_test_flows(chatbot_instance)
+
+        missing = (_selected_test_numbers or set()) - _defined_test_numbers
+        if missing:
+            print(f"⚠️ Flujos no definidos: {', '.join(map(str, sorted(missing)))}")
+        if not _executed_test_numbers:
+            parser.error("La selección no contiene ningún flujo definido.")
+
+        print(f"Flujos ejecutados: {', '.join(map(str, sorted(_executed_test_numbers)))}")
+        if _failed_test_numbers:
+            print(f"Flujos fallidos: {', '.join(map(str, sorted(_failed_test_numbers)))}")
+            raise SystemExit(1)
+        print("\n🎉 Todas las pruebas seleccionadas han finalizado correctamente.")

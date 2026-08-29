@@ -217,6 +217,26 @@ def test_codigo_nunca_se_guarda_como_giro(chatbot):
     assert chatbot.state["giro_empresa"] == "construcción"
 
 
+@pytest.mark.parametrize("giro_invalido", [
+    "compras@empresa.com",
+    "compras@empresa.com\nAv. Reforma 123, CDMX",
+    "https://empresa.com",
+])
+def test_datos_de_contacto_nunca_se_guardan_como_giro(chatbot, giro_invalido):
+    chatbot._update_state_with_extracted_info({"giro_empresa": giro_invalido})
+    assert chatbot.state["giro_empresa"] is None
+
+
+def test_descripcion_de_maquina_se_normaliza_a_modelo_recomendado(chatbot):
+    chatbot.state["maquinas_recomendadas"] = ["Toku TCB-300", "Toku TPB-90"]
+
+    chatbot._update_state_with_extracted_info({
+        "maquina_seleccionada": "Martillo rompedor Toku TPB-90"
+    })
+
+    assert chatbot.state["maquina_seleccionada"] == "Toku TPB-90"
+
+
 def test_giro_inferido_por_contexto_ignora_codigos(chatbot):
     """
     El fallback que toma el mensaje completo como giro (cuando el bot preguntó por
