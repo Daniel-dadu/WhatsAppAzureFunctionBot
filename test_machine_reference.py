@@ -21,6 +21,7 @@ from ai_langchain import (
     IntelligentResponseGenerator,
 )
 from machine_reference import detect_machine_reference, looks_like_machine_code
+from inventory_service import InventoryService
 
 
 # ============================================================================
@@ -84,6 +85,48 @@ def test_referencia_incluye_modelo_canonico():
     ref = detect_machine_reference("quiero cotizar la S4046E II")
     assert ref.modelo == "LGMG S4046E II"
     assert ref.confianza == "exacta"
+
+
+class _FakeCosmosContainer:
+    def __init__(self, items=None, error=None):
+        self.items = items or []
+        self.error = error
+
+    def query_items(self, **kwargs):
+        if self.error:
+            raise self.error
+        return self.items
+
+
+def test_lookup_modelo_exacto_consulta_cosmos():
+    service = InventoryService()
+    service.container = _FakeCosmosContainer([
+        {"modelo": "LGMG A14JE", "categoria": "plataforma"}
+    ])
+
+    result = service.lookup_exact_model("LGMG A14JE")
+
+    assert result.status == "found"
+    assert result.model == "LGMG A14JE"
+    assert result.category == "plataforma"
+
+
+def test_lookup_modelo_ausente_no_usa_fallback_local():
+    service = InventoryService()
+    service.container = _FakeCosmosContainer([])
+
+    result = service.lookup_exact_model("LGMG A14JE")
+
+    assert result.status == "not_found"
+
+
+def test_lookup_modelo_no_afirma_ausencia_si_cosmos_falla():
+    service = InventoryService()
+    service.container = _FakeCosmosContainer(error=RuntimeError("Cosmos no disponible"))
+
+    result = service.lookup_exact_model("LGMG A14JE")
+
+    assert result.status == "unavailable"
 
 
 def test_familia_no_inventa_modelo():
@@ -195,6 +238,51 @@ def test_no_sobrescribe_tipo_maquinaria_ya_conocido(chatbot):
     extracted = {}
     chatbot._detect_and_merge_machine_reference("PDSG900VR", extracted)
     assert "tipo_maquinaria" not in extracted
+
+
+def test_modelo_confirmado_en_cosmos_salta_a_datos_empresa(chatbot):
+    chatbot.response_generator.inventory_service.container = _FakeCosmosContainer([
+        {"modelo": "LGMG A14JE", "categoria": "plataforma"}
+    ])
+    chatbot.state.update({"nombre": "Arturo Ramirez", "apellido": "Ramirez"})
+    extracted = {}
+
+    chatbot._machine_ref = chatbot._detect_and_merge_machine_reference("LGMG A14JE", extracted)
+    chatbot._update_state_with_extracted_info(extracted)
+    chatbot._apply_model_lookup_to_state()
+    next_question = chatbot.slot_filler.get_next_question(chatbot.state)
+
+    assert chatbot.state["tipo_maquinaria"] == "plataforma"
+    assert chatbot.state["maquina_seleccionada"] == "LGMG A14JE"
+    assert chatbot.state["quiere_cotizacion"] is True
+    assert chatbot.state["modelo_verificado_inventario"] is True
+    assert next_question["question_type"] == "datos_empresa"
+
+
+def test_modelo_ausente_en_cosmos_continua_preguntas(chatbot):
+    chatbot.response_generator.inventory_service.container = _FakeCosmosContainer([])
+    chatbot.state.update({
+        "nombre": "Arturo Ramirez",
+        "apellido": "Ramirez",
+        "tipo_ayuda": "maquinaria",
+        "tipo_maquinaria": "plataforma",
+    })
+    extracted = {}
+
+    chatbot._machine_ref = chatbot._detect_and_merge_machine_reference("LGMG A14JE", extracted)
+    chatbot._update_state_with_extracted_info(extracted)
+    chatbot._apply_model_lookup_to_state()
+    next_question = chatbot.slot_filler.get_next_question(chatbot.state)
+    instruction = chatbot.response_generator._build_machine_reference_instruction(
+        chatbot._machine_ref,
+        next_question["question"],
+        next_question["question_type"],
+    )
+
+    assert chatbot.state["maquina_seleccionada"] is None
+    assert chatbot.state["modelo_verificado_inventario"] is False
+    assert next_question["question_type"] == "detalles_maquinaria"
+    assert "NO aparece en el inventario real" in instruction
 
 
 def test_codigo_nunca_se_guarda_como_nombre(chatbot):

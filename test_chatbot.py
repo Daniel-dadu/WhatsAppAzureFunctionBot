@@ -1511,6 +1511,64 @@ def define_test_flows(chatbot: IntelligentLeadQualificationChatbot):
         initial_state=estado_inicial_43,
     )
 
+    # ------------------------------------------------------------------------
+    # Flujo 44: Modelo exacto ausente en Cosmos
+    # Debe negar el modelo explícitamente y continuar calificando para ofrecer
+    # otras plataformas, sin guardar el modelo como seleccionado.
+    # ------------------------------------------------------------------------
+    run_conversation_test(
+        "Flujo 44: Modelo exacto ausente en Cosmos",
+        chatbot,
+        ["LGMG A14JE"],
+        {
+            "nombre": "Arturo Ramirez",
+            "tipo_maquinaria": "plataforma",
+            "maquina_seleccionada": None,
+            "modelo_verificado_inventario": False,
+            "completed": False,
+        },
+        expected_substrings=[
+            "No contamos con el modelo LGMG A14JE",
+            "otras máquinas",
+            "tipo de plataforma",
+        ],
+        initial_state={
+            "nombre": "Arturo Ramirez",
+            "apellido": "Ramirez",
+            "tipo_ayuda": "maquinaria",
+            "tipo_maquinaria": "plataforma",
+        },
+    )
+
+    # ------------------------------------------------------------------------
+    # Flujo 45: Modelo exacto encontrado en Cosmos
+    # Debe seleccionar el modelo y saltar detalles técnicos para ir directamente
+    # a la recopilación de datos de empresa para la cotización.
+    # ------------------------------------------------------------------------
+    run_conversation_test(
+        "Flujo 45: Modelo exacto encontrado en Cosmos",
+        chatbot,
+        ["LGMG AR52J"],
+        {
+            "nombre": "Arturo Ramirez",
+            "tipo_maquinaria": "plataforma",
+            "maquina_seleccionada": "LGMG AR52J",
+            "quiere_cotizacion": True,
+            "modelo_verificado_inventario": True,
+            "completed": False,
+        },
+        expected_substrings=[
+            "Sí contamos con el modelo LGMG AR52J",
+            "¿Te dedicas a la venta o renta",
+            "Correo electrónico",
+        ],
+        forbidden_substrings=["tipo de plataforma", "altura de trabajo"],
+        initial_state={
+            "nombre": "Arturo Ramirez",
+            "apellido": "Ramirez",
+        },
+    )
+
 def test_manually(chatbot: IntelligentLeadQualificationChatbot):
     try:
         print("🔄 Inicializando chatbot con slot-filling inteligente...")
